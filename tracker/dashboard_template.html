@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3514 Weekly Activity</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e2dd;
+  --grid: #ecebe7;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #77766f;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --ord-1: #86b6ef; --ord-2: #3987e5; --ord-3: #1c5cab; --ord-4: #0d366b;
+  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+  --chip-bg: #f0efec;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --bg: #111110; --surface-1: #1a1a19; --border: #2e2e2b; --grid: #262624;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #94938a;
+    --series-1: #3987e5; --series-2: #d95926;
+    --ord-1: #184f95; --ord-2: #2a78d6; --ord-3: #5598e7; --ord-4: #9ec5f4;
+    --chip-bg: #2a2a27;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111110; --surface-1: #1a1a19; --border: #2e2e2b; --grid: #262624;
+  --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #94938a;
+  --series-1: #3987e5; --series-2: #d95926;
+  --ord-1: #184f95; --ord-2: #2a78d6; --ord-3: #5598e7; --ord-4: #9ec5f4;
+  --chip-bg: #2a2a27;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text-primary);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif; }
+main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+h1 { font-size: 22px; margin: 0; }
+h2 { font-size: 16px; margin: 0 0 4px; }
+.sub { color: var(--text-secondary); font-size: 13px; }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-top: 16px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+select, input { font: inherit; color: var(--text-primary); background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; min-height: 34px; }
+input[type=search] { flex: 1 1 200px; min-width: 0; }
+button.theme { font: inherit; background: none; border: 1px solid var(--border); color: var(--text-secondary);
+  border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 16px; }
+.tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.tile .v { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.tile .l { color: var(--text-secondary); font-size: 12px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.grid2 .card { margin-top: 0; }
+.charts-row { margin-top: 16px; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+svg text { fill: var(--text-muted); font-size: 11px; font-family: inherit; }
+svg .lbl { fill: var(--text-secondary); font-size: 12px; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 6px 0 2px; font-size: 12px; color: var(--text-secondary); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -2px; }
+.legend i.line { height: 2px; border-radius: 1px; vertical-align: 3px; }
+.legend i.dash { height: 0; border-top: 2px dashed var(--text-muted); background: none !important; vertical-align: 3px; }
+#tip { position: fixed; pointer-events: none; z-index: 10; background: var(--surface-1); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.15); display: none; max-width: 240px; }
+#tip b { display: block; margin-bottom: 2px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px;
+  background: var(--chip-bg); font-size: 12px; color: var(--text-primary); white-space: nowrap; }
+.chip .dot { width: 8px; height: 8px; border-radius: 50%; }
+.player-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 8px; }
+.player-head .name { font-size: 18px; font-weight: 650; }
+.muted { color: var(--text-muted); }
+.table-wrap { overflow-x: auto; margin-top: 8px; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { font-size: 12px; color: var(--text-secondary); font-weight: 600; cursor: pointer; user-select: none; }
+th.num, td.num { text-align: right; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--chip-bg); }
+.below { color: var(--critical); font-weight: 600; }
+.below::after { content: " ▼"; font-size: 10px; }
+.empty { color: var(--text-muted); padding: 24px 0; text-align: center; }
+footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Kingdom 3514 · Weekly Activity</h1>
+      <div class="sub" id="subtitle"></div>
+    </div>
+    <button class="theme" id="themeBtn" type="button">Theme</button>
+  </header>
+
+  <div class="controls">
+    <label class="sub" for="weekSel">Week</label>
+    <select id="weekSel"></select>
+  </div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="grid2 charts-row">
+    <div class="card">
+      <h2>Main accounts meeting the minimum</h2>
+      <div class="sub">Share of main accounts in the alliance ranking, per week</div>
+      <div class="legend"><span><i class="line" style="background:var(--series-1)"></i>Forts</span><span><i class="line" style="background:var(--series-2)"></i>Tech</span></div>
+      <div id="passChart"></div>
+    </div>
+    <div class="card">
+      <h2>Fort offenses per week</h2>
+      <div class="sub">Main accounts below the fort minimum, by offense number</div>
+      <div class="legend" id="offLegend"></div>
+      <div id="offChart"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Player</h2>
+    <div class="controls">
+      <input type="search" id="playerSearch" list="playerList" placeholder="Search a player…" autocomplete="off">
+      <datalist id="playerList"></datalist>
+    </div>
+    <div id="playerView"><div class="empty">Pick a player above or click a row in the table.</div></div>
+  </div>
+
+  <div class="card">
+    <h2>All players</h2>
+    <div class="controls">
+      <input type="search" id="tableSearch" placeholder="Filter by name…" autocomplete="off">
+      <select id="typeSel">
+        <option value="main">Main accounts</option>
+        <option value="farm">Farms</option>
+        <option value="all">All</option>
+      </select>
+      <select id="offSel">
+        <option value="all">Any status</option>
+        <option value="fail">Below fort minimum</option>
+        <option value="tech">Below tech minimum</option>
+        <option value="2">Fined (2nd offense +)</option>
+      </select>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th data-k="n">Player</th><th data-k="t">Type</th>
+        <th class="num" data-k="f">Forts</th><th class="num" data-k="x">Tech</th>
+        <th data-k="o">Status</th><th class="num" data-k="d">Fine owed</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table></div>
+    <div class="sub" id="tableCount"></div>
+  </div>
+
+  <footer id="footer"></footer>
+</main>
+<div id="tip"></div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const $ = id => document.getElementById(id);
+const fmt = n => n == null ? '–' : n.toLocaleString('en-US');
+const gold = n => !n ? '–' : n >= 1e9 ? (n / 1e9).toFixed(n % 1e9 ? 2 : 0) + 'B' : (n / 1e6).toLocaleString('en-US', {maximumFractionDigits: 1}) + 'M';
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function weekLabel(wk) {
+  const s = new Date(wk + 'T00:00:00Z'), e = new Date(s.getTime() + 6 * 864e5);
+  return s.getUTCMonth() === e.getUTCMonth()
+    ? `${s.getUTCDate()}–${e.getUTCDate()} ${MON[s.getUTCMonth()]}`
+    : `${s.getUTCDate()} ${MON[s.getUTCMonth()]}–${e.getUTCDate()} ${MON[e.getUTCMonth()]}`;
+}
+const OFF = [
+  {label: 'OK', color: 'var(--good)', icon: '✓'},
+  {label: '1st offense', color: 'var(--warning)', icon: '!'},
+  {label: '2nd offense', color: 'var(--serious)', icon: '!!'},
+  {label: '3rd offense', color: 'var(--critical)', icon: '!!!'},
+  {label: 'Must migrate', color: 'var(--critical)', icon: '✕'},
+];
+function chip(o, isFarm) {
+  if (isFarm) return '<span class="chip muted">Farm · no penalty</span>';
+  const s = OFF[Math.min(o, 4)];
+  return `<span class="chip"><span class="dot" style="background:${s.color}"></span>${s.icon} ${s.label}</span>`;
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ---------- tooltip ----------
+const tip = $('tip');
+function showTip(html, ev) {
+  tip.innerHTML = html; tip.style.display = 'block';
+  const r = tip.getBoundingClientRect();
+  let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 14;
+  if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - 14;
+  tip.style.left = Math.max(8, x) + 'px'; tip.style.top = Math.max(8, y) + 'px';
+}
+const hideTip = () => { tip.style.display = 'none'; };
+
+// ---------- charts ----------
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function niceMax(v) {
+  if (v <= 0) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(v))), m = v / p;
+  return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
+}
+function frame(container, H, yMax, yFmt) {
+  container.innerHTML = '';
+  const W = Math.max(260, container.clientWidth || 520), m = {t: 12, r: 64, b: 26, l: 44};
+  const svg = el('svg', {viewBox: `0 0 ${W} ${H}`, role: 'img'}, container);
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const y = v => m.t + ih - (v / yMax) * ih;
+  for (let i = 0; i <= 4; i++) {
+    const v = yMax * i / 4, yy = y(v);
+    el('line', {x1: m.l, x2: m.l + iw, y1: yy, y2: yy, stroke: 'var(--grid)', 'stroke-width': 1}, svg);
+    el('text', {x: m.l - 6, y: yy + 4, 'text-anchor': 'end'}, svg).textContent = yFmt(v);
+  }
+  return {svg, W, H, m, iw, ih, y};
+}
+// line chart: one x per week, series [{name, color, values}], optional threshold line
+function lineChart(container, weeks, series, o = {}) {
+  const all = series.flatMap(s => s.values).filter(v => v != null).concat(o.threshold || 0);
+  const yMax = o.yMax || niceMax(Math.max(...all) * 1.1);
+  const f = frame(container, o.height || 220, yMax, o.yFmt || fmt);
+  const {svg, m, iw, ih, y} = f;
+  const step = weeks.length > 1 ? iw / (weeks.length - 1) : 0;
+  const x = i => weeks.length > 1 ? m.l + i * step : m.l + iw / 2;
+  const every = Math.max(1, Math.ceil(weeks.length * 64 / iw));
+  weeks.forEach((w, i) => {
+    if ((weeks.length - 1 - i) % every === 0) el('text', {x: x(i), y: m.t + ih + 18, 'text-anchor': 'middle'}, svg).textContent = weekLabel(w);
+  });
+  if (o.threshold != null) {
+    el('line', {x1: m.l, x2: m.l + iw, y1: y(o.threshold), y2: y(o.threshold), stroke: 'var(--text-muted)',
+      'stroke-width': 1.5, 'stroke-dasharray': '5 4'}, svg);
+    el('text', {x: m.l + iw + 6, y: y(o.threshold) + 4, class: 'lbl'}, svg).textContent = 'min ' + o.yFmtShort(o.threshold);
+  }
+  const labels = [];
+  series.forEach(s => {
+    const pts = s.values.map((v, i) => v == null ? null : [x(i), y(v)]);
+    let d = '', pen = false;
+    pts.forEach(p => { if (!p) { pen = false; return; } d += (pen ? 'L' : 'M') + p[0] + ' ' + p[1]; pen = true; });
+    el('path', {d, fill: 'none', stroke: s.color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'}, svg);
+    pts.forEach(p => p && el('circle', {cx: p[0], cy: p[1], r: 4, fill: s.color, stroke: 'var(--surface-1)', 'stroke-width': 2}, svg));
+    const li = s.values.map((v, i) => v == null ? -1 : i).filter(i => i >= 0).pop();
+    if (o.directLabels && li != null && li >= 0) labels.push({x: x(li) + 8, y: y(s.values[li]) + 4, t: s.name});
+  });
+  labels.sort((a, b) => a.y - b.y).forEach((l, i, arr) => {  // keep end labels 13px apart
+    if (i && l.y - arr[i - 1].y < 13) l.y = arr[i - 1].y + 13;
+    el('text', {x: l.x, y: l.y, class: 'lbl'}, svg).textContent = l.t;
+  });
+  // hover: crosshair + tooltip on the nearest week
+  const cross = el('line', {y1: m.t, y2: m.t + ih, stroke: 'var(--text-muted)', 'stroke-width': 1, visibility: 'hidden'}, svg);
+  const hit = el('rect', {x: m.l - 20, y: m.t, width: iw + 40, height: ih, fill: 'transparent'}, svg);
+  const pick = ev => {
+    const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * f.W / r.width;
+    return weeks.length > 1 ? Math.max(0, Math.min(weeks.length - 1, Math.round((px - m.l) / step))) : 0;
+  };
+  hit.addEventListener('pointermove', ev => {
+    const i = pick(ev);
+    cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.setAttribute('visibility', 'visible');
+    showTip(`<b>${weekLabel(weeks[i])}</b>` + series.map(s =>
+      `<span style="color:${s.color}">●</span> ${esc(s.name)}: ${s.values[i] == null ? (o.nullFor ? o.nullFor(i) : o.nullTxt || 'not in ranking') : o.tipFmt(s.values[i])}`).join('<br>'), ev);
+  });
+  hit.addEventListener('pointerleave', () => { cross.setAttribute('visibility', 'hidden'); hideTip(); });
+}
+// stacked bars: stacks [{name, color, values}] bottom to top
+function stackChart(container, weeks, stacks, o = {}) {
+  const totals = weeks.map((_, i) => stacks.reduce((a, s) => a + s.values[i], 0));
+  const yMax = Math.max(4, Math.ceil(Math.max(...totals, 1) * 1.15 / 4) * 4);
+  const f = frame(container, 220, yMax, v => Math.round(v));
+  const {svg, m, iw, ih, y} = f;
+  const band = iw / weeks.length, bw = Math.min(56, band * 0.5);
+  weeks.forEach((w, i) => {
+    const cx = m.l + band * i + band / 2;
+    el('text', {x: cx, y: m.t + ih + 18, 'text-anchor': 'middle'}, svg).textContent = weekLabel(w);
+    let base = 0;
+    const segs = stacks.map(s => ({s, v: s.values[i]})).filter(z => z.v > 0);
+    segs.forEach((z, j) => {
+      const top = j === segs.length - 1;
+      const y0 = y(base), y1 = y(base + z.v), hgt = y0 - y1 - (top ? 0 : 2);
+      const r = top ? Math.min(4, hgt) : 0;
+      const d = `M${cx - bw / 2} ${y0} V${y1 + r} Q${cx - bw / 2} ${y1} ${cx - bw / 2 + r} ${y1} H${cx + bw / 2 - r} Q${cx + bw / 2} ${y1} ${cx + bw / 2} ${y1 + r} V${y0} Z`;
+      const seg = el('path', {d, fill: z.s.color}, svg);
+      if (!top) seg.setAttribute('d', `M${cx - bw / 2} ${y0} V${y1 + 2} H${cx + bw / 2} V${y0} Z`);
+      base += z.v;
+    });
+    if (totals[i]) el('text', {x: cx, y: y(totals[i]) - 6, 'text-anchor': 'middle', class: 'lbl'}, svg).textContent = totals[i];
+    const hit = el('rect', {x: cx - band / 2, y: m.t, width: band, height: ih, fill: 'transparent'}, svg);
+    hit.addEventListener('pointermove', ev => showTip(`<b>${weekLabel(w)}</b>` +
+      stacks.map(s => `<span style="color:${s.color}">■</span> ${s.name}: ${s.values[i]}`).join('<br>') +
+      `<br>Total: ${totals[i]}` + (o.note ? o.note(i) : ''), ev));
+    hit.addEventListener('pointerleave', hideTip);
+  });
+}
+
+// ---------- state ----------
+const weeks = DATA.weeks, P = DATA.players;
+const seen = wk => P.filter(p => p.w[wk]).length;
+const maxSeen = Math.max(...weeks.map(seen));
+const partial = wk => seen(wk) < 0.9 * maxSeen;  // screenshots didn't cover the whole ranking
+let week = weeks[weeks.length - 1], sortK = 'f', sortDir = -1, current = null;
+const isFarm = p => p.t === 'farm';
+const roleTxt = p => isFarm(p) ? 'Farm' : (p.r || 'Main');
+
+function renderTiles() {
+  const rows = P.filter(p => p.w[week] && !isFarm(p)).map(p => p.w[week]);
+  const techRows = rows.filter(w => w.x != null);
+  const passF = rows.filter(w => w.f >= DATA.minF).length, passT = techRows.filter(w => w.x >= DATA.minT).length;
+  const fined = rows.filter(w => w.o >= 2);
+  const tiles = [
+    [`${passF}/${rows.length}`, `Main accounts with ${DATA.minF}+ forts`],
+    [techRows.length ? `${passT}/${techRows.length}` : '–', `Main accounts with ${fmt(DATA.minT)}+ tech` + (techRows.length < rows.length ? ` (${techRows.length} captured)` : '')],
+    [rows.filter(w => w.o === 1).length, '1st offense (forgiven)'],
+    [fined.length, 'Fined (2nd offense +)'],
+    [gold(fined.reduce((a, w) => a + w.d, 0)), 'Fines this week (gold)'],
+  ];
+  $('tiles').innerHTML = tiles.map(([v, l]) => `<div class="tile"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+}
+
+function renderOverview() {
+  const pct = (wk, key, min) => {
+    const r = P.filter(p => p.w[wk] && !isFarm(p)).map(p => p.w[wk]).filter(w => w[key] != null);
+    return !partial(wk) && r.length >= 20 ? Math.round(100 * r.filter(w => w[key] >= min).length / r.length) : null;
+  };
+  lineChart($('passChart'), weeks, [
+    {name: 'Forts', color: 'var(--series-1)', values: weeks.map(w => pct(w, 'f', DATA.minF))},
+    {name: 'Tech', color: 'var(--series-2)', values: weeks.map(w => pct(w, 'x', DATA.minT))},
+  ], {yMax: 100, yFmt: v => v + '%', tipFmt: v => v + '%', directLabels: true,
+      nullFor: i => partial(weeks[i]) ? 'partial week, not comparable' : 'not captured'});
+  const levels = [['1st', 1, 'var(--ord-1)'], ['2nd', 2, 'var(--ord-2)'], ['3rd', 3, 'var(--ord-3)'], ['4th+', 4, 'var(--ord-4)']];
+  const stacks = levels.map(([name, n, color]) => ({name, color,
+    values: weeks.map(wk => P.filter(p => p.w[wk] && !isFarm(p) && Math.min(p.w[wk].o, 4) === n).length)}));
+  $('offLegend').innerHTML = stacks.map(s => `<span><i style="background:${s.color}"></i>${s.name}</span>`).join('');
+  stackChart($('offChart'), weeks, stacks, {note: i => partial(weeks[i]) ? '<br><i>Partial week: only part of the ranking was captured</i>' : ''});
+}
+
+function renderPlayer() {
+  const p = current;
+  if (!p) return;
+  const lw = weeks.filter(w => p.w[w]).pop();
+  const now = p.w[week];
+  $('playerView').innerHTML = `
+    <div class="player-head">
+      <span class="name">${esc(p.n)}</span>
+      <span class="chip">${roleTxt(p)}</span>
+      ${chip(p.o, isFarm(p))}
+      ${!isFarm(p) && p.u ? `<span class="chip">Unpaid fines: ${gold(p.u)} gold</span>` : ''}
+    </div>
+    <div class="sub">${now ? `${weekLabel(week)}: <b>${fmt(now.f)}</b> forts · <b>${now.x == null ? 'not captured' : fmt(now.x)}</b> tech` : `Not in the ranking for ${weekLabel(week)}` + (lw ? ` (last seen ${weekLabel(lw)})` : '')}
+      ${!isFarm(p) ? ` · lifetime offenses: ${p.lt}` : ''}${p.pn && p.pn.length ? ` · previously: ${p.pn.map(esc).join(', ')}` : ''}</div>
+    <div class="grid2" style="margin-top:12px">
+      <div><h2>Forts per week</h2>
+        <div class="legend"><span><i class="line" style="background:var(--series-1)"></i>Forts</span><span><i class="dash"></i>Minimum ${DATA.minF}</span></div>
+        <div id="pForts"></div></div>
+      <div><h2>Tech donation per week</h2>
+        <div class="legend"><span><i class="line" style="background:var(--series-1)"></i>Tech points</span><span><i class="dash"></i>Minimum ${fmt(DATA.minT)}</span></div>
+        <div id="pTech"></div></div>
+    </div>`;
+  lineChart($('pForts'), weeks, [{name: 'Forts', color: 'var(--series-1)', values: weeks.map(w => p.w[w] ? p.w[w].f : null)}],
+    {threshold: DATA.minF, yFmtShort: v => v, tipFmt: v => fmt(v) + (v < DATA.minF ? ' (below minimum)' : ''), height: 200});
+  lineChart($('pTech'), weeks, [{name: 'Tech', color: 'var(--series-1)', values: weeks.map(w => p.w[w] ? p.w[w].x : null)}],
+    {threshold: DATA.minT, yFmt: v => v >= 1000 ? Math.round(v / 1000) + 'K' : v, yFmtShort: v => Math.round(v / 1000) + 'K',
+     tipFmt: v => fmt(v) + (v < DATA.minT ? ' (below minimum)' : ''), nullTxt: 'not captured', height: 200});
+}
+
+function renderTable() {
+  const q = $('tableSearch').value.trim().toLowerCase(), type = $('typeSel').value, off = $('offSel').value;
+  const rows = P.filter(p => p.w[week]).map(p => ({p, n: p.n, t: roleTxt(p), ...p.w[week]})).filter(r =>
+    (type === 'all' || r.p.t === type) && (!q || r.n.toLowerCase().includes(q)) &&
+    (off === 'all' || (off === 'fail' && r.f < DATA.minF) || (off === 'tech' && r.x != null && r.x < DATA.minT) || (off === '2' && r.o >= 2)));
+  rows.sort((a, b) => {
+    const va = a[sortK] ?? -1, vb = b[sortK] ?? -1;
+    return (typeof va === 'string' ? va.localeCompare(vb) : va - vb) * sortDir;
+  });
+  $('tbody').innerHTML = rows.map((r, i) => `<tr data-i="${P.indexOf(r.p)}">
+      <td>${esc(r.n)}</td><td>${r.t}</td>
+      <td class="num ${r.f < DATA.minF ? 'below' : ''}">${fmt(r.f)}</td>
+      <td class="num ${r.x != null && r.x < DATA.minT ? 'below' : ''}">${r.x == null ? '<span class="muted">not captured</span>' : fmt(r.x)}</td>
+      <td>${isFarm(r.p) ? '<span class="muted">Farm</span>' : chip(r.o, false)}</td>
+      <td class="num">${r.d ? gold(r.d) : '–'}</td></tr>`).join('') ||
+    '<tr><td colspan="6" class="empty">No players match.</td></tr>';
+  $('tableCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'} · ${weekLabel(week)} · ▼ = below minimum`;
+}
+
+function selectPlayer(p) {
+  current = p; $('playerSearch').value = p.n; renderPlayer();
+  history.replaceState(null, '', '#p=' + encodeURIComponent(p.n));
+}
+
+function renderAll() {
+  $('subtitle').textContent = `${weekLabel(week)} ${week.slice(0, 4)}${partial(week) ? ` · partial data (${seen(week)} of ${maxSeen} players captured)` : ''} · minimum ${DATA.minF} forts and ${fmt(DATA.minT)} tech per week`;
+  renderTiles(); renderOverview(); renderPlayer(); renderTable();
+}
+
+// ---------- wiring ----------
+$('weekSel').innerHTML = weeks.slice().reverse().map(w => `<option value="${w}">${weekLabel(w)} ${w.slice(0, 4)}${partial(w) ? ' (partial data)' : ''}</option>`).join('');
+$('weekSel').addEventListener('change', e => { week = e.target.value; renderAll(); });
+$('playerList').innerHTML = P.map(p => `<option value="${esc(p.n)}">`).join('');
+$('playerSearch').addEventListener('input', e => {
+  const v = e.target.value.trim().toLowerCase();
+  const p = P.find(p => p.n.toLowerCase() === v) || P.find(p => (p.pn || []).some(n => n.toLowerCase() === v));
+  if (p) { current = p; renderPlayer(); }
+});
+['tableSearch', 'typeSel', 'offSel'].forEach(id => $(id).addEventListener('input', renderTable));
+document.querySelectorAll('th[data-k]').forEach(th => th.addEventListener('click', () => {
+  const k = th.dataset.k;
+  sortDir = sortK === k ? -sortDir : (k === 'n' || k === 't' ? 1 : -1); sortK = k; renderTable();
+}));
+$('tbody').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-i]');
+  if (tr) { selectPlayer(P[+tr.dataset.i]); $('playerView').scrollIntoView({behavior: 'smooth', block: 'center'}); }
+});
+const root = document.documentElement;
+try { const t = localStorage.getItem('theme'); if (t) root.dataset.theme = t; } catch (e) {}
+$('themeBtn').addEventListener('click', () => {
+  const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark';
+  try { localStorage.setItem('theme', root.dataset.theme); } catch (e) {}
+});
+$('footer').textContent = `Updated ${DATA.updated}. Fort counts are per player; a fort destroyed in a rally counts for every participant. Farms, R4 and R5 are excluded from rewards; farms have no penalty.`;
+const fromHash = decodeURIComponent((location.hash.match(/p=([^&]+)/) || [])[1] || '');
+if (fromHash) current = P.find(p => p.n === fromHash) || null;
+let rt;
+addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { renderOverview(); renderPlayer(); }, 150); });
+renderAll();
+if (current) $('playerSearch').value = current.n;
+</script>
+</body>
+</html>

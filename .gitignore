@@ -1,0 +1,5 @@
+.venv/
+__pycache__/
+.DS_Store
+# published separately (public GitHub Pages repo rok-3514-dashboard)
+tracker/dashboard/

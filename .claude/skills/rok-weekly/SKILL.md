@@ -1,0 +1,82 @@
+---
+name: rok-weekly
+description: Process a week of Rise of Kingdoms 3514 alliance activity (fort destroyer + tech donation rankings from screenshots or screen recordings), update the offense tracker, and produce the weekly report, in-game mails and public dashboard. Use when the user drops a new "Activity <dates>" folder, says "process this week", marks accounts as farm/R4, records a paid fine, or changes the weekly rules.
+---
+
+# RoK 3514 weekly activity
+
+Everything lives under the project root (this repo). The tracker does the maths; your job is
+to read the rankings accurately, match names to Governor IDs, and keep `accounts.csv` correct.
+
+## Files
+
+| Path | What it is |
+|---|---|
+| `tracker/track.py` | Recomputes everything from scratch: offenses, fines, clearance, reports, mails, dashboard. Rules are constants at the top (`MIN_FORTS`, `MIN_TECH`, `REWARDS`, `BANK`, `MAIL_LIMIT`…) |
+| `tracker/accounts.csv` | One row per account: `governor_id, name, type (main/farm), role (R4/R5/blank), confirmed, previous_names`. Accounts with no ID are keyed by name |
+| `tracker/weeks/<monday>.csv` | One file per week: `governor_id, name, fort_rank, forts, tech_rank, tech` (blank = not captured) |
+| `tracker/fines_paid.csv` | `governor_id, name, week, gold_paid, note`. `week` = the Monday of the week the fine was issued |
+| `tracker/reports/<monday>.md` | Weekly report (generated) |
+| `tracker/mails/<monday>/` | In-game alliance mails, RoK rich text, each ≤ 2000 chars (generated) |
+| `tracker/status.csv`, `tracker/offense_log.csv` | Current status and full offense history (generated) |
+| `tracker/dashboard_template.html` → `tracker/dashboard/index.html` | Public dashboard (generated; `dashboard/` is its own git repo) |
+| `tracker/publish.sh` | Rebuilds and pushes the dashboard to GitHub Pages |
+| `Activity <d-d mon yyyy>/` | Raw screenshots / videos / member export the user provides each week |
+
+Never hand-edit generated files; change inputs and rerun `python3 tracker/track.py`.
+
+## Rules (current)
+
+- Minimum per week: **70 forts** and **50,000 tech**. Tech has no penalty — it is reported only.
+- Fort penalties apply to **main accounts, including R4 and R5**; farms never get penalties.
+  1st forgiven + Low Contribution label · 2nd 500K gold × missing forts · 3rd 1M gold × missing + unpaid fines · 4th must migrate (or zeroed).
+- **2 passing weeks in a row wipe all current offenses**; history stays in `offense_log.csv`; unpaid fines stay owed.
+- Rewards: top 10 by forts among main accounts, **farms, R4 and R5 excluded**. 1 Legendary Trophy + 10K VIP (+$5 Flux if ≥200 forts), 2 Epic Trophy + 5K VIP, 3 Epic Trophy, 4–8 Elite Trophy, 9–10 Advanced Trophy; every R4 gets an Advanced Trophy.
+- Fines are paid to the bank KD account **KINGDOM 3514** (the R5).
+- Fort counts are per-participant credits (every rally member gets credit). A sum of forts is **"fort credits"**, never "forts destroyed".
+
+## Farm rule
+
+A name containing "farm" or ending in `F<number>` is a farm. Everything else defaults to **main with `confirmed = no`** —
+always list new unconfirmed mains that failed the minimum and ask the user if they are farms.
+When the user says an account is a farm (or R4), set `type`/`role` and `confirmed = yes` in `accounts.csv` and rerun.
+Changing an account's type applies retroactively to every week.
+
+## Processing a week
+
+0. Python helpers need the project venv: `.venv/bin/python` (Pillow + openpyxl). If `.venv` is missing:
+   `python3 -m venv .venv && .venv/bin/pip install pillow openpyxl`.
+1. **Find the inputs** in the new `Activity …` folder: fort ranking, tech ranking (skip "Resource Assistance"),
+   and usually a member export `*_statsExport.xlsx` (Character ID, Username, Power…). The week's Monday is the file name.
+2. **Screen recordings**: for each video run
+   `.venv/bin/python .claude/skills/rok-weekly/scripts/extract_frames.py VIDEO <scratch>/fort` (or `/tech`).
+   Read every `start_*.png` first — **rank 1 is only visible in the first fraction of a second**.
+   Then read `stack_*.png` in order. Screenshots: read them directly.
+   Tell rankings apart by the title (Fort Destroyer / "Peringkat Penghancur Benteng" vs Mad Scientist).
+3. **Transcribe** into two pipe files in scratch: `rank|name|forts` and `rank|name|tech`. Copy names exactly,
+   including decorations (ᴴᴹ, メ, 么, superscripts). Case matters: `Senopati ᵀᴹ` and `SenOpati ᵀᴹ` are different players.
+4. **Check and match**:
+   `.venv/bin/python .claude/skills/rok-weekly/scripts/build_week.py MONDAY fort.txt tech.txt EXPORT.xlsx`
+   - `!!` lines are blocking (missing ranks, out-of-order values, name sets differ) — re-read those frames.
+   - `~~` close matches: verify each one by hand against the export (a wrong match moves offenses to the wrong
+     player — e.g. `KNTLkecil F4` once fuzzy-matched `KNTLkecil F3`). Put corrections in an overrides CSV
+     (`name,governor_id`, empty ID = name-only) and rerun with `--overrides`.
+   - When clean, rerun with `--write`. It writes the week file, records renames and adds new accounts.
+5. **Run** `python3 tracker/track.py`, then read `tracker/reports/<monday>.md`.
+6. **Report to the user**: renames (especially R4/R5), who left, rewards, 2nd+ offenses with fines, new 1st offenses,
+   tech below minimum, notable movers, and the list of unconfirmed mains to classify. Point to the mails folder.
+7. **Publish** the dashboard: `sh tracker/publish.sh` (ask first if unsure; it pushes to a public GitHub Pages site).
+
+## Other requests
+
+- **Fine paid**: append to `tracker/fines_paid.csv` (week = Monday of the week the fine was issued), rerun.
+- **Rule change**: edit the constants in `tracker/track.py`; the rules mail (`5_fort_rules.txt`) regenerates from them.
+- **Missing rank or wrong number** reported by the user: fix the week CSV row, rerun.
+
+## Gotchas
+
+- WhatsApp recordings are 848×392; the default crop in `extract_frames.py` fits that layout. Other devices may need `--crop`.
+- Ask for the original video or "send as document" — WhatsApp video compression can blur superscript tags.
+- A week where only part of the ranking was captured is marked partial on the dashboard automatically
+  (fewer than 90% of the usual player count). Players outside the captured ranks get no offense that week.
+- `tracker/dashboard/` is a separate git repo (public). Commits there use the GitHub noreply address, never the work email.
