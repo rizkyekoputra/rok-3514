@@ -261,9 +261,9 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
   <section data-panel="review" hidden>
     <div class="card">
       <h2>Waiting for admin approval</h2>
-      <div class="sub">Farm/main changes proposed by R4s. The admin approves them in the sheet (3514 → Approve selected account changes); every week is then recalculated.</div>
+      <div class="sub">Farm/main changes proposed by R4s. Approvers decide here (or the admin in the sheet); after an approval every week is recalculated.</div>
       <div class="table-wrap"><table>
-        <thead><tr><th>Player</th><th>Change</th><th>Proposed by</th><th>When</th></tr></thead>
+        <thead><tr><th>Player</th><th id="pendActTh" hidden></th><th>Change</th><th>Proposed by</th><th>When</th></tr></thead>
         <tbody id="pendBody"></tbody>
       </table></div>
     </div>
@@ -433,7 +433,7 @@ const maxSeen = Math.max(...weeks.map(seen));
 const partial = wk => seen(wk) < 0.9 * maxSeen;  // screenshots didn't cover the whole ranking
 let week = weeks[weeks.length - 1], sortK = 'f', sortDir = -1, current = null;
 const isFarm = p => p.t === 'farm';
-const roleTxt = p => isFarm(p) ? 'Farm' : (p.r || 'Main');
+const typeTxt = p => isFarm(p) ? 'Farm' : 'Main';  // type is only Main/Farm; R4/R5 is a role, shown separately
 const short = n => n == null ? '–' : n >= 1e9 ? (n / 1e9).toFixed(2) + 'B' : n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'K' : String(n);
 const dayLabel = d => d ? `${+d.slice(8)} ${MON[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}` : '';
 const hasWeeks = p => weeks.some(w => p.w[w]);
@@ -489,7 +489,7 @@ function renderPlayer() {
   $('playerView').innerHTML = `
     <div class="player-head">
       <span class="name">${esc(p.n)}</span>
-      <span class="chip">${roleTxt(p)}</span>
+      <span class="chip">${typeTxt(p)}</span>${p.r ? `<span class="chip">${p.r}</span>` : ''}
       ${p.c ? '' : `<span class="chip">${strong(p) ? '<span class="dot" style="background:var(--serious)"></span>Likely farm · ' : ''}not confirmed</span>`}
       ${ranked ? chip(p.o, isFarm(p)) : ''}
       ${typeNote(p)}
@@ -537,7 +537,7 @@ function renderRoster() {
   $('rosterBody').innerHTML = rows.map(p => `<tr data-i="${P.indexOf(p)}">
       <td>${esc(p.n)}</td><td>${p.a ? esc(p.a) : '<span class="muted">–</span>'}</td>
       <td class="num">${short(p.pw)}</td><td class="num">${short(p.kp)}</td>
-      <td>${roleTxt(p)}</td><td>${statusCell(p)}</td></tr>`).join('') ||
+      <td>${typeTxt(p)}</td><td>${statusCell(p)}</td></tr>`).join('') ||
     '<tr><td colspan="6" class="empty">No players match.</td></tr>';
   $('rosterCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'}` + (q && ally !== 'all' ? ' · searching all alliances' : '');
   $('rosterSub').textContent = `Every governor in the kingdom scan and member export, plus anyone seen in the alliance rankings. Click a name for details. Events are tracked for ${DATA.mainAlly} only.`;
@@ -547,12 +547,14 @@ function renderRoster() {
 function renderReview() {
   const pend = P.filter(p => typeState(p) === 'pending');
   $('pendBody').innerHTML = pend.map(p => { const c = changes[p.id].pending;
-    return `<tr data-i="${P.indexOf(p)}"><td>${esc(p.n)}</td><td>${roleTxt(p)} → <b>${c.type === p.t ? 'confirm ' + c.type : c.type}</b></td><td>${esc(c.by)}</td><td>${c.time.slice(0, 10)}</td></tr>`; }).join('') ||
-    '<tr><td colspan="4" class="empty">Nothing waiting.</td></tr>';
+    const act = approver ? `<td style="white-space:nowrap"><button class="act" data-decide="approve" data-i="${P.indexOf(p)}" type="button">Approve</button> <button class="act ghost" data-decide="reject" data-i="${P.indexOf(p)}" type="button">Reject</button></td>` : '';
+    return `<tr data-i="${P.indexOf(p)}"><td>${esc(p.n)}</td>${act}<td>${typeTxt(p)} → <b>${c.type === p.t ? 'confirm ' + c.type : c.type}</b></td><td>${esc(c.by)}</td><td>${c.time.slice(0, 10)}</td></tr>`; }).join('') ||
+    `<tr><td colspan="${approver ? 5 : 4}" class="empty">Nothing waiting.</td></tr>`;
+  $('pendActTh').hidden = !approver;
   const queue = P.filter(p => inQueue(p) && !typeState(p))
     .sort((a, b) => strong(b) - strong(a) || (b.h || []).length - (a.h || []).length || (b.pw || 0) - (a.pw || 0));
   $('queueBody').innerHTML = queue.map(p => `<tr data-i="${P.indexOf(p)}"><td>${esc(p.n)}</td><td style="white-space:nowrap">${typeButtons(p)}</td>
-      <td>${roleTxt(p)}</td><td class="num">${short(p.pw)}</td><td class="num">${short(p.kp)}</td>
+      <td>${typeTxt(p)}</td><td class="num">${short(p.pw)}</td><td class="num">${short(p.kp)}</td>
       <td style="white-space:normal;min-width:180px">${(p.h || []).map(esc).join('<br>') || '<span class="muted">–</span>'}</td></tr>`).join('') ||
     '<tr><td colspan="6" class="empty">Every account is confirmed.</td></tr>';
   $('queueCount').textContent = `${queue.length} account${queue.length === 1 ? '' : 's'} to check`;
@@ -561,7 +563,7 @@ function renderReview() {
 
 function renderTable() {
   const q = $('tableSearch').value.trim().toLowerCase(), type = $('typeSel').value, off = $('offSel').value;
-  const rows = P.filter(p => p.w[week]).map(p => ({p, n: p.n, t: roleTxt(p), ...p.w[week]})).filter(r =>
+  const rows = P.filter(p => p.w[week]).map(p => ({p, n: p.n, t: typeTxt(p), ...p.w[week]})).filter(r =>
     (type === 'all' || r.p.t === type) && (!q || r.n.toLowerCase().includes(q)) &&
     (off === 'all' || (off === 'fail' && r.f < DATA.minF) || (off === 'tech' && r.x != null && r.x < DATA.minT) || (off === '2' && r.o >= 2)));
   rows.sort((a, b) => {
@@ -580,7 +582,7 @@ function renderTable() {
 
 // ---------- fines ledger (Apps Script web app; R4s write with a personal ?key= link) ----------
 const F = DATA.fines || [];
-let ledger = null, officer = null, r4key = null;  // ledger: {fine_id: {amount, by, time}} once loaded
+let ledger = null, officer = null, approver = false, r4key = null;  // ledger: {fine_id: {amount, by, time}} once loaded
 let changes = {};  // account_id -> {type, by, decided, pending: {type, by, time}} from the ledger
 const paidOf = f => (f.h || 0) + (ledger && ledger[f.id] ? ledger[f.id].amount : 0);
 const unpaidOf = p => ledger ? F.filter(f => P[f.p] === p).reduce((a, f) => a + Math.max(0, f.a - paidOf(f)), 0) : p.u;
@@ -598,7 +600,7 @@ async function loadLedger() {
     const r = await fetch(DATA.finesUrl + (r4key ? '?key=' + encodeURIComponent(r4key) : ''),
       AbortSignal.timeout ? {signal: AbortSignal.timeout(20000)} : {});
     const j = await r.json();
-    ledger = j.paid || {}; officer = j.officer || null; changes = j.accounts || {};
+    ledger = j.paid || {}; officer = j.officer || null; approver = !!j.approver; changes = j.accounts || {};
   } catch (e) {
     $('finesSub').textContent = 'Could not load the latest payments; showing the last published totals.';
   }
@@ -610,7 +612,7 @@ function renderOfficer() {
   bar.hidden = !r4key || !ledger;
   bar.classList.toggle('bad', !officer);
   bar.innerHTML = officer
-    ? `<span>Logged in as <b>${esc(officer)}</b> (R4) · mark payments in <a href="#t=fines">Fines</a>, check accounts in <a href="#t=review">Review</a>.</span><button class="act ghost" id="logoutBtn" type="button">Leave R4 mode</button>`
+    ? `<span>Logged in as <b>${esc(officer)}</b> (R4${approver ? ', approver' : ''}) · mark payments in <a href="#t=fines">Fines</a>, check accounts in <a href="#t=review">Review</a>.</span><button class="act ghost" id="logoutBtn" type="button">Leave R4 mode</button>`
     : `<span>This R4 link is not valid or has been revoked. Ask the admin for a new one.</span><button class="act ghost" id="logoutBtn" type="button">Dismiss</button>`;
   const b = $('logoutBtn'); if (b) b.addEventListener('click', forgetKey);
   $('finesActTh').hidden = !officer;
@@ -676,6 +678,23 @@ document.addEventListener('click', async e => {
       body: JSON.stringify({key: r4key, account_id: p.id, player: p.n, action: type})});
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || 'not saved');
+    await loadLedger();
+  } catch (err) { alert('Not saved: ' + err.message + '. Try again.'); b.disabled = false; }
+});
+
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button[data-decide]');
+  if (!b || !approver) return;
+  const p = P[+b.dataset.i], c = (changes[p.id] || {}).pending, ok = b.dataset.decide === 'approve';
+  if (!c || !confirm(`${ok ? 'Approve' : 'Reject'}: ${p.n} → ${c.type === p.t ? 'confirm ' + c.type : c.type}?` +
+      (ok ? '\n\nEvery week is recalculated with the new type.' : ''))) return;
+  b.disabled = true;
+  try {
+    const r = await fetch(DATA.finesUrl, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify({key: r4key, account_id: p.id, action: b.dataset.decide})});
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'not saved');
+    if (ok) alert(`Approved. Recalculation: ${j.recalc || 'runs within the hour'}`);
     await loadLedger();
   } catch (err) { alert('Not saved: ' + err.message + '. Try again.'); b.disabled = false; }
 });

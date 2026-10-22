@@ -10,10 +10,13 @@ const RECALC = 'https://api.github.com/repos/rizkyekoputra/rok-3514/actions/work
 // Keep in sync with role=R4 in ../accounts.csv; rerun setup() after adding names (existing keys are kept).
 const R4 = ['Totos メtreme', 'Dobelメtreme', 'RockyメGirang', 'Depati Amir', 'ＡＧＡＭ', 'MʀメSENOPATI', 'JDメ', 'ツ 3D',
             'Saxaa メtreme', 'Nyyaaa', '么 QUEEN', 'xxYxx', 'メ S L A Y E R メ'];
+// Officers who may also approve/reject farm/main changes on the dashboard (besides the admin in the sheet menu).
+// Also settable per row: approver = yes in the Officers tab.
+const APPROVERS = ['ＡＧＡＭ'];
 const HEADERS = {
-  Officers: ['name', 'key', 'status', 'link'],
+  Officers: ['name', 'key', 'status', 'link', 'approver'],
   Payments: ['time', 'fine_id', 'player', 'week', 'amount', 'by', 'action'],
-  Accounts: ['time', 'account_id', 'player', 'type', 'by', 'status', 'decided'],
+  Accounts: ['time', 'account_id', 'player', 'type', 'by', 'status', 'decided', 'decided_by'],
 };
 
 const book = () => SpreadsheetApp.getActiveSpreadsheet();
@@ -68,7 +71,7 @@ function decideSelected(status) {
     for (let r = Math.max(2, rg.getRow()); r <= rg.getLastRow(); r++) {
       const [, , player, type, , st] = sh.getRange(r, 1, 1, 7).getValues()[0];
       if (st !== 'proposed') continue;
-      sh.getRange(r, 6, 1, 2).setValues([[status, new Date()]]);
+      sh.getRange(r, 6, 1, 3).setValues([[status, new Date(), 'admin']]);
       done.push(`${player} → ${type}`);
     }
   });
@@ -103,6 +106,7 @@ function setup() {
   Object.keys(HEADERS).forEach(name => {
     const sh = tab(name) || book().insertSheet(name);
     if (sh.getLastRow() === 0) sh.appendRow(HEADERS[name]).setFrozenRows(1);
+    else sh.getRange(1, 1, 1, HEADERS[name].length).setValues([HEADERS[name]]);  // adds columns introduced later
   });
   const known = rows('Officers').map(r => r[0]);
   const added = R4.filter(n => !known.includes(n));
@@ -116,10 +120,24 @@ function setup() {
   return added;
 }
 
+// {name, approver} for an active key, else null.
 function officer(key) {
   if (!key) return null;
   const row = rows('Officers').find(r => r[1] === key && r[2] === 'active');
-  return row ? row[0] : null;
+  return row ? {name: row[0], approver: row[4] === 'yes' || APPROVERS.includes(row[0])} : null;
+}
+
+// Approver on the dashboard: decide every open proposal for one account.
+function decide(accountId, status, by) {
+  const sh = tab('Accounts'), vals = sh.getDataRange().getValues();
+  let n = 0;
+  for (let r = 1; r < vals.length; r++) {
+    if (vals[r][1] === accountId && vals[r][5] === 'proposed') {
+      sh.getRange(r + 1, 6, 1, 3).setValues([[status, new Date(), by]]);
+      n++;
+    }
+  }
+  return n;
 }
 
 // account_id -> {type, by, decided} of the latest approved change, plus pending: the newest proposal after it.
@@ -141,17 +159,32 @@ function doGet(e) {
     if (action === 'undo') delete paid[fid];
     else paid[fid] = {amount: Number(amount), by, time: new Date(time).toISOString()};
   });
-  return out({paid, accounts: accountChanges(), officer: officer(e.parameter.key)});
+  const o = officer(e.parameter.key);
+  return out({paid, accounts: accountChanges(), officer: o && o.name, approver: !!(o && o.approver)});
 }
 
 // POST (text/plain JSON), either
 //   {key, fine_id, player, week, amount, action: "paid" | "undo"}   fine payment
 //   {key, account_id, player, action: "farm" | "main"}               account type proposal for the admin
+//   {key, account_id, action: "approve" | "reject"}                  approvers only
 function doPost(e) {
   let req;
   try { req = JSON.parse(e.postData.contents); } catch (err) { return out({ok: false, error: 'bad request'}); }
-  const by = officer(req.key);
-  if (!by) return out({ok: false, error: 'invalid key'});
+  const o = officer(req.key);
+  if (!o) return out({ok: false, error: 'invalid key'});
+  const by = o.name;
+  if (req.action === 'approve' || req.action === 'reject') {
+    if (!o.approver) return out({ok: false, error: 'not an approver'});
+    if (!/^[0-9a-f]{10}$/.test(req.account_id)) return out({ok: false, error: 'bad request'});
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    let n;
+    try { n = decide(req.account_id, req.action === 'approve' ? 'approved' : 'rejected', by); } finally { lock.releaseLock(); }
+    if (!n) return out({ok: false, error: 'nothing to decide'});
+    let recalc = '';
+    if (req.action === 'approve') { try { recalc = triggerRecalc(); } catch (err) { recalc = 'not started (' + err.message + ')'; } }
+    return out({ok: true, by, recalc});
+  }
   if (req.action === 'farm' || req.action === 'main') {
     if (!/^[0-9a-f]{10}$/.test(req.account_id)) return out({ok: false, error: 'bad request'});
     return locked(() => tab('Accounts').appendRow([new Date(), req.account_id, plain(req.player), req.action, by, 'proposed', '']), by);
