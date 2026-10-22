@@ -142,6 +142,7 @@ body.gating .gate { display: flex; flex-direction: column; align-items: center; 
 .kv td, .kv th { padding: 6px 8px; }
 .pct-good { color: var(--good); font-weight: 600; }
 .pct-bad { color: var(--critical); font-weight: 600; }
+.pct-mid { color: var(--serious); font-weight: 600; }
 .dlg-close { float: right; font: inherit; font-size: 16px; line-height: 1; background: none; border: 1px solid var(--border);
   color: var(--text-secondary); border-radius: 6px; padding: 6px 9px; cursor: pointer; margin: 0 0 8px 8px; }
 #playerDlg .player-head { margin-top: 0; }
@@ -480,9 +481,12 @@ const monthLabel = d => d ? `${MON[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}` : '';
 const KVK = Object.fromEntries((DATA.kvks || []).map(k => [k.k, k]));
 const kvkWhen = n => KVK[n] ? (KVK[n].e ? '≈ ' : '') + monthLabel(KVK[n].d) : '';
 const pctCell = v => v == null ? '<span class="muted">–</span>' : `<span class="${v >= 100 ? 'pct-good' : 'pct-bad'}">${Math.round(v)}%</span>`;
+// KvKs without a target (KvK 9) show the sheet's own result in the % column instead
+const kvPct = r => r[3] != null || !r[5] ? pctCell(r[3])
+  : `<span class="${/MET/i.test(r[5]) ? 'pct-good' : /PROGRESS/i.test(r[5]) ? 'pct-mid' : 'pct-bad'}" style="font-size:12px">${esc(r[5])}</span>`;
 // a KvK record: [kvk, value, target, pct, fine, status, type, name then]
 const kvResult = r => r[1] == null ? '–' : short(r[1]) + (r[2] ? ` <span class="muted">/ ${short(r[2])}</span>` : '');
-const kvNote = r => [r[4] ? `fine ${gold(r[4])}` : '', r[5]].filter(Boolean).map(esc).join(' · ');
+const kvNote = r => [r[4] ? `fine ${gold(r[4])}` : '', r[3] != null ? r[5] : ''].filter(Boolean).map(esc).join(' · ');
 const strong = p => (p.h || []).some(h => !h.startsWith('Low kill'));  // a name/alliance hint, not just low kill points
 const inQueue = p => !p.c && !p.r && (p.a === DATA.mainAlly || hasWeeks(p));
 
@@ -554,7 +558,7 @@ function renderPlayer() {
       <thead><tr><th>KvK</th><th>Name then</th><th>Type</th><th class="num">Result</th><th class="num">%</th><th>Notes</th></tr></thead>
       <tbody>${p.kv.slice().reverse().map(r => `<tr style="cursor:default"><td>KvK ${r[0]} <span class="muted">${kvkWhen(r[0])}</span></td>
         <td>${r[7] === p.n ? '<span class="muted">same</span>' : esc(r[7])}</td><td>${r[6] ? r[6][0].toUpperCase() + r[6].slice(1) : '–'}</td>
-        <td class="num">${kvResult(r)} <span class="muted">${KVK[r[0]] ? KVK[r[0]].m : ''}</span></td><td class="num">${pctCell(r[3])}</td>
+        <td class="num">${kvResult(r)} <span class="muted">${KVK[r[0]] ? KVK[r[0]].m : ''}</span></td><td class="num">${kvPct(r)}</td>
         <td style="white-space:normal">${kvNote(r)}</td></tr>`).join('')}</tbody></table></div>` : ''}
     ${!p.c && p.h && p.h.length ? `<div class="p-sec">Farm hints</div><div class="hints">${p.h.map(h => `<span class="chip">${esc(h)}</span>`).join('')}</div>` : ''}
     ${kingdom}${activity}
@@ -613,13 +617,14 @@ function renderKvk() {
   const q = $('kvkSearch').value.trim().toLowerCase(), t = $('kvkType').value;
   const rows = P.map(p => ({p, r: (p.kv || []).find(r => r[0] === n)})).filter(({p, r}) => r &&
     (t === 'all' || (r[6] || p.t) === t) && (!q || p.n.toLowerCase().includes(q) || r[7].toLowerCase().includes(q)));
-  rows.sort((a, b) => ((a.r[kvSortK] ?? -1) - (b.r[kvSortK] ?? -1)) * kvSortDir);
+  const sk = kvSortK === 3 && rows.every(x => x.r[3] == null) ? 1 : kvSortK;  // no % in this KvK: sort by result
+  rows.sort((a, b) => ((a.r[sk] ?? -1) - (b.r[sk] ?? -1)) * kvSortDir);
   const cols = [['Player'], ['Name then'], ['Type'], [k.m, 1], ['Target', 2], ['%', 3], ['Notes']];
   $('kvkHead').innerHTML = cols.map(([h, i]) => `<th${i ? ` class="num" data-kv="${i}"` : ''}>${h}</th>`).join('');
   $('kvkBody').innerHTML = rows.map(({p, r}) => `<tr data-i="${P.indexOf(p)}"><td>${esc(p.n)}</td>
       <td>${r[7] === p.n ? '<span class="muted">same</span>' : esc(r[7])}</td><td>${r[6] ? r[6][0].toUpperCase() + r[6].slice(1) : typeTxt(p)}</td>
       <td class="num">${r[1] == null ? '–' : short(r[1])}</td><td class="num">${r[2] ? short(r[2]) : '<span class="muted">–</span>'}</td>
-      <td class="num">${pctCell(r[3])}</td><td style="white-space:normal">${kvNote(r)}</td></tr>`).join('') ||
+      <td class="num">${kvPct(r)}</td><td style="white-space:normal">${kvNote(r)}</td></tr>`).join('') ||
     '<tr><td colspan="7" class="empty">No current players match.</td></tr>';
   $('kvkCount').textContent = `${rows.length} current governor${rows.length === 1 ? '' : 's'} took part`;
   $('kvkSub').textContent = `KvK ${n} · ${kvkWhen(n)}${k.e ? ' (date estimated)' : ''} · measured by ${k.m}` +
