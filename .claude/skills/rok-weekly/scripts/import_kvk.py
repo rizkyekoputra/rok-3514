@@ -2,7 +2,7 @@
 """Import one KvK's tracking sheet into tracker/kvk/ and seed name history from it.
 
 Every KvK sheet has its own layout; this recognises them by their headers and keeps what each one has:
-  KP sheets     (KvK 4, 6, 7)  KP gained vs a target, KP %, fines, MIGRATED/ZEROED, deads when present
+  KP sheets     (KvK 4-7)    KP gained vs a target, KP %, fines, MIGRATED/ZEROED/paid notes, deads when present
   DKP sheet     (KvK 8)        DKP gained vs target, DKP %
   Acclaim sheets(KvK 9, 10)    acclaim (vs target acclaim when present), status; several scans -> first/last
 Older KvKs have no acclaim (it was added to the game later), newer ones no KP target; missing = blank.
@@ -69,16 +69,16 @@ def main():
     gi, ni = col('ID', 'Character ID', 'Governor ID'), col('Name', 'Username', 'Governor Name')
     if gi is None or ni is None:
         raise SystemExit(f'No ID/name column: {head}')
-    ti, si, scan = col('Type'), col('Slot', 'SLOT'), col('Last Scan')
+    ti, fi, si, scan = col('Type'), col('Is Farm?'), col('Slot', 'SLOT'), col('Last Scan')
     pw = col('Starting Power First Snapshot', 'Initial Power', 'Power', 'Current Power')
-    fine, fstat, stat = col('GOLD FINE', 'FINE GOLD'), col('Fine Status'), col('Status')
-    dead, accl = col('Total #deadtroops'), col('Aclaim', 'Acclaim')
+    fine, fstat, stat = col('GOLD FINE', 'FINE GOLD'), col('Fine Status', 'KET LUNAS'), col('Status')
+    dead, accl = col('Total #deadtroops', 'Total #deadtroops (t1-t5)'), col('Aclaim', 'Acclaim')
     if col('DKP Achievement') is not None:
         metric, vi, tgi, pi = 'DKP', col('DKP Achievement'), col('Target KP'), col('DKP%')
     elif col('Target Acclaim') is not None:
         metric, vi, tgi, pi = 'Acclaim', accl, col('Initial Target', 'Target Acclaim'), col('Acclaim Progress %')
     elif col('Total KP') is not None:
-        metric, vi, tgi, pi = 'KP', col('Total KP'), col('KP Required', 'Target KP (50% of power)'), col('KP %')
+        metric, vi, tgi, pi = 'KP', col('Total KP'), col('KP Required', 'Target KP (50% of power)', 'Target KP'), col('KP %')
     elif col('Last Scan Final') is not None:  # KvK 7: target was 100% of power (KP % = KP / power)
         metric, vi, tgi, pi = 'KP', col('Last Scan Final'), None, col('KP %')
     elif accl is not None:
@@ -109,7 +109,8 @@ def main():
             pct = round(100 * value / target, 2)
         status = ' · '.join(x for x in (get(last, fstat), get(last, stat),
                                         'Vacation' if get(last, si).lower() == 'vacation' else '') if x)
-        out.append([gid, get(last, ni), get(last, ti).lower(), power, metric, value, target, pct,
+        typ = get(last, ti).lower() or ('farm' if get(last, fi).upper() == 'TRUE' else 'main' if fi is not None else '')
+        out.append([gid, get(last, ni), typ, power, metric, value, target, pct,
                     num(get(last, dead)), num(get(last, accl)) if accl is not None else None, status,
                     num(get(last, fine))])
 

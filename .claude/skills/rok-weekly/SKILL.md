@@ -79,8 +79,8 @@ Old name lists (e.g. a past KvK sheet shared by link) seed history the same way:
 one KvK (layout recognised from its headers: KP / DKP / Acclaim, targets, fines, status; several scans -> first and
 last) into `tracker/kvk/kvk<N>.csv` + `kvks.csv`, and its names into `tracker/names/<date>_kvk<N>.csv` (Name
 history, labelled "KvK N"). Shown in the player pop-up and the KvK history tab, matched by Governor ID.
-Imported: KvK 4, 6, 7, 8, 9, 10 (KvK 5 sheet is not shared publicly). Dates of KvK 7, 8, 9 are estimated
-(≈ Nov 2025, Feb 2026, May 2026) until the user gives them; rerun with the real `--date` to fix.
+Imported: KvK 4-10. Dates of KvK 5, 7, 8, 9 are estimated (≈ Jul 2025, Nov 2025, Feb 2026, May 2026) until
+the user gives them; rerun with the real `--date` to fix.
 
 ## Dashboard tabs
 
