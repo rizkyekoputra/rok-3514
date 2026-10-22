@@ -622,7 +622,7 @@ function renderKvk() {
   $('kvkBody').innerHTML = rows.map(({p, r}) => `<tr data-i="${P.indexOf(p)}"><td>${esc(p.n)}</td>
       <td>${r[7] === p.n ? '<span class="muted">same</span>' : esc(r[7])}</td><td>${r[6] ? r[6][0].toUpperCase() + r[6].slice(1) : typeTxt(p)}</td>
       <td class="num">${r[1] == null ? '–' : short(r[1])}</td><td class="num">${r[2] ? short(r[2]) : '<span class="muted">No target</span>'}</td>
-      <td class="num">${kvPct(r)}</td><td style="white-space:normal">${kvNote(r)}</td></tr>`).join('') ||
+      <td class="num">${pctCell(r[3])}</td><td style="white-space:normal">${kvNote(r)}</td></tr>`).join('') ||
     '<tr><td colspan="7" class="empty">No current players match.</td></tr>';
   $('kvkCount').textContent = `${rows.length} current governor${rows.length === 1 ? '' : 's'} took part`;
   $('kvkSub').textContent = `KvK ${n} · ${kvkWhen(n)}${k.e ? ' (date estimated)' : ''} · measured by ${k.m}` +
