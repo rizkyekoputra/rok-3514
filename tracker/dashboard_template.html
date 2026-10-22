@@ -96,6 +96,11 @@ button.act { font: inherit; font-size: 12px; border-radius: 6px; padding: 4px 10
   border: 1px solid var(--series-1); background: var(--series-1); color: #fff; }
 button.act.ghost { background: none; color: var(--text-secondary); border-color: var(--border); }
 button.act:disabled { opacity: .5; cursor: wait; }
+.bulk { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px;
+  padding: 8px 12px; border-radius: 8px; background: var(--chip-bg); border: 1px solid var(--border); font-size: 13px; }
+.bulk[hidden] { display: none; }
+td.sel, th.sel { width: 28px; padding-right: 0; }
+td.sel input, th.sel input { min-height: 0; width: 16px; height: 16px; cursor: pointer; }
 #finesBody tr:not([data-i]) { cursor: default; }
 .paid { color: var(--good); font-weight: 600; }
 .gate { display: none; }
@@ -171,11 +176,13 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
           <option value="likely">Likely farm</option>
         </select>
       </div>
+      <div class="bulk" id="bulkBar" hidden></div>
       <div class="table-wrap"><table>
         <thead><tr>
+          <th class="sel" id="rosterSelTh" hidden><input type="checkbox" id="rosterAll" aria-label="Select all shown"></th>
           <th data-rk="n">Player</th><th data-rk="a">Alliance</th>
           <th class="num" data-rk="pw">Power</th><th class="num" data-rk="kp">Kill points</th>
-          <th data-rk="t">Type</th><th>Status</th>
+          <th data-rk="t">Type</th><th>Status</th><th id="rosterActTh" hidden></th>
         </tr></thead>
         <tbody id="rosterBody"></tbody>
       </table></div>
@@ -260,7 +267,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
 
   <section data-panel="review" hidden>
     <div class="card">
-      <h2>Waiting for admin approval</h2>
+      <h2>Waiting for approval</h2>
       <div class="sub">Farm/main changes proposed by R4s. Approvers decide here (or the admin in the sheet); after an approval every week is recalculated.</div>
       <div class="table-wrap"><table>
         <thead><tr><th>Player</th><th id="pendActTh" hidden></th><th>Change</th><th>Proposed by</th><th>When</th></tr></thead>
@@ -521,7 +528,7 @@ function renderPlayer() {
 let rSortK = 'pw', rSortDir = -1;
 function statusCell(p) {
   const c = changes[p.id] || {}, st = typeState(p);
-  if (st === 'pending') return `<span class="chip"><span class="dot" style="background:var(--warning)"></span>${c.pending.type}? waiting for admin</span>`;
+  if (st === 'pending') return `<span class="chip"><span class="dot" style="background:var(--warning)"></span>${c.pending.type}? waiting for approval</span>`;
   if (st === 'approved') return `<span class="chip"><span class="dot" style="background:var(--series-1)"></span>approved, recalculating</span>`;
   if (p.c) return '<span class="muted">Confirmed</span>';
   return strong(p) ? '<span class="chip"><span class="dot" style="background:var(--serious)"></span>Likely farm</span>' : '<span class="muted">Needs review</span>';
@@ -534,14 +541,63 @@ function renderRoster() {
     const va = a[rSortK] ?? (rSortK === 'n' || rSortK === 'a' || rSortK === 't' ? '' : -1), vb = b[rSortK] ?? (typeof va === 'string' ? '' : -1);
     return (typeof va === 'string' ? va.localeCompare(vb) : va - vb) * rSortDir;
   });
+  const can = p => officer && !p.r && !typeState(p);  // R4/R5 and accounts with a change in flight can't be selected
+  rosterShown = rows.filter(can);
   $('rosterBody').innerHTML = rows.map(p => `<tr data-i="${P.indexOf(p)}">
+      ${officer ? `<td class="sel">${can(p) ? `<input type="checkbox" data-sel="${P.indexOf(p)}"${picked.has(P.indexOf(p)) ? ' checked' : ''} aria-label="Select ${esc(p.n)}">` : ''}</td>` : ''}
       <td>${esc(p.n)}</td><td>${p.a ? esc(p.a) : '<span class="muted">–</span>'}</td>
       <td class="num">${short(p.pw)}</td><td class="num">${short(p.kp)}</td>
-      <td>${typeTxt(p)}</td><td>${statusCell(p)}</td></tr>`).join('') ||
-    '<tr><td colspan="6" class="empty">No players match.</td></tr>';
+      <td>${typeTxt(p)}</td><td>${statusCell(p)}</td>${officer ? `<td style="white-space:nowrap">${typeButtons(p)}</td>` : ''}</tr>`).join('') ||
+    `<tr><td colspan="${officer ? 8 : 6}" class="empty">No players match.</td></tr>`;
+  $('rosterActTh').hidden = $('rosterSelTh').hidden = !officer;
+  renderBulk();
   $('rosterCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'}` + (q && ally !== 'all' ? ' · searching all alliances' : '');
   $('rosterSub').textContent = `Every governor in the kingdom scan and member export, plus anyone seen in the alliance rankings. Click a name for details. Events are tracked for ${DATA.mainAlly} only.`;
 }
+
+// ---------- multi-select (R4 mode): change many accounts at once ----------
+const picked = new Set();  // player indexes ticked in the master list
+let rosterShown = [];      // selectable rows currently shown (for "select all")
+function renderBulk() {
+  const n = picked.size, verb = approver ? 'Set as' : 'Propose';
+  $('bulkBar').hidden = !officer || !n;
+  $('bulkBar').innerHTML = `<b>${n} selected</b>
+    <button class="act" data-bulk="farm" type="button">${verb} farm</button>
+    <button class="act" data-bulk="main" type="button">${verb} main</button>
+    <button class="act ghost" data-bulk="clear" type="button">Clear</button>`;
+  $('rosterAll').checked = rosterShown.length > 0 && rosterShown.every(p => picked.has(P.indexOf(p)));
+}
+$('rosterBody').addEventListener('change', e => {
+  const c = e.target.closest('input[data-sel]');
+  if (!c) return;
+  c.checked ? picked.add(+c.dataset.sel) : picked.delete(+c.dataset.sel);
+  renderBulk();
+});
+$('rosterAll').addEventListener('change', e => {
+  rosterShown.forEach(p => e.target.checked ? picked.add(P.indexOf(p)) : picked.delete(P.indexOf(p)));
+  renderRoster();
+});
+$('bulkBar').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-bulk]');
+  if (!b) return;
+  if (b.dataset.bulk === 'clear') { picked.clear(); return renderRoster(); }
+  const type = b.dataset.bulk, list = [...picked].map(i => P[i]).filter(p => p.t !== type || !p.c);
+  if (!list.length) return alert(`All selected accounts are already confirmed as ${type}.`);
+  const names = list.slice(0, 12).map(p => p.n).join(', ') + (list.length > 12 ? ` and ${list.length - 12} more` : '');
+  if (!confirm(`${approver ? 'Set' : 'Propose'} ${list.length} account${list.length === 1 ? '' : 's'} as ${type}?\n\n${names}` +
+      (approver ? `\n\nEvery week is recalculated with the ${type} rules.` : '\n\nAn approver has to approve them.'))) return;
+  b.disabled = true;
+  try {
+    const r = await fetch(DATA.finesUrl, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify({key: r4key, action: type, accounts: list.map(p => ({account_id: p.id, player: p.n}))})});
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'not saved');
+    alert(j.approved ? `Saved ${j.count}. The dashboard updates ${String(j.recalc).startsWith('started') ? 'in a few minutes' : 'within the hour'}.`
+      : `Proposed ${j.count}. An approver will review them.`);
+    picked.clear();
+    await loadLedger();
+  } catch (err) { alert('Not saved: ' + err.message + '. Try again.'); b.disabled = false; }
+});
 
 // ---------- review (R4 mode) ----------
 function renderReview() {
@@ -647,11 +703,11 @@ function typeButtons(p) {
   if (!officer || p.r || typeState(p)) return '';
   const i = P.indexOf(p), other = isFarm(p) ? 'main' : 'farm';
   return (p.c ? '' : `<button class="act" data-type="${p.t}" data-i="${i}" type="button">Confirm ${p.t}</button> `) +
-    `<button class="act ghost" data-type="${other}" data-i="${i}" type="button">Propose ${other}</button>`;
+    `<button class="act ghost" data-type="${other}" data-i="${i}" type="button">${approver ? 'Set as' : 'Propose'} ${other}</button>`;
 }
 function typeNote(p) {
   const c = changes[p.id] || {}, st = typeState(p);
-  const note = st === 'pending' ? `<span class="chip"><span class="dot" style="background:var(--warning)"></span>Proposed: ${c.pending.type === p.t ? 'confirm ' + c.pending.type : c.pending.type} · by ${esc(c.pending.by)}, waiting for admin approval</span>`
+  const note = st === 'pending' ? `<span class="chip"><span class="dot" style="background:var(--warning)"></span>Proposed: ${c.pending.type === p.t ? 'confirm ' + c.pending.type : c.pending.type} · by ${esc(c.pending.by)}, waiting for approval</span>`
     : st === 'approved' ? `<span class="chip"><span class="dot" style="background:var(--series-1)"></span>Approved as ${c.type} · recalculating, check back in a few minutes</span>` : '';
   return note + typeButtons(p);
 }
@@ -667,10 +723,12 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('button[data-type]');
   if (!b || !officer) return;
   const p = P[+b.dataset.i], type = b.dataset.type;
-  const msg = type === p.t
-    ? `Confirm ${p.n} as a ${type} account?\n\nThe admin approves it in the sheet.`
-    : `Propose ${p.n} as a ${type} account?\n\nThe admin has to approve it; after that every week is recalculated with the ${type} rules` +
-      (type === 'farm' ? ' (no offenses or fines, not in the rewards).' : '.');
+  const rules = type === 'farm' ? ' (no offenses or fines, not in the rewards).' : '.';
+  const msg = approver
+    ? `${type === p.t ? 'Confirm' : 'Set'} ${p.n} as a ${type} account?\n\nEvery week is recalculated with the ${type} rules` + rules
+    : type === p.t
+    ? `Confirm ${p.n} as a ${type} account?\n\nAn approver still has to approve it.`
+    : `Propose ${p.n} as a ${type} account?\n\nAn approver has to approve it; after that every week is recalculated with the ${type} rules` + rules;
   if (!confirm(msg)) return;
   b.disabled = true;
   try {
@@ -678,6 +736,7 @@ document.addEventListener('click', async e => {
       body: JSON.stringify({key: r4key, account_id: p.id, player: p.n, action: type})});
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || 'not saved');
+    if (j.approved) alert(`Saved. The dashboard updates ${String(j.recalc).startsWith('started') ? 'in a few minutes' : 'within the hour'}.`);
     await loadLedger();
   } catch (err) { alert('Not saved: ' + err.message + '. Try again.'); b.disabled = false; }
 });
@@ -732,7 +791,7 @@ function renderSubtitle() {
     tab === 'activity' ? `${weekLabel(week)} ${week.slice(0, 4)}${partial(week) ? ` · partial data (${seen(week)} of ${maxSeen} players captured)` : ''} · minimum ${DATA.minF} forts and ${fmt(DATA.minT)} tech per week`
     : tab === 'players' ? `${fmt(P.length)} governors · alliances from the scan of ${dayLabel(DATA.scanDay)}` + (DATA.namesDay ? ` · names and power from the member export of ${dayLabel(DATA.namesDay)}` : '')
     : tab === 'fines' ? 'Fort fines from the 2nd offense on, and whether they have been paid'
-    : 'Farm and main account changes for the admin to approve';
+    : 'Farm and main account changes waiting for approval';
 }
 function showTab(t) {
   tab = TABS.includes(t) && (t !== 'review' || officer) ? t : 'activity';
@@ -779,7 +838,7 @@ document.querySelectorAll('th[data-k]').forEach(th => th.addEventListener('click
 }));
 ['tbody', 'rosterBody', 'pendBody', 'queueBody', 'finesBody'].forEach(id => $(id).addEventListener('click', e => {
   const tr = e.target.closest('tr[data-i]');
-  if (tr && !e.target.closest('button')) selectPlayer(P[+tr.dataset.i]);
+  if (tr && !e.target.closest('button, input, td.sel')) selectPlayer(P[+tr.dataset.i]);
 }));
 document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
 addEventListener('hashchange', route);

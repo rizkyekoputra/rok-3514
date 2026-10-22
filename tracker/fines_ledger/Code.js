@@ -127,12 +127,12 @@ function officer(key) {
   return row ? {name: row[0], approver: row[4] === 'yes' || APPROVERS.includes(row[0])} : null;
 }
 
-// Approver on the dashboard: decide every open proposal for one account.
-function decide(accountId, status, by) {
-  const sh = tab('Accounts'), vals = sh.getDataRange().getValues();
+// Approver on the dashboard: decide every open proposal for the given account(s).
+function decide(accountIds, status, by) {
+  const ids = new Set([].concat(accountIds)), sh = tab('Accounts'), vals = sh.getDataRange().getValues();
   let n = 0;
   for (let r = 1; r < vals.length; r++) {
-    if (vals[r][1] === accountId && vals[r][5] === 'proposed') {
+    if (ids.has(vals[r][1]) && vals[r][5] === 'proposed') {
       sh.getRange(r + 1, 6, 1, 3).setValues([[status, new Date(), by]]);
       n++;
     }
@@ -165,7 +165,8 @@ function doGet(e) {
 
 // POST (text/plain JSON), either
 //   {key, fine_id, player, week, amount, action: "paid" | "undo"}   fine payment
-//   {key, account_id, player, action: "farm" | "main"}               account type proposal for the admin
+//   {key, account_id, player, action: "farm" | "main"}               account type change (proposal, or
+//   {key, accounts: [{account_id, player}], action: "farm" | "main"}  applied at once for approvers)
 //   {key, account_id, action: "approve" | "reject"}                  approvers only
 function doPost(e) {
   let req;
@@ -186,8 +187,22 @@ function doPost(e) {
     return out({ok: true, by, recalc});
   }
   if (req.action === 'farm' || req.action === 'main') {
-    if (!/^[0-9a-f]{10}$/.test(req.account_id)) return out({ok: false, error: 'bad request'});
-    return locked(() => tab('Accounts').appendRow([new Date(), req.account_id, plain(req.player), req.action, by, 'proposed', '']), by);
+    const list = Array.isArray(req.accounts) ? req.accounts : [{account_id: req.account_id, player: req.player}];
+    if (!list.length || list.length > 500 || list.some(a => !a || !/^[0-9a-f]{10}$/.test(a.account_id)))
+      return out({ok: false, error: 'bad request'});
+    const now = new Date(), status = o.approver ? 'approved' : 'proposed';
+    const add = list.map(a => [now, a.account_id, plain(a.player), req.action, by, status, o.approver ? now : '', o.approver ? by : '']);
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      if (o.approver) decide(list.map(a => a.account_id), 'rejected', by);  // approvers' changes supersede open proposals
+      const sh = tab('Accounts');
+      sh.getRange(sh.getLastRow() + 1, 1, add.length, add[0].length).setValues(add);
+    } finally { lock.releaseLock(); }
+    if (!o.approver) return out({ok: true, by, count: add.length});
+    let recalc = '';
+    try { recalc = triggerRecalc(); } catch (err) { recalc = 'not started (' + err.message + ')'; }
+    return out({ok: true, by, count: add.length, approved: true, recalc});
   }
   const amount = Number(req.amount);
   if (!/^[0-9a-f]{10}$/.test(req.fine_id) || !/^\d{4}-\d{2}-\d{2}$/.test(req.week) ||
