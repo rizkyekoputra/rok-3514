@@ -10,7 +10,7 @@ Reads:
   names/<date>.csv  governor_id, name, power from the latest member export (import_export.py): current name
                     per ID, plus governors below the TOP500 scan
   accounts_online.csv  governor_id, name, type, approved_by, decided: farm/main changes R4s proposed and the
-                    R5 approved in the ledger (--pull); they override accounts.csv
+                    admin approved in the ledger (--pull); they override accounts.csv
 
 Writes:
   status.csv                 current offense status per account
@@ -150,7 +150,7 @@ def penalty(offense, missing, unpaid):
 
 def main():
     accounts = {key(a): a for a in read('accounts.csv')}
-    for o in read('accounts_online.csv'):  # R5-approved farm/main changes from the dashboard win
+    for o in read('accounts_online.csv'):  # admin-approved farm/main changes from the dashboard win
         a = accounts.setdefault(key(o), dict(governor_id=o['governor_id'], name=o['name'], type='', role='',
                                              confirmed='', previous_names=''))
         a.update(type=o['type'], confirmed='yes')
@@ -464,7 +464,7 @@ def write_dashboard(history, state, accounts, fines):
         p = players[i]
         p.update(id=account_id(k), o=s.get('offenses', 0), u=s.get('unpaid', 0), lt=s.get('lifetime', 0),
                  pn=[n for n in a.get('previous_names', '').split(';') if n],
-                 c=a.get('confirmed') == 'yes' or bool(p.get('r')))  # c = type confirmed by the R5/R4s
+                 c=a.get('confirmed') == 'yes' or bool(p.get('r')))  # c = type confirmed (accounts.csv, admin approval, or R4/R5)
         if r:  # a = alliance, pw = power, kp = kill points, dd = deads, rg = resources gathered (latest scan)
             p.update(a=r['alliance'] if r['alliance'] != '-' else '', pw=num(r['power']), kp=num(r['killpoints']),
                      dd=num(r['deads']), rg=num(r['rss_gathered']))

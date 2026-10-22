@@ -18,9 +18,9 @@ to read the rankings accurately, match names to Governor IDs, and keep `accounts
 | `tracker/weeks/<monday>.csv` | One file per week: `governor_id, name, fort_rank, forts, tech_rank, tech` (blank = not captured) |
 | `tracker/fines_paid.csv` | `governor_id, name, week, gold_paid, note`. `week` = the Monday of the week the fine was issued. Hand-entered payments only |
 | `tracker/fines_online.csv` | Same columns, payments R4s marked on the dashboard; written by `track.py --pull` (generated) |
-| `tracker/accounts_online.csv` | `governor_id, name, type, approved_by, decided`: farm/main changes R4s proposed on the dashboard and the R5 approved in the sheet; written by `track.py --pull`, overrides `accounts.csv` (generated) |
+| `tracker/accounts_online.csv` | `governor_id, name, type, approved_by, decided`: farm/main changes R4s proposed on the dashboard and the admin approved in the sheet; written by `track.py --pull`, overrides `accounts.csv` (generated) |
 | `.github/workflows/recalc.yml` + `tracker/publish_ci.sh` | GitHub Action: `track.py --pull` and republish the dashboard. Started by the sheet on approval, hourly, or `gh workflow run recalc.yml`. Uses the `DASHBOARD_DEPLOY_KEY` secret; refuses to publish if the live dashboard has a week the repo lacks |
-| `tracker/fines_ledger/` | Apps Script (clasp project, owned by the Google account clasp is logged in as) bound to the "3514 Fines" Google Sheet: `Officers` tab = one personal dashboard key per R4, `Payments` tab = append-only payment log, `Accounts` tab = farm/main proposals (status proposed/approved/rejected; the R5 decides via the **3514** menu, which starts the Action using a GitHub token kept in Script Properties). `track.py` `FINES_URL` points at its web app |
+| `tracker/fines_ledger/` | Apps Script (clasp project, owned by the Google account clasp is logged in as) bound to the "3514 Fines" Google Sheet: `Officers` tab = one personal dashboard key per R4, `Payments` tab = append-only payment log, `Accounts` tab = farm/main proposals (status proposed/approved/rejected; the admin, i.e. the user / sheet owner, not the R5, decides via the **3514** menu, which starts the Action using a GitHub token kept in Script Properties). `track.py` `FINES_URL` points at its web app |
 | `tracker/reports/<monday>.md` | Weekly report (generated) |
 | `tracker/mails/<monday>/` | In-game alliance mails, RoK rich text, each ≤ 2000 chars (generated) |
 | `tracker/status.csv`, `tracker/offense_log.csv` | Current status and full offense history (generated) |
@@ -45,7 +45,7 @@ Never hand-edit generated files; change inputs and rerun `python3 tracker/track.
 A name containing "farm" or ending in `F<number>` is a farm. Everything else defaults to **main with `confirmed = no`** —
 always list new unconfirmed mains that failed the minimum and ask the user if they are farms.
 When the user says an account is a farm (or R4), set `type`/`role` and `confirmed = yes` in `accounts.csv` and rerun.
-R4s can also propose farm/main on the dashboard; once the R5 approves, `accounts_online.csv` overrides `accounts.csv`.
+R4s can also propose farm/main on the dashboard; once the admin (the user) approves, `accounts_online.csv` overrides `accounts.csv`.
 To make such a change permanent, copy it into `accounts.csv`.
 For a new or removed R4, also update the `R4` list in `tracker/fines_ledger/Code.js`, then from that folder
 `clasp push -f && clasp update-deployment <deployment id from FINES_URL>`, and have the user click
@@ -68,7 +68,7 @@ Its kill points / kills cover only its date range, so they are not used as lifet
 
 ## Dashboard tabs
 
-Players (master list + player view) · Weekly activity · Fines · Review (R4 mode only: proposals waiting for the R5,
+Players (master list + player view) · Weekly activity · Fines · Review (R4 mode only: proposals waiting for the admin,
 and unconfirmed accounts in the alliance with farm hints from `farm_hints()` in `track.py`). Links: `#t=<tab>`, `#t=players&p=<name>`.
 Future events (KvK, MGE, AoO, 20 GH…) get their own tab and data folder, sharing the master list, R4 keys and fines ledger.
 

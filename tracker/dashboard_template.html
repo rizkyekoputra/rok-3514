@@ -246,8 +246,8 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
 
   <section data-panel="review" hidden>
     <div class="card">
-      <h2>Waiting for R5 approval</h2>
-      <div class="sub">Farm/main changes proposed by R4s. The R5 approves them in the sheet (3514 → Approve selected account changes); every week is then recalculated.</div>
+      <h2>Waiting for admin approval</h2>
+      <div class="sub">Farm/main changes proposed by R4s. The admin approves them in the sheet (3514 → Approve selected account changes); every week is then recalculated.</div>
       <div class="table-wrap"><table>
         <thead><tr><th>Player</th><th>Change</th><th>Proposed by</th><th>When</th></tr></thead>
         <tbody id="pendBody"></tbody>
@@ -501,7 +501,7 @@ function renderPlayer() {
 let rSortK = 'pw', rSortDir = -1;
 function statusCell(p) {
   const c = changes[p.id] || {}, st = typeState(p);
-  if (st === 'pending') return `<span class="chip"><span class="dot" style="background:var(--warning)"></span>${c.pending.type}? waiting for R5</span>`;
+  if (st === 'pending') return `<span class="chip"><span class="dot" style="background:var(--warning)"></span>${c.pending.type}? waiting for admin</span>`;
   if (st === 'approved') return `<span class="chip"><span class="dot" style="background:var(--series-1)"></span>approved, recalculating</span>`;
   if (p.c) return '<span class="muted">Confirmed</span>';
   return strong(p) ? '<span class="chip"><span class="dot" style="background:var(--serious)"></span>Likely farm</span>' : '<span class="muted">Needs review</span>';
@@ -591,7 +591,7 @@ function renderOfficer() {
   bar.classList.toggle('bad', !officer);
   bar.innerHTML = officer
     ? `<span>Logged in as <b>${esc(officer)}</b> (R4) · mark payments in <a href="#t=fines">Fines</a>, check accounts in <a href="#t=review">Review</a>.</span><button class="act ghost" id="logoutBtn" type="button">Leave R4 mode</button>`
-    : `<span>This R4 link is not valid or has been revoked. Ask the R5 for a new one.</span><button class="act ghost" id="logoutBtn" type="button">Dismiss</button>`;
+    : `<span>This R4 link is not valid or has been revoked. Ask the admin for a new one.</span><button class="act ghost" id="logoutBtn" type="button">Dismiss</button>`;
   const b = $('logoutBtn'); if (b) b.addEventListener('click', forgetKey);
   $('finesActTh').hidden = !officer;
   $('reviewTabBtn').hidden = !officer;
@@ -616,7 +616,7 @@ function renderFines() {
     (ledger ? '' : ' (last published totals)');
 }
 
-// Farm/main status from the ledger: proposals wait for the R5; approved ones show until the recalculation lands.
+// Farm/main status from the ledger: proposals wait for the admin; approved ones show until the recalculation lands.
 function typeState(p) {
   const c = changes[p.id] || {};
   return c.pending ? 'pending' : c.type && (c.type !== p.t || !p.c) ? 'approved' : '';
@@ -629,7 +629,7 @@ function typeButtons(p) {
 }
 function typeNote(p) {
   const c = changes[p.id] || {}, st = typeState(p);
-  const note = st === 'pending' ? `<span class="chip"><span class="dot" style="background:var(--warning)"></span>Proposed: ${c.pending.type === p.t ? 'confirm ' + c.pending.type : c.pending.type} · by ${esc(c.pending.by)}, waiting for R5 approval</span>`
+  const note = st === 'pending' ? `<span class="chip"><span class="dot" style="background:var(--warning)"></span>Proposed: ${c.pending.type === p.t ? 'confirm ' + c.pending.type : c.pending.type} · by ${esc(c.pending.by)}, waiting for admin approval</span>`
     : st === 'approved' ? `<span class="chip"><span class="dot" style="background:var(--series-1)"></span>Approved as ${c.type} · recalculating, check back in a few minutes</span>` : '';
   return note + typeButtons(p);
 }
@@ -646,8 +646,8 @@ document.addEventListener('click', async e => {
   if (!b || !officer) return;
   const p = P[+b.dataset.i], type = b.dataset.type;
   const msg = type === p.t
-    ? `Confirm ${p.n} as a ${type} account?\n\nThe R5 approves it in the sheet.`
-    : `Propose ${p.n} as a ${type} account?\n\nThe R5 has to approve it; after that every week is recalculated with the ${type} rules` +
+    ? `Confirm ${p.n} as a ${type} account?\n\nThe admin approves it in the sheet.`
+    : `Propose ${p.n} as a ${type} account?\n\nThe admin has to approve it; after that every week is recalculated with the ${type} rules` +
       (type === 'farm' ? ' (no offenses or fines, not in the rewards).' : '.');
   if (!confirm(msg)) return;
   b.disabled = true;
@@ -693,7 +693,7 @@ function renderSubtitle() {
     tab === 'activity' ? `${weekLabel(week)} ${week.slice(0, 4)}${partial(week) ? ` · partial data (${seen(week)} of ${maxSeen} players captured)` : ''} · minimum ${DATA.minF} forts and ${fmt(DATA.minT)} tech per week`
     : tab === 'players' ? `${fmt(P.length)} governors · alliances from the scan of ${dayLabel(DATA.scanDay)}` + (DATA.namesDay ? ` · names and power from the member export of ${dayLabel(DATA.namesDay)}` : '')
     : tab === 'fines' ? 'Fort fines from the 2nd offense on, and whether they have been paid'
-    : 'Farm and main account changes for the R5 to approve';
+    : 'Farm and main account changes for the admin to approve';
 }
 function showTab(t) {
   tab = TABS.includes(t) && (t !== 'review' || officer) ? t : 'activity';

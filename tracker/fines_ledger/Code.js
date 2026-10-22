@@ -1,7 +1,7 @@
 // 3514 fines ledger behind the public dashboard (bound to the "3514 Fines" sheet).
 // Officers tab: one personal key per R4 (made by setup(), never stored in code or the repo).
 // Payments tab: append-only log; the latest row per fine_id wins, "undo" clears it.
-// Accounts tab: R4 proposals to mark an account farm/main; the R5 approves or rejects them from the 3514 menu,
+// Accounts tab: R4 proposals to mark an account farm/main; the admin (sheet owner) approves or rejects them from the 3514 menu,
 // which starts the GitHub Action that recalculates and republishes the dashboard.
 // Deployed as a Web app: execute as the owner, access "Anyone" (keys gate writes, reads are public).
 
@@ -146,7 +146,7 @@ function doGet(e) {
 
 // POST (text/plain JSON), either
 //   {key, fine_id, player, week, amount, action: "paid" | "undo"}   fine payment
-//   {key, account_id, player, action: "farm" | "main"}               account type proposal for the R5
+//   {key, account_id, player, action: "farm" | "main"}               account type proposal for the admin
 function doPost(e) {
   let req;
   try { req = JSON.parse(e.postData.contents); } catch (err) { return out({ok: false, error: 'bad request'}); }
