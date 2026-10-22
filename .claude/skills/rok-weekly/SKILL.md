@@ -69,6 +69,9 @@ and records renames in `accounts.csv`. Governors below the TOP500 scan join the 
 Its kill points / kills cover only its date range, so they are not used as lifetime stats.
 Older exports can be imported too: they only add name history (the pop-up's Name history is built from every
 dated week file, scan and export; the most recently seen name is the current one) and never rename accounts.
+Old name lists (e.g. a past KvK sheet shared by link) seed history the same way:
+`python3 .claude/skills/rok-weekly/scripts/import_name_list.py <sheet link or csv> --date YYYY-MM-DD`
+(use the date the names were current, e.g. the end of the period the sheet covers; matched by Governor ID).
 
 ## Dashboard tabs
 
