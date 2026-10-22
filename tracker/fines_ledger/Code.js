@@ -1,15 +1,19 @@
 // 3514 fines ledger behind the public dashboard (bound to the "3514 Fines" sheet).
 // Officers tab: one personal key per R4 (made by setup(), never stored in code or the repo).
 // Payments tab: append-only log; the latest row per fine_id wins, "undo" clears it.
+// Accounts tab: R4 proposals to mark an account farm/main; the R5 approves or rejects them from the 3514 menu,
+// which starts the GitHub Action that recalculates and republishes the dashboard.
 // Deployed as a Web app: execute as the owner, access "Anyone" (keys gate writes, reads are public).
 
 const DASHBOARD = 'https://rizkyekoputra.github.io/rok-3514-dashboard/';
+const RECALC = 'https://api.github.com/repos/rizkyekoputra/rok-3514/actions/workflows/recalc.yml/dispatches';
 // Keep in sync with role=R4 in ../accounts.csv; rerun setup() after adding names (existing keys are kept).
 const R4 = ['Totos メtreme', 'Dobelメtreme', 'RockyメGirang', 'Depati Amir', 'ＡＧＡＭ', 'MʀメSENOPATI', 'JDメ', 'ツ 3D',
             'Saxaa メtreme', 'Nyyaaa', '么 QUEEN', 'xxYxx', 'メ S L A Y E R メ'];
 const HEADERS = {
   Officers: ['name', 'key', 'status', 'link'],
   Payments: ['time', 'fine_id', 'player', 'week', 'amount', 'by', 'action'],
+  Accounts: ['time', 'account_id', 'player', 'type', 'by', 'status', 'decided'],
 };
 
 const book = () => SpreadsheetApp.getActiveSpreadsheet();
@@ -27,6 +31,11 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('3514')
     .addItem('Create keys for missing R4s', 'menuSetup')
     .addItem('New key for selected R4', 'rotateSelected')
+    .addSeparator()
+    .addItem('Approve selected account changes', 'approveSelected')
+    .addItem('Reject selected account changes', 'rejectSelected')
+    .addItem('Recalculate dashboard now', 'menuRecalc')
+    .addItem('Set GitHub token', 'setToken')
     .addToUi();
 }
 
@@ -45,6 +54,48 @@ function rotateSelected() {
   const key = newKey();
   sh.getRange(r, 2, 1, 3).setValues([[key, 'active', DASHBOARD + '?key=' + key]]);
   ui.alert(`New link for ${name} is in column D. Send it to them privately.`);
+}
+
+const approveSelected = () => decideSelected('approved');
+const rejectSelected = () => decideSelected('rejected');
+
+// Approve/reject the proposed rows in the selection (Accounts tab), then recalculate if anything was approved.
+function decideSelected(status) {
+  const ui = SpreadsheetApp.getUi(), sh = book().getActiveSheet();
+  if (sh.getName() !== 'Accounts') return ui.alert('Select the proposed rows in the Accounts tab first.');
+  const done = [];
+  sh.getActiveRangeList().getRanges().forEach(rg => {
+    for (let r = Math.max(2, rg.getRow()); r <= rg.getLastRow(); r++) {
+      const [, , player, type, , st] = sh.getRange(r, 1, 1, 7).getValues()[0];
+      if (st !== 'proposed') continue;
+      sh.getRange(r, 6, 1, 2).setValues([[status, new Date()]]);
+      done.push(`${player} → ${type}`);
+    }
+  });
+  if (!done.length) return ui.alert('No proposed changes in the selection.');
+  const recalc = status === 'approved' ? '\n\nRecalculation: ' + triggerRecalc() : '';
+  ui.alert(`${status === 'approved' ? 'Approved' : 'Rejected'}:\n${done.join('\n')}${recalc}`);
+}
+
+function menuRecalc() { SpreadsheetApp.getUi().alert('Recalculation: ' + triggerRecalc()); }
+
+// Starts the "Recalculate dashboard" GitHub Action (fine-grained token: rok-3514 only, Actions read/write).
+function triggerRecalc() {
+  const token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
+  if (!token) return 'not started, no GitHub token yet (3514 → Set GitHub token). The hourly run will pick it up.';
+  const r = UrlFetchApp.fetch(RECALC, {method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    headers: {Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json'}, payload: JSON.stringify({ref: 'main'})});
+  return r.getResponseCode() === 204 ? 'started, the dashboard updates in about 2 minutes.'
+    : `GitHub refused (${r.getResponseCode()}); the token may have expired (3514 → Set GitHub token).`;
+}
+
+// Token lives in Script Properties (owner-only), never in the sheet or the code.
+function setToken() {
+  const ui = SpreadsheetApp.getUi();
+  const res = ui.prompt('GitHub token', 'Paste the fine-grained token (rok-3514 only, Actions: read and write).', ui.ButtonSet.OK_CANCEL);
+  if (res.getSelectedButton() !== ui.Button.OK || !res.getResponseText().trim()) return;
+  PropertiesService.getScriptProperties().setProperty('GITHUB_TOKEN', res.getResponseText().trim());
+  ui.alert('Saved. Testing it: ' + triggerRecalc());
 }
 
 // Creates the tabs and a key + link for every R4 not listed yet; returns the names added.
@@ -71,33 +122,51 @@ function officer(key) {
   return row ? row[0] : null;
 }
 
-// GET: {paid: {fine_id: {amount, by, time}}, officer: name or null for ?key=}
+// account_id -> {type, by, decided} of the latest approved change, plus pending: the newest proposal after it.
+function accountChanges() {
+  const acc = {};
+  rows('Accounts').forEach(([time, id, , type, by, status, decided]) => {
+    const a = acc[id] || (acc[id] = {});
+    if (status === 'approved') Object.assign(a, {type, by, decided: new Date(decided).toISOString()});
+    if (status === 'proposed') a.pending = {type, by, time: new Date(time).toISOString()};
+    else delete a.pending;
+  });
+  return acc;
+}
+
+// GET: {paid: {fine_id: {amount, by, time}}, accounts: accountChanges(), officer: name or null for ?key=}
 function doGet(e) {
   const paid = {};
   rows('Payments').forEach(([time, fid, , , amount, by, action]) => {
     if (action === 'undo') delete paid[fid];
     else paid[fid] = {amount: Number(amount), by, time: new Date(time).toISOString()};
   });
-  return out({paid, officer: officer(e.parameter.key)});
+  return out({paid, accounts: accountChanges(), officer: officer(e.parameter.key)});
 }
 
-// POST (text/plain JSON): {key, fine_id, player, week, amount, action: "paid" | "undo"}
+// POST (text/plain JSON), either
+//   {key, fine_id, player, week, amount, action: "paid" | "undo"}   fine payment
+//   {key, account_id, player, action: "farm" | "main"}               account type proposal for the R5
 function doPost(e) {
   let req;
   try { req = JSON.parse(e.postData.contents); } catch (err) { return out({ok: false, error: 'bad request'}); }
   const by = officer(req.key);
   if (!by) return out({ok: false, error: 'invalid key'});
+  if (req.action === 'farm' || req.action === 'main') {
+    if (!/^[0-9a-f]{10}$/.test(req.account_id)) return out({ok: false, error: 'bad request'});
+    return locked(() => tab('Accounts').appendRow([new Date(), req.account_id, plain(req.player), req.action, by, 'proposed', '']), by);
+  }
   const amount = Number(req.amount);
   if (!/^[0-9a-f]{10}$/.test(req.fine_id) || !/^\d{4}-\d{2}-\d{2}$/.test(req.week) ||
       !(amount >= 0 && amount <= 1e12)) return out({ok: false, error: 'bad request'});
   const action = req.action === 'undo' ? 'undo' : 'paid';
+  return locked(() => tab('Payments').appendRow([new Date(), req.fine_id, plain(req.player), req.week,
+                                                 action === 'undo' ? 0 : amount, by, action]), by);
+}
+
+function locked(write, by) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);  // two R4s tapping at once
-  try {
-    tab('Payments').appendRow([new Date(), req.fine_id, plain(req.player), req.week,
-                               action === 'undo' ? 0 : amount, by, action]);
-  } finally {
-    lock.releaseLock();
-  }
+  try { write(); } finally { lock.releaseLock(); }
   return out({ok: true, by});
 }

@@ -13,6 +13,10 @@ if [ ! -d .git ]; then
   git config user.name "$(gh api user --jq .login)"
   git config credential.helper '!gh auth git-credential'  # push with the gh login, this repo only
 fi
+# The recalc GitHub Action also publishes; start from its latest commit, keeping the new index.html.
+if git remote | grep -q origin; then
+  git fetch -q origin main && git reset -q origin/main
+fi
 git add index.html
 if git diff --cached --quiet; then
   echo "Dashboard unchanged, nothing to publish."

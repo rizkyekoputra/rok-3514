@@ -6,13 +6,15 @@ Reads:
   weeks/<monday>.csv governor_id, name, fort_rank, forts, tech_rank, tech  (blank = not captured)
   fines_paid.csv    governor_id, name, week, gold_paid, note  (entered by hand)
   fines_online.csv  same columns, pulled from the R4 fines ledger (Google Sheet) by --pull
+  accounts_online.csv  governor_id, name, type, approved_by, decided: farm/main changes R4s proposed and the
+                    R5 approved in the ledger (--pull); they override accounts.csv
 
 Writes:
   status.csv                 current offense status per account
   reports/<monday>.md        weekly report for each week file
 
 Usage: python3 track.py          rebuild from local files
-       python3 track.py --pull   first refresh fines_online.csv from the ledger
+       python3 track.py --pull   first refresh fines_online.csv and accounts_online.csv from the ledger
 """
 import csv
 import hashlib
@@ -78,11 +80,19 @@ def fine_id(k, wk):
     return hashlib.sha1(f'3514|{k}|{wk}'.encode()).hexdigest()[:10]
 
 
-def pull_payments():
-    """Ledger payments -> fines_online.csv, matched to fines in the last offense_log.csv."""
-    fines = {fine_id(r['governor_id'], r['week']): r for r in read('offense_log.csv') if num(r['fine_gold'])}
+def account_id(k):
+    """Stable public id for one account (same idea as fine_id)."""
+    return hashlib.sha1(f'3514|acct|{k}'.encode()).hexdigest()[:10]
+
+
+def pull_ledger():
+    """Ledger -> fines_online.csv (payments, matched to offense_log.csv) and accounts_online.csv
+    (approved farm/main changes, matched to every known account)."""
     with urllib.request.urlopen(FINES_URL, timeout=30) as resp:
-        paid = json.load(resp)['paid']
+        ledger = json.load(resp)
+    pull_accounts(ledger.get('accounts', {}))
+    paid = ledger['paid']
+    fines = {fine_id(r['governor_id'], r['week']): r for r in read('offense_log.csv') if num(r['fine_gold'])}
     with open(os.path.join(HERE, 'fines_online.csv'), 'w', newline='', encoding='utf-8-sig') as f:
         w = csv.writer(f)
         w.writerow(['governor_id', 'name', 'week', 'gold_paid', 'note'])
@@ -94,6 +104,26 @@ def pull_payments():
             else:
                 print(f'Ledger payment {fid} matches no fine in offense_log.csv, skipped')
     print(f'Pulled {len(paid)} payment(s) from the fines ledger')
+
+
+def pull_accounts(changes):
+    names = {key(a): a['name'] for a in read('accounts.csv')}
+    for wk in os.listdir(os.path.join(HERE, 'weeks')):
+        if wk.endswith('.csv'):
+            names.update({key(r): r['name'] for r in read(f'weeks/{wk}')})
+    ids = {account_id(k): k for k in names}
+    approved = {i: c for i, c in changes.items() if c.get('type') in ('farm', 'main')}
+    with open(os.path.join(HERE, 'accounts_online.csv'), 'w', newline='', encoding='utf-8-sig') as f:
+        w = csv.writer(f)
+        w.writerow(['governor_id', 'name', 'type', 'approved_by', 'decided'])
+        for i, c in sorted(approved.items(), key=lambda kv: kv[1]['decided']):
+            if i not in ids:
+                print(f'Ledger account change {i} matches no known account, skipped')
+                continue
+            k = ids[i]
+            gid = '' if k.startswith('name:') else k
+            w.writerow([gid, names[k], c['type'], f"proposed by {c['by']}", c['decided'][:10]])
+    print(f'Pulled {len(approved)} approved account change(s) from the ledger')
 
 
 def penalty(offense, missing, unpaid):
@@ -112,6 +142,10 @@ def penalty(offense, missing, unpaid):
 
 def main():
     accounts = {key(a): a for a in read('accounts.csv')}
+    for o in read('accounts_online.csv'):  # R5-approved farm/main changes from the dashboard win
+        a = accounts.setdefault(key(o), dict(governor_id=o['governor_id'], name=o['name'], type='', role='',
+                                             confirmed='', previous_names=''))
+        a.update(type=o['type'], confirmed='yes')
     paid, by_hand = {}, {}
     for src in ('fines_paid.csv', 'fines_online.csv'):
         for p in read(src):
@@ -380,7 +414,7 @@ def write_dashboard(history, state, accounts, fines):
             p['w'][wk] = dict(f=l['forts'], x=l['tech'], o=l['offense'] or 0, d=l['due'] or 0)
     for k, i in ids.items():
         s, a = state.get(k, {}), accounts.get(k, {})
-        players[i].update(o=s.get('offenses', 0), u=s.get('unpaid', 0), lt=s.get('lifetime', 0),
+        players[i].update(id=account_id(k), o=s.get('offenses', 0), u=s.get('unpaid', 0), lt=s.get('lifetime', 0),
                           pn=[n for n in a.get('previous_names', '').split(';') if n])
     # p = player index; Governor IDs stay local. h = paid by hand (fines_paid.csv), not in the ledger.
     fines = [dict({x: v for x, v in f.items() if x != 'k'}, p=ids.get(f['k'])) for f in fines]
@@ -395,5 +429,5 @@ def write_dashboard(history, state, accounts, fines):
 
 if __name__ == '__main__':
     if '--pull' in sys.argv:
-        pull_payments()
+        pull_ledger()
     main()

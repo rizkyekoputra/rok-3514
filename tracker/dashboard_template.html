@@ -395,6 +395,7 @@ function renderPlayer() {
       <span class="chip">${roleTxt(p)}</span>
       ${chip(p.o, isFarm(p))}
       ${!isFarm(p) && unpaidOf(p) ? `<span class="chip">Unpaid fines: ${gold(unpaidOf(p))} gold</span>` : ''}
+      ${typeNote(p)}
     </div>
     <div class="sub">${now ? `${weekLabel(week)}: <b>${fmt(now.f)}</b> forts · <b>${now.x == null ? 'not captured' : fmt(now.x)}</b> tech` : `Not in the ranking for ${weekLabel(week)}` + (lw ? ` (last seen ${weekLabel(lw)})` : '')}
       ${!isFarm(p) ? ` · lifetime offenses: ${p.lt}` : ''}${p.pn && p.pn.length ? ` · previously: ${p.pn.map(esc).join(', ')}` : ''}</div>
@@ -423,7 +424,7 @@ function renderTable() {
     return (typeof va === 'string' ? va.localeCompare(vb) : va - vb) * sortDir;
   });
   $('tbody').innerHTML = rows.map((r, i) => `<tr data-i="${P.indexOf(r.p)}">
-      <td>${esc(r.n)}</td><td>${r.t}</td>
+      <td>${esc(r.n)}</td><td>${r.t}${changes[r.p.id] && changes[r.p.id].pending ? ` <span class="muted">(${changes[r.p.id].pending.type}?)</span>` : ''}</td>
       <td class="num ${r.f < DATA.minF ? 'below' : ''}">${fmt(r.f)}</td>
       <td class="num ${r.x != null && r.x < DATA.minT ? 'below' : ''}">${r.x == null ? '<span class="muted">not captured</span>' : fmt(r.x)}</td>
       <td>${isFarm(r.p) ? '<span class="muted">Farm</span>' : chip(r.o, false)}</td>
@@ -435,6 +436,7 @@ function renderTable() {
 // ---------- fines ledger (Apps Script web app; R4s write with a personal ?key= link) ----------
 const F = DATA.fines || [];
 let ledger = null, officer = null, r4key = null;  // ledger: {fine_id: {amount, by, time}} once loaded
+let changes = {};  // account_id -> {type, by, decided, pending: {type, by, time}} from the ledger
 const paidOf = f => (f.h || 0) + (ledger && ledger[f.id] ? ledger[f.id].amount : 0);
 const unpaidOf = p => ledger ? F.filter(f => P[f.p] === p).reduce((a, f) => a + Math.max(0, f.a - paidOf(f)), 0) : p.u;
 
@@ -451,11 +453,11 @@ async function loadLedger() {
     const r = await fetch(DATA.finesUrl + (r4key ? '?key=' + encodeURIComponent(r4key) : ''),
       AbortSignal.timeout ? {signal: AbortSignal.timeout(20000)} : {});
     const j = await r.json();
-    ledger = j.paid || {}; officer = j.officer || null;
+    ledger = j.paid || {}; officer = j.officer || null; changes = j.accounts || {};
   } catch (e) {
     $('finesSub').textContent = 'Could not load the latest payments; showing the last published totals.';
   }
-  renderOfficer(); renderFines(); renderPlayer();
+  renderOfficer(); renderFines(); renderPlayer(); renderTable();
 }
 
 function renderOfficer() {
@@ -488,12 +490,39 @@ function renderFines() {
     (ledger ? '' : ' (last published totals)');
 }
 
+// Farm/main status from the ledger: proposals wait for the R5; approved ones show until the recalculation lands.
+function typeNote(p) {
+  const c = changes[p.id] || {}, want = isFarm(p) ? 'main' : 'farm';
+  let note = '';
+  if (c.pending) note = `<span class="chip"><span class="dot" style="background:var(--warning)"></span>Proposed: ${c.pending.type} · by ${esc(c.pending.by)}, waiting for R5 approval</span>`;
+  else if (c.type && c.type !== p.t) note = `<span class="chip"><span class="dot" style="background:var(--series-1)"></span>Approved as ${c.type} · recalculating, check back in a few minutes</span>`;
+  const btn = officer && !c.pending && !(c.type && c.type !== p.t)
+    ? `<button class="act ghost" data-type="${want}" type="button">Propose as ${want === 'farm' ? 'farm account' : 'main account'}</button>` : '';
+  return note + btn;
+}
+
 async function sendPayment(f, action, amount) {
   const r = await fetch(DATA.finesUrl, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
     body: JSON.stringify({key: r4key, fine_id: f.id, player: f.p != null ? P[f.p].n : f.n, week: f.wk, amount, action})});
   const j = await r.json();
   if (!j.ok) throw new Error(j.error || 'not saved');
 }
+
+$('playerView').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-type]');
+  if (!b || !officer || !current) return;
+  const p = current, type = b.dataset.type;
+  if (!confirm(`Propose ${p.n} as a ${type} account?\n\nThe R5 has to approve it; after that every week is recalculated with the ${type} rules` +
+      (type === 'farm' ? ' (no offenses or fines, not in the rewards).' : '.'))) return;
+  b.disabled = true;
+  try {
+    const r = await fetch(DATA.finesUrl, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify({key: r4key, account_id: p.id, player: p.n, action: type})});
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'not saved');
+    await loadLedger();
+  } catch (err) { alert('Not saved: ' + err.message + '. Try again.'); b.disabled = false; }
+});
 
 $('finesBody').addEventListener('click', async e => {
   const b = e.target.closest('button[data-pay], button[data-undo]');
