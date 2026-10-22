@@ -39,8 +39,10 @@ def main():
     with open(ACCOUNTS, encoding='utf-8-sig') as f:
         rd = csv.DictReader(f)
         fields, accounts = rd.fieldnames, list(rd)
+    ndir = os.path.join(ROOT, 'tracker', 'names')
+    newer = [f for f in (os.listdir(ndir) if os.path.isdir(ndir) else []) if f.endswith('.csv') and f[:-4] > day]
     renames = []
-    for a in accounts:
+    for a in accounts if not newer else []:  # an older export only adds name history, it never renames
         new = names.get(a['governor_id'], (None,))[0]
         if new and new != a['name']:
             renames.append((a['name'], new))
@@ -50,6 +52,8 @@ def main():
             a.update(name=new, previous_names=';'.join(prev))
     for old, new in renames:
         print(f'rename: {old} -> {new}')
+    if newer:
+        print(f'Older than {newer[0][:-4]}: kept for name history only, accounts.csv not renamed')
 
     if not args.write:
         print(f'{len(names)} governors, {len(renames)} rename(s) in accounts.csv. Rerun with --write to save.')

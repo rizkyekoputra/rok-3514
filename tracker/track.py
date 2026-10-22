@@ -423,6 +423,25 @@ def latest(folder):
     return days[-1], {key(r): r for r in read(f'{folder}/{days[-1]}.csv')}
 
 
+def name_history(history):
+    """{key: {name: [first_date, last_date]}} from every dated source: week files, scans, member exports."""
+    seen = {}
+    def add(k, name, day):
+        span = seen.setdefault(k, {}).setdefault(name, [day, day])
+        span[0], span[1] = min(span[0], day), max(span[1], day)
+    for wk, lines in history:
+        for l in lines:
+            if l.get('key'):
+                add(l['key'], l['name'], wk)
+    for folder in ('scans', 'names'):
+        d = os.path.join(HERE, folder)
+        for f in sorted(os.listdir(d)) if os.path.isdir(d) else []:
+            if f.endswith('.csv'):
+                for r in read(f'{folder}/{f}'):
+                    add(key(r), r['name'], f[:-4])
+    return seen
+
+
 def core(name):
     """Name folded for comparing accounts: NFKC, case-folded, letters and digits only."""
     return ''.join(c for c in unicodedata.normalize('NFKC', name).casefold() if c.isalnum())
@@ -484,6 +503,20 @@ def write_dashboard(history, state, accounts, fines):
             p['n'] = new['name']
             if names_day >= scan_day or p.get('pw') is None:
                 p['pw'] = num(new['power'])
+    # hn = name history, oldest first: [name, first seen, last seen] ('' = date unknown, from accounts.csv)
+    seen = name_history(history)
+    for k, i in ids.items():
+        p, spans = players[i], seen.get(k, {})
+        if spans:  # current name = the one seen most recently in any source
+            newest = max(spans, key=lambda n: (spans[n][1], n == p['n']))
+            if newest != p['n']:
+                p['pn'] = [n for n in p['pn'] if n != newest] + ([p['n']] if p['n'] not in p['pn'] else [])
+                p['n'] = newest
+        old = [[n, '', ''] for n in p['pn'] if n not in spans]  # undated: older than anything tracked
+        old += sorted(([n, a, b] for n, (a, b) in spans.items() if n != p['n']), key=lambda h: (h[1], h[2]))
+        if old:
+            cur = spans.get(p['n'], ['', ''])
+            p['hn'] = old + [[p['n'], cur[0], cur[1]]]
     mains = [p['n'] for p in players if p['t'] == 'main' and p['c']] + [p['n'] for p in players if p['t'] == 'main' and not p['c']]
     for p in players:
         if not p['c']:

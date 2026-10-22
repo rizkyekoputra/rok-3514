@@ -132,6 +132,12 @@ body.gating .gate { display: flex; flex-direction: column; align-items: center; 
 .stat.good .v { color: var(--good); }
 .stat .v .muted { font-size: 14px; font-weight: 400; }
 .hints { display: flex; flex-wrap: wrap; gap: 6px; }
+.names { display: grid; gap: 6px; }
+.nm { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; padding: 7px 12px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+.nm .n { font-weight: 600; }
+.nm.old .n { font-weight: 400; color: var(--text-secondary); }
+.nm .when { font-size: 12px; color: var(--text-muted); }
 .dlg-close { float: right; font: inherit; font-size: 16px; line-height: 1; background: none; border: 1px solid var(--border);
   color: var(--text-secondary); border-radius: 6px; padding: 6px 9px; cursor: pointer; margin: 0 0 8px 8px; }
 #playerDlg .player-head { margin-top: 0; }
@@ -504,8 +510,11 @@ function renderPlayer() {
     <div class="p-meta">
       <span>${p.a ? esc(p.a) : p.pw != null ? 'No alliance' : 'Not in the latest scan'}</span>
       ${ranked ? '' : '<span>Not in the alliance fort/tech rankings</span>'}
-      ${p.pn && p.pn.length ? `<span>Previously: ${p.pn.map(esc).join(', ')}</span>` : ''}
+      ${!p.hn && p.pn && p.pn.length ? `<span>Previously: ${p.pn.map(esc).join(', ')}</span>` : ''}
     </div>
+    ${p.hn ? `<div class="p-sec">Name history</div><div class="names">${p.hn.slice().reverse().map(([n, a, b], i) => `
+      <div class="nm${i ? ' old' : ''}"><span class="n">${esc(n)}${i ? '' : ' <span class="chip">current</span>'}</span>
+        <span class="when">${!a ? 'before tracking' : a === b ? `seen ${dayLabel(a)}` : `${dayLabel(a)} – ${dayLabel(b)}`}</span></div>`).join('')}</div>` : ''}
     ${!p.c && p.h && p.h.length ? `<div class="p-sec">Farm hints</div><div class="hints">${p.h.map(h => `<span class="chip">${esc(h)}</span>`).join('')}</div>` : ''}
     ${kingdom}${activity}
     ${ranked ? `<div class="grid2" style="margin-top:16px">

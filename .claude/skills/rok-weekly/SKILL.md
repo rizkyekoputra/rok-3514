@@ -67,6 +67,8 @@ rerun `track.py`, push, publish. The master list, alliances and farm hints updat
 writes `tracker/names/<to-date>.csv` (latest name + power per ID, wins over scan and week names on the dashboard)
 and records renames in `accounts.csv`. Governors below the TOP500 scan join the master list without an alliance.
 Its kill points / kills cover only its date range, so they are not used as lifetime stats.
+Older exports can be imported too: they only add name history (the pop-up's Name history is built from every
+dated week file, scan and export; the most recently seen name is the current one) and never rename accounts.
 
 ## Dashboard tabs
 
