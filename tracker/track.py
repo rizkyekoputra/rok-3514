@@ -8,7 +8,9 @@ Reads:
   fines_online.csv  same columns, pulled from the R4 fines ledger (Google Sheet) by --pull
   scans/<date>.csv  latest kingdom scan = master player list (made by import_scan.py from the TOP500 xlsx)
   names/<date>.csv  governor_id, name, power from the latest member export (import_export.py): current name
-                    per ID, plus governors below the TOP500 scan
+                    per ID, plus governors below the TOP500 scan. names/<date>_kvk<N>.csv = names in that KvK
+                    (history only)
+  kvk/kvks.csv, kvk/kvk<N>.csv  past KvK results per governor (import_kvk.py), shown in the player pop-up
   accounts_online.csv  governor_id, name, type, approved_by, decided: farm/main changes R4s proposed and the
                     admin approved in the ledger (--pull); they override accounts.csv
 
@@ -415,20 +417,20 @@ def split_mail(title, head, intro, items, outro):
     return build(chunks)
 
 def latest(folder):
-    """(date, {key: row}) of the newest <folder>/<date>.csv, or ('', {})."""
+    """(date, {key: row}) of the newest <folder>/<date>.csv, or ('', {}). <date>_<label>.csv files are history only."""
     d = os.path.join(HERE, folder)
-    days = sorted(f[:-4] for f in os.listdir(d) if f.endswith('.csv')) if os.path.isdir(d) else []
+    days = sorted(f[:-4] for f in os.listdir(d) if re.fullmatch(r'\d{4}-\d{2}-\d{2}\.csv', f)) if os.path.isdir(d) else []
     if not days:
         return '', {}
     return days[-1], {key(r): r for r in read(f'{folder}/{days[-1]}.csv')}
 
 
 def name_history(history):
-    """{key: {name: [first_date, last_date]}} from every dated source: week files, scans, member exports."""
-    seen = {}
-    def add(k, name, day):
-        span = seen.setdefault(k, {}).setdefault(name, [day, day])
-        span[0], span[1] = min(span[0], day), max(span[1], day)
+    """{key: [[name, first_date, last_date, labels], ...]} oldest first: consecutive sightings of the same name
+    form one period. Sources: week files, scans, member exports, KvK sheets (names/<date>_kvk<N>.csv = "KvK <N>")."""
+    obs = {}
+    def add(k, name, day, label=''):
+        obs.setdefault(k, []).append((day, name, label))
     for wk, lines in history:
         for l in lines:
             if l.get('key'):
@@ -437,9 +439,31 @@ def name_history(history):
         d = os.path.join(HERE, folder)
         for f in sorted(os.listdir(d)) if os.path.isdir(d) else []:
             if f.endswith('.csv'):
+                label = re.sub(r'^kvk(\d+)$', r'KvK \1', f[11:-4])
                 for r in read(f'{folder}/{f}'):
-                    add(key(r), r['name'], f[:-4])
-    return seen
+                    add(key(r), r['name'], f[:10], label)
+    runs = {}
+    for k, seen in obs.items():
+        out = runs[k] = []
+        for day, name, label in sorted(seen):
+            if not out or out[-1][0] != name:
+                out.append([name, day, day, []])
+            out[-1][2] = day
+            if label and label not in out[-1][3]:
+                out[-1][3].append(label)
+    return runs
+
+
+def kvk_records():
+    """(kvks, {key: [[kvk, value, target, pct, fine, status, type, name then], ...]}) from tracker/kvk/."""
+    kvks = [dict(k=int(m['kvk']), d=m['date'], e=m['estimated'] == 'yes', m=m['metric']) for m in read('kvk/kvks.csv')]
+    recs = {}
+    for m in kvks:
+        for r in read(f"kvk/kvk{m['k']}.csv"):
+            n = lambda c: float(r[c]) if r[c] else None
+            recs.setdefault(r['governor_id'], []).append(
+                [m['k'], n('value'), n('target'), n('pct'), n('fine'), r['status'], r['type'], r['name']])
+    return kvks, recs
 
 
 def core(name):
@@ -503,20 +527,21 @@ def write_dashboard(history, state, accounts, fines):
             p['n'] = new['name']
             if names_day >= scan_day or p.get('pw') is None:
                 p['pw'] = num(new['power'])
-    # hn = name history, oldest first: [name, first seen, last seen] ('' = date unknown, from accounts.csv)
-    seen = name_history(history)
+    # hn = name history, oldest first: [name, first seen, last seen, sources]; '' dates = before tracking
+    runs_by = name_history(history)
     for k, i in ids.items():
-        p, spans = players[i], seen.get(k, {})
-        if spans:  # current name = the one seen most recently in any source
-            newest = max(spans, key=lambda n: (spans[n][1], n == p['n']))
-            if newest != p['n']:
-                p['pn'] = [n for n in p['pn'] if n != newest] + ([p['n']] if p['n'] not in p['pn'] else [])
-                p['n'] = newest
-        old = [[n, '', ''] for n in p['pn'] if n not in spans]  # undated: older than anything tracked
-        old += sorted(([n, a, b] for n, (a, b) in spans.items() if n != p['n']), key=lambda h: (h[1], h[2]))
-        if old:
-            cur = spans.get(p['n'], ['', ''])
-            p['hn'] = old + [[p['n'], cur[0], cur[1]]]
+        p, runs = players[i], runs_by.get(k, [])
+        if runs and runs[-1][0] != p['n']:  # current name = the one seen most recently in any source
+            p['pn'] = [n for n in p['pn'] if n != runs[-1][0]] + ([p['n']] if p['n'] not in p['pn'] else [])
+            p['n'] = runs[-1][0]
+        named = {r[0] for r in runs}
+        hn = [[n, '', '', ''] for n in p['pn'] if n not in named] + [[n, a, b, ', '.join(l)] for n, a, b, l in runs]
+        if len(hn) > 1:
+            p['hn'] = hn
+    kvks, kv = kvk_records()
+    for k, i in ids.items():  # kv = past KvKs this governor took part in (matched by Governor ID)
+        if k in kv:
+            players[i]['kv'] = sorted(kv[k], key=lambda r: r[0])
     mains = [p['n'] for p in players if p['t'] == 'main' and p['c']] + [p['n'] for p in players if p['t'] == 'main' and not p['c']]
     for p in players:
         if not p['c']:
@@ -524,7 +549,7 @@ def write_dashboard(history, state, accounts, fines):
     # p = player index; Governor IDs stay local. h = paid by hand (fines_paid.csv), not in the ledger.
     fines = [dict({x: v for x, v in f.items() if x != 'k'}, p=ids.get(f['k'])) for f in fines]
     data = dict(weeks=[wk for wk, _ in history], minF=MIN_FORTS, minT=MIN_TECH, players=players,
-                fines=fines, finesUrl=FINES_URL, scanDay=scan_day, namesDay=names_day, mainAlly=MAIN_ALLIANCE,
+                fines=fines, finesUrl=FINES_URL, scanDay=scan_day, namesDay=names_day, mainAlly=MAIN_ALLIANCE, kvks=kvks,
                 updated=date.today().isoformat())
     with open(os.path.join(HERE, 'dashboard_template.html'), encoding='utf-8') as f:
         html = f.read()

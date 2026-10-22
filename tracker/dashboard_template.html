@@ -138,6 +138,10 @@ body.gating .gate { display: flex; flex-direction: column; align-items: center; 
 .nm .n { font-weight: 600; }
 .nm.old .n { font-weight: 400; color: var(--text-secondary); }
 .nm .when { font-size: 12px; color: var(--text-muted); }
+.kv { width: 100%; font-size: 13px; }
+.kv td, .kv th { padding: 6px 8px; }
+.pct-good { color: var(--good); font-weight: 600; }
+.pct-bad { color: var(--critical); font-weight: 600; }
 .dlg-close { float: right; font: inherit; font-size: 16px; line-height: 1; background: none; border: 1px solid var(--border);
   color: var(--text-secondary); border-radius: 6px; padding: 6px 9px; cursor: pointer; margin: 0 0 8px 8px; }
 #playerDlg .player-head { margin-top: 0; }
@@ -164,6 +168,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
     <button data-tab="players" type="button">Players</button>
     <button data-tab="activity" type="button">Weekly activity</button>
     <button data-tab="fines" type="button">Fines</button>
+    <button data-tab="kvk" type="button">KvK history</button>
     <button data-tab="review" id="reviewTabBtn" type="button" hidden>Review <span class="badge" id="reviewCount"></span></button>
   </nav>
 
@@ -269,6 +274,27 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       <div class="sub" id="finesCount"></div>
     </div>
 
+  </section>
+
+  <section data-panel="kvk" hidden>
+    <div class="card">
+      <h2>KvK history</h2>
+      <div class="sub" id="kvkSub"></div>
+      <div class="controls">
+        <select id="kvkSel"></select>
+        <input type="search" id="kvkSearch" placeholder="Filter by name…" autocomplete="off">
+        <select id="kvkType">
+          <option value="all">Main and farm</option>
+          <option value="main">Main accounts</option>
+          <option value="farm">Farms</option>
+        </select>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr id="kvkHead"></tr></thead>
+        <tbody id="kvkBody"></tbody>
+      </table></div>
+      <div class="sub" id="kvkCount"></div>
+    </div>
   </section>
 
   <section data-panel="review" hidden>
@@ -450,6 +476,13 @@ const typeTxt = p => isFarm(p) ? 'Farm' : 'Main';  // type is only Main/Farm; R4
 const short = n => n == null ? '–' : n >= 1e9 ? (n / 1e9).toFixed(2) + 'B' : n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'K' : String(n);
 const dayLabel = d => d ? `${+d.slice(8)} ${MON[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}` : '';
 const hasWeeks = p => weeks.some(w => p.w[w]);
+const monthLabel = d => d ? `${MON[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}` : '';
+const KVK = Object.fromEntries((DATA.kvks || []).map(k => [k.k, k]));
+const kvkWhen = n => KVK[n] ? (KVK[n].e ? '≈ ' : '') + monthLabel(KVK[n].d) : '';
+const pctCell = v => v == null ? '<span class="muted">–</span>' : `<span class="${v >= 100 ? 'pct-good' : 'pct-bad'}">${Math.round(v)}%</span>`;
+// a KvK record: [kvk, value, target, pct, fine, status, type, name then]
+const kvResult = r => r[1] == null ? '–' : short(r[1]) + (r[2] ? ` <span class="muted">/ ${short(r[2])}</span>` : '');
+const kvNote = r => [r[4] ? `fine ${gold(r[4])}` : '', r[5]].filter(Boolean).map(esc).join(' · ');
 const strong = p => (p.h || []).some(h => !h.startsWith('Low kill'));  // a name/alliance hint, not just low kill points
 const inQueue = p => !p.c && !p.r && (p.a === DATA.mainAlly || hasWeeks(p));
 
@@ -512,9 +545,17 @@ function renderPlayer() {
       ${ranked ? '' : '<span>Not in the alliance fort/tech rankings</span>'}
       ${!p.hn && p.pn && p.pn.length ? `<span>Previously: ${p.pn.map(esc).join(', ')}</span>` : ''}
     </div>
-    ${p.hn ? `<div class="p-sec">Name history</div><div class="names">${p.hn.slice().reverse().map(([n, a, b], i) => `
-      <div class="nm${i ? ' old' : ''}"><span class="n">${esc(n)}${i ? '' : ' <span class="chip">current</span>'}</span>
-        <span class="when">${!a ? 'before tracking' : a === b ? `seen ${dayLabel(a)}` : `${dayLabel(a)} – ${dayLabel(b)}`}</span></div>`).join('')}</div>` : ''}
+    ${p.hn ? `<div class="p-sec">Name history</div><div class="names">${p.hn.slice().reverse().map(([n, a, b, src], i) => {
+      const kv = (src || '').match(/\d+/g), dates = kv && kv.every(x => KVK[x] && KVK[x].e) ? kvkWhen(kv[0]) + (kv.length > 1 ? ' – ' + kvkWhen(kv[kv.length - 1]).replace('≈ ', '') : '')
+        : !a ? 'before tracking' : a === b ? dayLabel(a) : `${dayLabel(a)} – ${dayLabel(b)}`;
+      return `<div class="nm${i ? ' old' : ''}"><span class="n">${esc(n)}${i ? '' : ' <span class="chip">current</span>'}</span>
+        <span class="when">${src ? esc(src) + ' · ' : ''}${dates}</span></div>`; }).join('')}</div>` : ''}
+    ${p.kv ? `<div class="p-sec">KvK history</div><div class="table-wrap"><table class="kv">
+      <thead><tr><th>KvK</th><th>Name then</th><th>Type</th><th class="num">Result</th><th class="num">%</th><th>Notes</th></tr></thead>
+      <tbody>${p.kv.slice().reverse().map(r => `<tr style="cursor:default"><td>KvK ${r[0]} <span class="muted">${kvkWhen(r[0])}</span></td>
+        <td>${r[7] === p.n ? '<span class="muted">same</span>' : esc(r[7])}</td><td>${r[6] ? r[6][0].toUpperCase() + r[6].slice(1) : '–'}</td>
+        <td class="num">${kvResult(r)} <span class="muted">${KVK[r[0]] ? KVK[r[0]].m : ''}</span></td><td class="num">${pctCell(r[3])}</td>
+        <td style="white-space:normal">${kvNote(r)}</td></tr>`).join('')}</tbody></table></div>` : ''}
     ${!p.c && p.h && p.h.length ? `<div class="p-sec">Farm hints</div><div class="hints">${p.h.map(h => `<span class="chip">${esc(h)}</span>`).join('')}</div>` : ''}
     ${kingdom}${activity}
     ${ranked ? `<div class="grid2" style="margin-top:16px">
@@ -563,6 +604,34 @@ function renderRoster() {
   $('rosterCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'}` + (q && ally !== 'all' ? ' · searching all alliances' : '');
   $('rosterSub').textContent = `Every governor in the kingdom scan and member export, plus anyone seen in the alliance rankings. Click a name for details. Events are tracked for ${DATA.mainAlly} only.`;
 }
+
+// ---------- KvK history tab ----------
+let kvSortK = 3, kvSortDir = -1;
+function renderKvk() {
+  const n = +$('kvkSel').value, k = KVK[n];
+  if (!k) { $('kvkBody').innerHTML = '<tr><td class="empty">No KvK data yet.</td></tr>'; return; }
+  const q = $('kvkSearch').value.trim().toLowerCase(), t = $('kvkType').value;
+  const rows = P.map(p => ({p, r: (p.kv || []).find(r => r[0] === n)})).filter(({p, r}) => r &&
+    (t === 'all' || (r[6] || p.t) === t) && (!q || p.n.toLowerCase().includes(q) || r[7].toLowerCase().includes(q)));
+  rows.sort((a, b) => ((a.r[kvSortK] ?? -1) - (b.r[kvSortK] ?? -1)) * kvSortDir);
+  const cols = [['Player'], ['Name then'], ['Type'], [k.m, 1], ['Target', 2], ['%', 3], ['Notes']];
+  $('kvkHead').innerHTML = cols.map(([h, i]) => `<th${i ? ` class="num" data-kv="${i}"` : ''}>${h}</th>`).join('');
+  $('kvkBody').innerHTML = rows.map(({p, r}) => `<tr data-i="${P.indexOf(p)}"><td>${esc(p.n)}</td>
+      <td>${r[7] === p.n ? '<span class="muted">same</span>' : esc(r[7])}</td><td>${r[6] ? r[6][0].toUpperCase() + r[6].slice(1) : typeTxt(p)}</td>
+      <td class="num">${r[1] == null ? '–' : short(r[1])}</td><td class="num">${r[2] ? short(r[2]) : '<span class="muted">–</span>'}</td>
+      <td class="num">${pctCell(r[3])}</td><td style="white-space:normal">${kvNote(r)}</td></tr>`).join('') ||
+    '<tr><td colspan="7" class="empty">No current players match.</td></tr>';
+  $('kvkCount').textContent = `${rows.length} current governor${rows.length === 1 ? '' : 's'} took part`;
+  $('kvkSub').textContent = `KvK ${n} · ${kvkWhen(n)}${k.e ? ' (date estimated)' : ''} · measured by ${k.m}` +
+    (k.m === 'Acclaim' ? '' : ' (no acclaim yet in this KvK)') + '. Only governors still in the kingdom are listed, matched by Governor ID.';
+}
+$('kvkSel').innerHTML = (DATA.kvks || []).slice().reverse().map(k => `<option value="${k.k}">KvK ${k.k} · ${kvkWhen(k.k)}</option>`).join('');
+['kvkSel', 'kvkSearch', 'kvkType'].forEach(id => $(id).addEventListener('input', renderKvk));
+$('kvkHead').addEventListener('click', e => {
+  const th = e.target.closest('th[data-kv]');
+  if (!th) return;
+  const k = +th.dataset.kv; kvSortDir = kvSortK === k ? -kvSortDir : -1; kvSortK = k; renderKvk();
+});
 
 // ---------- multi-select (R4 mode): change many accounts at once ----------
 const picked = new Set();  // player indexes ticked in the master list
@@ -788,7 +857,7 @@ $('finesBody').addEventListener('click', async e => {
 ['finesSearch', 'finesSel'].forEach(id => $(id).addEventListener('input', renderFines));
 
 // ---------- tabs (#t=players|activity|fines|review, plus p=<name> on the players tab) ----------
-const TABS = ['players', 'activity', 'fines', 'review'];
+const TABS = ['players', 'activity', 'fines', 'kvk', 'review'];
 let tab = 'activity';
 function setHash() {
   const q = new URLSearchParams({t: tab});
@@ -800,6 +869,7 @@ function renderSubtitle() {
     tab === 'activity' ? `${weekLabel(week)} ${week.slice(0, 4)}${partial(week) ? ` · partial data (${seen(week)} of ${maxSeen} players captured)` : ''} · minimum ${DATA.minF} forts and ${fmt(DATA.minT)} tech per week`
     : tab === 'players' ? `${fmt(P.length)} governors · alliances from the scan of ${dayLabel(DATA.scanDay)}` + (DATA.namesDay ? ` · names and power from the member export of ${dayLabel(DATA.namesDay)}` : '')
     : tab === 'fines' ? 'Fort fines from the 2nd offense on, and whether they have been paid'
+    : tab === 'kvk' ? 'Past KvK results of governors still in the kingdom'
     : 'Farm and main account changes waiting for approval';
 }
 function showTab(t) {
@@ -829,7 +899,7 @@ function selectPlayer(p) {
 function closePlayer() { $('playerDlg').close(); }
 
 function renderAll() {
-  renderSubtitle(); renderTiles(); renderTable(); renderRoster(); renderReview();
+  renderSubtitle(); renderTiles(); renderTable(); renderRoster(); renderReview(); renderKvk();
   if (tab === 'activity') renderOverview();
   renderPlayer();
 }
@@ -845,7 +915,7 @@ document.querySelectorAll('th[data-k]').forEach(th => th.addEventListener('click
   const k = th.dataset.k;
   sortDir = sortK === k ? -sortDir : (k === 'n' || k === 't' ? 1 : -1); sortK = k; renderTable();
 }));
-['tbody', 'rosterBody', 'pendBody', 'queueBody', 'finesBody'].forEach(id => $(id).addEventListener('click', e => {
+['tbody', 'rosterBody', 'pendBody', 'queueBody', 'finesBody', 'kvkBody'].forEach(id => $(id).addEventListener('click', e => {
   const tr = e.target.closest('tr[data-i]');
   if (tr && !e.target.closest('button, input, td.sel')) selectPlayer(P[+tr.dataset.i]);
 }));

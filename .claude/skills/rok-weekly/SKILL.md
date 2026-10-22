@@ -73,9 +73,18 @@ Old name lists (e.g. a past KvK sheet shared by link) seed history the same way:
 `python3 .claude/skills/rok-weekly/scripts/import_name_list.py <sheet link or csv> --date YYYY-MM-DD`
 (use the date the names were current, e.g. the end of the period the sheet covers; matched by Governor ID).
 
+## Past KvK sheets
+
+`python3 .claude/skills/rok-weekly/scripts/import_kvk.py N <sheet link> --date YYYY-MM-DD [--estimated]` imports
+one KvK (layout recognised from its headers: KP / DKP / Acclaim, targets, fines, status; several scans -> first and
+last) into `tracker/kvk/kvk<N>.csv` + `kvks.csv`, and its names into `tracker/names/<date>_kvk<N>.csv` (Name
+history, labelled "KvK N"). Shown in the player pop-up and the KvK history tab, matched by Governor ID.
+Imported: KvK 4, 6, 7, 8, 9, 10 (KvK 5 sheet is not shared publicly). Dates of KvK 7, 8, 9 are estimated
+(≈ Nov 2025, Feb 2026, May 2026) until the user gives them; rerun with the real `--date` to fix.
+
 ## Dashboard tabs
 
-Players (master list + player view) · Weekly activity · Fines · Review (R4 mode only: proposals waiting for the admin,
+Players (master list + player view) · Weekly activity · Fines · KvK history · Review (R4 mode only: proposals waiting for the admin,
 and unconfirmed accounts in the alliance with farm hints from `farm_hints()` in `track.py`). Links: `#t=<tab>`, `#t=players&p=<name>`.
 Future events (KvK, MGE, AoO, 20 GH…) get their own tab and data folder, sharing the master list, R4 keys and fines ledger.
 
