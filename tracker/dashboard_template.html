@@ -96,7 +96,7 @@ button.act { font: inherit; font-size: 12px; border-radius: 6px; padding: 4px 10
   border: 1px solid var(--series-1); background: var(--series-1); color: #fff; }
 button.act.ghost { background: none; color: var(--text-secondary); border-color: var(--border); }
 button.act:disabled { opacity: .5; cursor: wait; }
-#finesBody tr { cursor: default; }
+#finesBody tr:not([data-i]) { cursor: default; }
 .paid { color: var(--good); font-weight: 600; }
 .gate { display: none; }
 body.gating main { display: none; }
@@ -113,6 +113,12 @@ body.gating .gate { display: flex; flex-direction: column; align-items: center; 
 .badge { display: inline-block; min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--series-1);
   color: #fff; font-size: 11px; line-height: 18px; text-align: center; }
 .badge:empty { display: none; }
+#playerDlg { width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 16px 18px 20px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); color: var(--text-primary); }
+#playerDlg::backdrop { background: rgba(0, 0, 0, .45); }
+.dlg-close { float: right; font: inherit; font-size: 16px; line-height: 1; background: none; border: 1px solid var(--border);
+  color: var(--text-secondary); border-radius: 6px; padding: 6px 9px; cursor: pointer; margin: 0 0 8px 8px; }
+#playerDlg .player-head { margin-top: 0; }
 footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
 </style>
 </head>
@@ -137,20 +143,11 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
   </nav>
 
   <section data-panel="players" hidden>
-    <div class="card" id="playerCard">
-      <h2>Player</h2>
-      <div class="controls">
-        <input type="search" id="playerSearch" list="playerList" placeholder="Search a player…" autocomplete="off">
-        <datalist id="playerList"></datalist>
-      </div>
-      <div id="playerView"><div class="empty">Search a player, or click anyone in a list.</div></div>
-    </div>
-
     <div class="card">
       <h2>Master list</h2>
       <div class="sub" id="rosterSub"></div>
       <div class="controls">
-        <input type="search" id="rosterSearch" placeholder="Filter by name…" autocomplete="off">
+        <input type="search" id="rosterSearch" placeholder="Search any player…" autocomplete="off">
         <select id="allySel"></select>
         <select id="rosterType">
           <option value="all">Any type</option>
@@ -269,6 +266,10 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
 
   <footer id="footer"></footer>
 </main>
+<dialog id="playerDlg" aria-label="Player details">
+  <button class="dlg-close" id="dlgClose" type="button" aria-label="Close">✕</button>
+  <div id="playerView"></div>
+</dialog>
 <div id="tip"></div>
 
 <script>
@@ -459,7 +460,7 @@ function renderOverview() {
 
 function renderPlayer() {
   const p = current;
-  if (!p) return;
+  if (!p || !$('playerDlg').open) return;
   const lw = weeks.filter(w => p.w[w]).pop(), now = p.w[week], ranked = hasWeeks(p);
   const scanLine = p.pw != null
     ? `${p.a ? esc(p.a) : 'No alliance'} · power <b>${short(p.pw)}</b> · kill points <b>${short(p.kp)}</b> · deads ${short(p.dd)} · resources gathered ${short(p.rg)} <span class="muted">(scan ${dayLabel(DATA.scanDay)})</span>`
@@ -507,7 +508,7 @@ function statusCell(p) {
 }
 function renderRoster() {
   const q = $('rosterSearch').value.trim().toLowerCase(), ally = $('allySel').value, t = $('rosterType').value;
-  const rows = P.filter(p => (ally === 'all' || (p.a || '') === ally) && (!q || p.n.toLowerCase().includes(q) || (p.pn || []).some(n => n.toLowerCase().includes(q))) &&
+  const rows = P.filter(p => (q || ally === 'all' || (p.a || '') === ally) && (!q || p.n.toLowerCase().includes(q) || (p.pn || []).some(n => n.toLowerCase().includes(q))) &&
     (t === 'all' || (t === 'review' ? !p.c : t === 'likely' ? !p.c && strong(p) : p.t === t)));
   rows.sort((a, b) => {
     const va = a[rSortK] ?? (rSortK === 'n' || rSortK === 'a' || rSortK === 't' ? '' : -1), vb = b[rSortK] ?? (typeof va === 'string' ? '' : -1);
@@ -518,8 +519,8 @@ function renderRoster() {
       <td class="num">${short(p.pw)}</td><td class="num">${short(p.kp)}</td>
       <td>${roleTxt(p)}</td><td>${statusCell(p)}</td></tr>`).join('') ||
     '<tr><td colspan="6" class="empty">No players match.</td></tr>';
-  $('rosterCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'}`;
-  $('rosterSub').textContent = `Every governor in the kingdom scan of ${dayLabel(DATA.scanDay)}, plus anyone seen in the alliance rankings. Events are tracked for ${DATA.mainAlly} only.`;
+  $('rosterCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'}` + (q && ally !== 'all' ? ' · searching all alliances' : '');
+  $('rosterSub').textContent = `Every governor in the kingdom scan and member export, plus anyone seen in the alliance rankings. Click a name for details. Events are tracked for ${DATA.mainAlly} only.`;
 }
 
 // ---------- review (R4 mode) ----------
@@ -608,7 +609,7 @@ function renderFines() {
       : paid ? `${gold(paid)} of ${gold(f.a)} paid${l ? ` <span class="muted">${esc(l.by)}</span>` : ''}` : '<span class="below">Unpaid</span>';
     const act = !officer ? '' : `<td>${l ? `<button class="act ghost" data-undo="${f.id}" type="button">Undo</button>`
       : `<button class="act" data-pay="${f.id}" type="button">Mark paid</button>`}</td>`;
-    return `<tr><td>${esc(name)}</td>${act}<td>${weekLabel(f.wk)}</td><td class="num">${f.m}</td><td class="num">${gold(f.a)}</td><td>${status}</td></tr>`;
+    return `<tr${f.p != null ? ` data-i="${f.p}"` : ''}><td>${esc(name)}</td>${act}<td>${weekLabel(f.wk)}</td><td class="num">${f.m}</td><td class="num">${gold(f.a)}</td><td>${status}</td></tr>`;
   }).join('') || `<tr><td colspan="${officer ? 6 : 5}" class="empty">No fines match.</td></tr>`;
   const owed = F.reduce((a, f) => a + Math.max(0, f.a - paidOf(f)), 0);
   $('finesCount').textContent = `${rows.length} fine${rows.length === 1 ? '' : 's'} · ${gold(owed)} gold still unpaid in total` +
@@ -684,13 +685,13 @@ const TABS = ['players', 'activity', 'fines', 'review'];
 let tab = 'activity';
 function setHash() {
   const q = new URLSearchParams({t: tab});
-  if (tab === 'players' && current) q.set('p', current.n);
+  if (current) q.set('p', current.n);
   history.replaceState(null, '', location.pathname + location.search + '#' + q);  // keeps ?key= in R4 mode
 }
 function renderSubtitle() {
   $('subtitle').textContent =
     tab === 'activity' ? `${weekLabel(week)} ${week.slice(0, 4)}${partial(week) ? ` · partial data (${seen(week)} of ${maxSeen} players captured)` : ''} · minimum ${DATA.minF} forts and ${fmt(DATA.minT)} tech per week`
-    : tab === 'players' ? `${fmt(P.filter(p => p.pw != null).length)} governors in the scan of ${dayLabel(DATA.scanDay)}`
+    : tab === 'players' ? `${fmt(P.length)} governors · alliances from the scan of ${dayLabel(DATA.scanDay)}` + (DATA.namesDay ? ` · names and power from the member export of ${dayLabel(DATA.namesDay)}` : '')
     : tab === 'fines' ? 'Fort fines from the 2nd offense on, and whether they have been paid'
     : 'Farm and main account changes for the R5 to approve';
 }
@@ -700,42 +701,44 @@ function showTab(t) {
   document.querySelectorAll('section[data-panel]').forEach(sec => { sec.hidden = sec.dataset.panel !== tab; });
   renderSubtitle();
   if (tab === 'activity') renderOverview();  // charts need a visible width
-  if (tab === 'players') renderPlayer();
   setHash();
 }
 function route() {
   const q = new URLSearchParams(location.hash.slice(1)), name = q.get('p');
-  if (name) { current = P.find(p => p.n === name) || current; if (current) $('playerSearch').value = current.n; }
-  showTab(q.get('t') || (name ? 'players' : tab));
+  const p = name && (P.find(p => p.n === name) || P.find(p => (p.pn || []).includes(name)));
+  showTab(q.get('t') || (p ? 'players' : tab));
+  if (p) selectPlayer(p); else if ($('playerDlg').open) $('playerDlg').close();
 }
 
+// Player details open in a pop-up over whatever list was clicked.
 function selectPlayer(p) {
-  current = p; $('playerSearch').value = p.n;
-  showTab('players');
-  $('playerCard').scrollIntoView({behavior: 'smooth', block: 'start'});
+  const dlg = $('playerDlg');
+  current = p;
+  if (!dlg.open) { dlg.showModal(); dlg.appendChild(tip); }  // the tooltip must live in the top layer too
+  dlg.scrollTop = 0;
+  renderPlayer();
+  setHash();
 }
+function closePlayer() { $('playerDlg').close(); }
 
 function renderAll() {
   renderSubtitle(); renderTiles(); renderTable(); renderRoster(); renderReview();
   if (tab === 'activity') renderOverview();
-  if (tab === 'players') renderPlayer();
+  renderPlayer();
 }
 
 // ---------- wiring ----------
 $('weekSel').innerHTML = weeks.slice().reverse().map(w => `<option value="${w}">${weekLabel(w)} ${w.slice(0, 4)}${partial(w) ? ' (partial data)' : ''}</option>`).join('');
 $('weekSel').addEventListener('change', e => { week = e.target.value; renderAll(); });
-$('playerList').innerHTML = P.map(p => `<option value="${esc(p.n)}">`).join('');
-$('playerSearch').addEventListener('input', e => {
-  const v = e.target.value.trim().toLowerCase();
-  const p = P.find(p => p.n.toLowerCase() === v) || P.find(p => (p.pn || []).some(n => n.toLowerCase() === v));
-  if (p) { current = p; renderPlayer(); setHash(); }
-});
+$('dlgClose').addEventListener('click', closePlayer);
+$('playerDlg').addEventListener('click', e => { if (e.target === $('playerDlg')) closePlayer(); });  // click on the backdrop
+$('playerDlg').addEventListener('close', () => { current = null; hideTip(); document.body.appendChild(tip); setHash(); });
 ['tableSearch', 'typeSel', 'offSel'].forEach(id => $(id).addEventListener('input', renderTable));
 document.querySelectorAll('th[data-k]').forEach(th => th.addEventListener('click', () => {
   const k = th.dataset.k;
   sortDir = sortK === k ? -sortDir : (k === 'n' || k === 't' ? 1 : -1); sortK = k; renderTable();
 }));
-['tbody', 'rosterBody', 'pendBody', 'queueBody'].forEach(id => $(id).addEventListener('click', e => {
+['tbody', 'rosterBody', 'pendBody', 'queueBody', 'finesBody'].forEach(id => $(id).addEventListener('click', e => {
   const tr = e.target.closest('tr[data-i]');
   if (tr && !e.target.closest('button')) selectPlayer(P[+tr.dataset.i]);
 }));
@@ -761,7 +764,7 @@ $('themeBtn').addEventListener('click', () => {
 });
 $('footer').textContent = `Updated ${DATA.updated}. Fort counts are per player; a fort destroyed in a rally counts for every participant. Farms and the R5 are excluded from rewards; farms have no penalty.`;
 let rt;
-addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (tab === 'activity') renderOverview(); if (tab === 'players') renderPlayer(); }, 150); });
+addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (tab === 'activity') renderOverview(); renderPlayer(); }, 150); });
 // With ?key= the page stays behind the "Checking" screen until the key is verified, then renders in R4 mode.
 readKey();
 (async () => {
