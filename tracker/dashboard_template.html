@@ -694,7 +694,7 @@ document.addEventListener('click', async e => {
       body: JSON.stringify({key: r4key, account_id: p.id, action: b.dataset.decide})});
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || 'not saved');
-    if (ok) alert(`Approved. Recalculation: ${j.recalc || 'runs within the hour'}`);
+    if (ok) alert(`Approved. The dashboard updates ${String(j.recalc).startsWith('started') ? 'in a few minutes' : 'within the hour'}.`);
     await loadLedger();
   } catch (err) { alert('Not saved: ' + err.message + '. Try again.'); b.disabled = false; }
 });
