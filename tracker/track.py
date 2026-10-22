@@ -96,8 +96,15 @@ def account_id(k):
 def pull_ledger():
     """Ledger -> fines_online.csv (payments, matched to offense_log.csv) and accounts_online.csv
     (approved farm/main changes, matched to every known account)."""
-    with urllib.request.urlopen(FINES_URL, timeout=30) as resp:
-        ledger = json.load(resp)
+    for attempt in (1, 2):  # the web app can take a while to wake up, especially right after a redeploy
+        try:
+            with urllib.request.urlopen(FINES_URL, timeout=60) as resp:
+                ledger = json.load(resp)
+            break
+        except OSError:
+            if attempt == 2:
+                raise
+            print('Ledger slow to answer, retrying once')
     pull_accounts(ledger.get('accounts', {}))
     paid = ledger['paid']
     fines = {fine_id(r['governor_id'], r['week']): r for r in read('offense_log.csv') if num(r['fine_gold'])}
