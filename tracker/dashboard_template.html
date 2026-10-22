@@ -98,10 +98,19 @@ button.act.ghost { background: none; color: var(--text-secondary); border-color:
 button.act:disabled { opacity: .5; cursor: wait; }
 #finesBody tr { cursor: default; }
 .paid { color: var(--good); font-weight: 600; }
+.gate { display: none; }
+body.gating main { display: none; }
+body.gating .gate { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  min-height: 100vh; color: var(--text-secondary); }
+.spin { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--series-1);
+  animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
 </style>
 </head>
 <body>
+<script>if (/[?&]key=/.test(location.search)) document.body.classList.add('gating');  // no flash of the read-only page</script>
+<div class="gate"><div class="spin"></div><div>Checking your R4 link…</div></div>
 <main>
   <header>
     <div>
@@ -439,7 +448,8 @@ function forgetKey() { location.href = location.pathname; }
 async function loadLedger() {
   if (!DATA.finesUrl) return;
   try {
-    const r = await fetch(DATA.finesUrl + (r4key ? '?key=' + encodeURIComponent(r4key) : ''));
+    const r = await fetch(DATA.finesUrl + (r4key ? '?key=' + encodeURIComponent(r4key) : ''),
+      AbortSignal.timeout ? {signal: AbortSignal.timeout(20000)} : {});
     const j = await r.json();
     ledger = j.paid || {}; officer = j.officer || null;
   } catch (e) {
@@ -545,10 +555,15 @@ const fromHash = decodeURIComponent((location.hash.match(/p=([^&]+)/) || [])[1] 
 if (fromHash) current = P.find(p => p.n === fromHash) || null;
 let rt;
 addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { renderOverview(); renderPlayer(); }, 150); });
+// With ?key= the page stays behind the "Checking" screen until the key is verified, then renders in R4 mode.
 readKey();
-renderAll(); renderFines();
-if (current) $('playerSearch').value = current.n;
-loadLedger();
+(async () => {
+  if (r4key) await loadLedger();
+  document.body.classList.remove('gating');
+  renderAll(); renderFines();
+  if (current) $('playerSearch').value = current.n;
+  if (!r4key) loadLedger();
+})();
 </script>
 </body>
 </html>

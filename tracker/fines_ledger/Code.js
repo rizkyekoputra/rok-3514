@@ -20,19 +20,49 @@ const rows = name => (tab(name) || (setup(), tab(name))).getDataRange().getValue
 // Player names come from the game; stop "=..." etc. being read as a formula.
 const plain = s => String(s == null ? '' : s).slice(0, 80).replace(/^([=+\-@])/, "'$1");
 
-// Run once from the editor: creates the tabs and a key + link for every R4 not listed yet.
+const newKey = () => Utilities.getUuid().replace(/-/g, '');
+
+// Sheet menu, so keys can be managed without opening the script editor.
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu('3514')
+    .addItem('Create keys for missing R4s', 'menuSetup')
+    .addItem('New key for selected R4', 'rotateSelected')
+    .addToUi();
+}
+
+function menuSetup() {
+  const added = setup();
+  SpreadsheetApp.getUi().alert(added.length ? `Created keys for: ${added.join(', ')}` : 'Every R4 already has a key.');
+}
+
+// Replace the key (and link) on the selected Officers row; the old link stops working at once.
+function rotateSelected() {
+  const ui = SpreadsheetApp.getUi(), sh = book().getActiveSheet(), r = sh.getActiveRange().getRow();
+  if (sh.getName() !== 'Officers' || r < 2 || !sh.getRange(r, 1).getValue())
+    return ui.alert('Select an R4 row in the Officers tab first.');
+  const name = sh.getRange(r, 1).getValue();
+  if (ui.alert(`Give ${name} a new key? Their current link stops working.`, ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+  const key = newKey();
+  sh.getRange(r, 2, 1, 3).setValues([[key, 'active', DASHBOARD + '?key=' + key]]);
+  ui.alert(`New link for ${name} is in column D. Send it to them privately.`);
+}
+
+// Creates the tabs and a key + link for every R4 not listed yet; returns the names added.
 function setup() {
   Object.keys(HEADERS).forEach(name => {
     const sh = tab(name) || book().insertSheet(name);
     if (sh.getLastRow() === 0) sh.appendRow(HEADERS[name]).setFrozenRows(1);
   });
   const known = rows('Officers').map(r => r[0]);
-  R4.filter(n => !known.includes(n)).forEach(n => {
-    const key = Utilities.getUuid().replace(/-/g, '');
+  const added = R4.filter(n => !known.includes(n));
+  added.forEach(n => {
+    const key = newKey();
     tab('Officers').appendRow([n, key, 'active', DASHBOARD + '?key=' + key]);
   });
+  console.log(`Officers listed: ${known.length}; keys created for ${added.length}: ${added.join(', ')}`);
   const blank = book().getSheetByName('Sheet1');
   if (blank && book().getSheets().length > 2 && blank.getLastRow() === 0) book().deleteSheet(blank);
+  return added;
 }
 
 function officer(key) {

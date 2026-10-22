@@ -43,8 +43,9 @@ A name containing "farm" or ending in `F<number>` is a farm. Everything else def
 always list new unconfirmed mains that failed the minimum and ask the user if they are farms.
 When the user says an account is a farm (or R4), set `type`/`role` and `confirmed = yes` in `accounts.csv` and rerun.
 For a new or removed R4, also update the `R4` list in `tracker/fines_ledger/Code.js`, then from that folder
-`clasp push -f && clasp update-deployment <deployment id from FINES_URL>`, and have the user run `setup` in the
-script editor (adds a key + link for new names; to remove an R4, set their `status` to `revoked` in the Officers tab).
+`clasp push -f && clasp update-deployment <deployment id from FINES_URL>`, and have the user click
+**3514 → Create keys for missing R4s** in the sheet (adds a key + link for new names; to remove an R4, set their
+`status` to `revoked` in the Officers tab). **3514 → New key for selected R4** rotates one R4's key.
 Changing an account's type applies retroactively to every week.
 
 ## Processing a week
