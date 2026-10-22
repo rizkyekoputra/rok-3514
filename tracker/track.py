@@ -41,7 +41,8 @@ FINES_URL = 'https://script.google.com/macros/s/AKfycbxjPVSNgqPqh5ki0M_dEydbNi2k
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-# Accounts not yet in accounts.csv: "Farm" anywhere in the name, or an F<number> suffix.
+# Farm-looking names ("Farm" anywhere, or an F<number> suffix). Only a hint: accounts not listed as farm
+# in accounts.csv (or approved as farm on the dashboard) are treated as main.
 FARM_NAME = re.compile(r'farm|\bF\d+\s*$', re.I)
 # Farm-looking name endings stripped to find the main a farm belongs to ("NAHKODA F1", "EdėlwėiS 02", "Totos Farm").
 FARM_TAIL = re.compile(r'(\s*(farm\w*|f\s*\d+|f|\d+))+\s*$', re.I)
@@ -181,7 +182,7 @@ def main():
         for r in rows:
             k = key(r)
             acc = accounts.get(k, {})
-            typ = acc.get('type') or ('farm' if FARM_NAME.search(r['name']) else 'main')
+            typ = acc.get('type') or 'main'
             forts, tech = num(r['forts']), num(r['tech'])
             s = state.setdefault(k, dict(offenses=0, streak=0, unpaid=0, lifetime=0, cleared=0, last=''))
             s.update(name=r['name'], type=typ, role=acc.get('role', ''))
@@ -464,7 +465,7 @@ def write_dashboard(history, state, accounts, fines):
         if k not in ids:  # governors not in the alliance rankings (yet); export-only ones are below the scan
             a = accounts.get(k, {})
             ids[k] = len(players)
-            players.append(dict(n=r['name'], t=a.get('type') or ('farm' if FARM_NAME.search(r['name']) else 'main'),
+            players.append(dict(n=r['name'], t=a.get('type') or 'main',
                                 r=a.get('role', ''), w={}))
     for k, i in ids.items():
         s, a, r = state.get(k, {}), accounts.get(k, {}), scan.get(k)

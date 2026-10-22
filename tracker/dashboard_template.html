@@ -115,10 +115,24 @@ body.gating .gate { display: flex; flex-direction: column; align-items: center; 
 .badge:empty { display: none; }
 #playerDlg { width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 16px 18px 20px;
   border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); color: var(--text-primary); }
-#playerDlg::backdrop { background: rgba(0, 0, 0, .45); }
+#playerDlg::backdrop { background: rgba(0, 0, 0, .35); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.p-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--text-secondary); font-size: 13px; }
+.p-sec { margin: 16px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
+.p-sec .muted { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.stat { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.stat .v { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.stat .l { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.stat.bad .v { color: var(--critical); }
+.stat.good .v { color: var(--good); }
+.stat .v .muted { font-size: 14px; font-weight: 400; }
+.hints { display: flex; flex-wrap: wrap; gap: 6px; }
 .dlg-close { float: right; font: inherit; font-size: 16px; line-height: 1; background: none; border: 1px solid var(--border);
   color: var(--text-secondary); border-radius: 6px; padding: 6px 9px; cursor: pointer; margin: 0 0 8px 8px; }
 #playerDlg .player-head { margin-top: 0; }
+#playerDlg .grid2 { grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); }
+#playerDlg .stats { grid-template-columns: repeat(auto-fit, minmax(min(140px, 40%), 1fr)); }
+@media (max-width: 600px) { #playerDlg { width: calc(100vw - 16px); max-width: none; padding: 12px; } }
 footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
 </style>
 </head>
@@ -462,26 +476,32 @@ function renderPlayer() {
   const p = current;
   if (!p || !$('playerDlg').open) return;
   const lw = weeks.filter(w => p.w[w]).pop(), now = p.w[week], ranked = hasWeeks(p);
-  const scanLine = p.pw != null
-    ? `${p.a ? esc(p.a) : 'No alliance'} · power <b>${short(p.pw)}</b> · kill points <b>${short(p.kp)}</b> · deads ${short(p.dd)} · resources gathered ${short(p.rg)} <span class="muted">(scan ${dayLabel(DATA.scanDay)})</span>`
-    : 'Not in the latest kingdom scan';
-  const weekLine = ranked
-    ? (now ? `${weekLabel(week)}: <b>${fmt(now.f)}</b> forts · <b>${now.x == null ? 'not captured' : fmt(now.x)}</b> tech` : `Not in the ranking for ${weekLabel(week)}` + (lw ? ` (last seen ${weekLabel(lw)})` : '')) +
-      (!isFarm(p) ? ` · lifetime offenses: ${p.lt}` : '')
-    : 'Not in the alliance fort/tech rankings';
+  const tile = (v, l, cls = '') => `<div class="stat ${cls}"><div class="v">${v}</div><div class="l">${l}</div></div>`;
+  const kingdom = p.pw != null ? `
+    <div class="p-sec">Kingdom stats <span class="muted">· scan ${dayLabel(DATA.scanDay)}${DATA.namesDay && DATA.namesDay !== DATA.scanDay ? `, power ${dayLabel(DATA.namesDay)}` : ''}</span></div>
+    <div class="stats">${tile(short(p.pw), 'Power')}${tile(short(p.kp), 'Kill points')}${tile(short(p.dd), 'Deads')}${tile(short(p.rg), 'Resources gathered')}</div>` : '';
+  const due = !isFarm(p) ? unpaidOf(p) : 0;
+  const activity = ranked ? `
+    <div class="p-sec">Weekly activity <span class="muted">· ${now ? weekLabel(week) : `not in the ${weekLabel(week)} ranking` + (lw ? `, last seen ${weekLabel(lw)}` : '')}</span></div>
+    <div class="stats">${now ? tile(fmt(now.f), `Forts <span class="muted">(min ${DATA.minF})</span>`, now.f < DATA.minF ? 'bad' : 'good') +
+      tile(now.x == null ? '<span class="muted">not captured</span>' : fmt(now.x), `Tech <span class="muted">(min ${short(DATA.minT)})</span>`, now.x == null ? '' : now.x < DATA.minT ? 'bad' : 'good') : ''}${
+      !isFarm(p) ? tile(p.lt, 'Lifetime offenses', p.lt ? 'bad' : '') + tile(due ? gold(due) : '–', 'Unpaid fines (gold)', due ? 'bad' : '') : ''}</div>` : '';
   $('playerView').innerHTML = `
     <div class="player-head">
       <span class="name">${esc(p.n)}</span>
       <span class="chip">${roleTxt(p)}</span>
       ${p.c ? '' : `<span class="chip">${strong(p) ? '<span class="dot" style="background:var(--serious)"></span>Likely farm · ' : ''}not confirmed</span>`}
       ${ranked ? chip(p.o, isFarm(p)) : ''}
-      ${!isFarm(p) && unpaidOf(p) ? `<span class="chip">Unpaid fines: ${gold(unpaidOf(p))} gold</span>` : ''}
       ${typeNote(p)}
     </div>
-    <div class="sub">${scanLine}</div>
-    <div class="sub">${weekLine}${p.pn && p.pn.length ? ` · previously: ${p.pn.map(esc).join(', ')}` : ''}</div>
-    ${!p.c && p.h && p.h.length ? `<div class="sub">Farm hints: ${p.h.map(esc).join(' · ')}</div>` : ''}
-    ${ranked ? `<div class="grid2" style="margin-top:12px">
+    <div class="p-meta">
+      <span>${p.a ? esc(p.a) : p.pw != null ? 'No alliance' : 'Not in the latest scan'}</span>
+      ${ranked ? '' : '<span>Not in the alliance fort/tech rankings</span>'}
+      ${p.pn && p.pn.length ? `<span>Previously: ${p.pn.map(esc).join(', ')}</span>` : ''}
+    </div>
+    ${!p.c && p.h && p.h.length ? `<div class="p-sec">Farm hints</div><div class="hints">${p.h.map(h => `<span class="chip">${esc(h)}</span>`).join('')}</div>` : ''}
+    ${kingdom}${activity}
+    ${ranked ? `<div class="grid2" style="margin-top:16px">
       <div><h2>Forts per week</h2>
         <div class="legend"><span><i class="line" style="background:var(--series-1)"></i>Forts</span><span><i class="dash"></i>Minimum ${DATA.minF}</span></div>
         <div id="pForts"></div></div>

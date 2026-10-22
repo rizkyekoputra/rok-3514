@@ -42,8 +42,10 @@ Never hand-edit generated files; change inputs and rerun `python3 tracker/track.
 
 ## Farm rule
 
-A name containing "farm" or ending in `F<number>` is a farm. Everything else defaults to **main with `confirmed = no`** —
-always list new unconfirmed mains that failed the minimum and ask the user if they are farms.
+Only accounts **listed as farm** in `accounts.csv` (or approved as farm on the dashboard) are farms. Every other
+account, including names with "farm" or an `F<number>` suffix, defaults to **main with `confirmed = no`**; a
+farm-looking name is only a hint (dashboard Review tab). List new unconfirmed mains that failed the minimum,
+flag the farm-looking ones, and ask the user.
 When the user says an account is a farm (or R4), set `type`/`role` and `confirmed = yes` in `accounts.csv` and rerun.
 R4s can also propose farm/main on the dashboard; once the admin (the user) approves, `accounts_online.csv` overrides `accounts.csv`.
 To make such a change permanent, copy it into `accounts.csv`.

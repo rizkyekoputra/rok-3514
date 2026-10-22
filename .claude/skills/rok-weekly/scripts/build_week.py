@@ -11,7 +11,7 @@ What it does:
   - checks both rankings have every rank 1..N and the same set of names
   - matches each screen name to a Governor ID in the export (exact, then a unique close match)
   - uses the export's spelling as the current name
-  - adds new accounts to tracker/accounts.csv (farm if the name has "farm" or an F<number> suffix)
+  - adds new accounts to tracker/accounts.csv as main (unconfirmed); farm-looking names are only flagged
   - records renames in accounts.csv previous_names
   - prints everything that needs a human look
 
@@ -139,15 +139,14 @@ for row in rows:
             x['previous_names'] = ';'.join(filter(None, [x['previous_names'], x['name']]))
             x['name'] = row['name']
     else:
-        farm = bool(FARM.search(row['name']))
-        x = dict(governor_id=row['governor_id'], name=row['name'], type='farm' if farm else 'main',
-                 role='', confirmed='yes' if farm else 'no', previous_names='')
+        # main until an R4 proposes farm and the admin approves (or the user says so)
+        x = dict(governor_id=row['governor_id'], name=row['name'], type='main', role='', confirmed='no', previous_names='')
         acc.append(x)
         new.append(x)
         (by_id if x['governor_id'] else by_name)[x['governor_id'] or x['name']] = x
 if new:
-    print(f'++ new accounts: farms {[x["name"] for x in new if x["type"] == "farm"]}')
-    print(f'++ new accounts treated as MAIN until confirmed: {[x["name"] for x in new if x["type"] == "main"]}')
+    print(f'++ new accounts (main until confirmed): {[x["name"] for x in new]}')
+    print(f'++   of which the name looks like a farm: {[x["name"] for x in new if FARM.search(x["name"])]}')
 seen = {r['governor_id'] for r in rows if r['governor_id']} | {r['name'] for r in rows if not r['governor_id']}
 prev = sorted(f for f in os.listdir(os.path.join(TRACKER, 'weeks')) if f < a.monday)
 if prev:
