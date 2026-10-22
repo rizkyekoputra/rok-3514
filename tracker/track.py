@@ -7,6 +7,8 @@ Reads:
   fines_paid.csv    governor_id, name, week, gold_paid, note  (entered by hand)
   fines_online.csv  same columns, pulled from the R4 fines ledger (Google Sheet) by --pull
   scans/<date>.csv  latest kingdom scan = master player list (made by import_scan.py from the TOP500 xlsx)
+  names/<date>.csv  governor_id, name, power from the latest member export (import_export.py): current name
+                    per ID, plus governors below the TOP500 scan
   accounts_online.csv  governor_id, name, type, approved_by, decided: farm/main changes R4s proposed and the
                     R5 approved in the ledger (--pull); they override accounts.csv
 
@@ -404,13 +406,13 @@ def split_mail(title, head, intro, items, outro):
             chunks = trial
     return build(chunks)
 
-def latest_scan():
-    """(date, {key: row}) of the newest scans/<date>.csv, or ('', {})."""
-    d = os.path.join(HERE, 'scans')
+def latest(folder):
+    """(date, {key: row}) of the newest <folder>/<date>.csv, or ('', {})."""
+    d = os.path.join(HERE, folder)
     days = sorted(f[:-4] for f in os.listdir(d) if f.endswith('.csv')) if os.path.isdir(d) else []
     if not days:
         return '', {}
-    return days[-1], {key(r): r for r in read(f'scans/{days[-1]}.csv')}
+    return days[-1], {key(r): r for r in read(f'{folder}/{days[-1]}.csv')}
 
 
 def core(name):
@@ -449,9 +451,10 @@ def write_dashboard(history, state, accounts, fines):
             p = players[ids[l['key']]]
             p.update(n=l['name'], t=l['type'], r=l['role'])
             p['w'][wk] = dict(f=l['forts'], x=l['tech'], o=l['offense'] or 0, d=l['due'] or 0)
-    scan_day, scan = latest_scan()
-    for k, r in scan.items():  # scan-only governors: not in the alliance rankings (yet)
-        if k not in ids:
+    scan_day, scan = latest('scans')
+    names_day, names = latest('names')
+    for k, r in list(scan.items()) + [(k, r) for k, r in names.items() if k not in scan]:
+        if k not in ids:  # governors not in the alliance rankings (yet); export-only ones are below the scan
             a = accounts.get(k, {})
             ids[k] = len(players)
             players.append(dict(n=r['name'], t=a.get('type') or ('farm' if FARM_NAME.search(r['name']) else 'main'),
@@ -465,6 +468,14 @@ def write_dashboard(history, state, accounts, fines):
         if r:  # a = alliance, pw = power, kp = kill points, dd = deads, rg = resources gathered (latest scan)
             p.update(a=r['alliance'] if r['alliance'] != '-' else '', pw=num(r['power']), kp=num(r['killpoints']),
                      dd=num(r['deads']), rg=num(r['rss_gathered']))
+        new = names.get(k)
+        if new:  # the member export is the newest source for names (and power, when newer than the scan)
+            for old in (p['n'], r and r['name']):
+                if old and old != new['name'] and old not in p['pn']:
+                    p['pn'].append(old)
+            p['n'] = new['name']
+            if names_day >= scan_day or p.get('pw') is None:
+                p['pw'] = num(new['power'])
     mains = [p['n'] for p in players if p['t'] == 'main' and p['c']] + [p['n'] for p in players if p['t'] == 'main' and not p['c']]
     for p in players:
         if not p['c']:
@@ -472,7 +483,7 @@ def write_dashboard(history, state, accounts, fines):
     # p = player index; Governor IDs stay local. h = paid by hand (fines_paid.csv), not in the ledger.
     fines = [dict({x: v for x, v in f.items() if x != 'k'}, p=ids.get(f['k'])) for f in fines]
     data = dict(weeks=[wk for wk, _ in history], minF=MIN_FORTS, minT=MIN_TECH, players=players,
-                fines=fines, finesUrl=FINES_URL, scanDay=scan_day, mainAlly=MAIN_ALLIANCE,
+                fines=fines, finesUrl=FINES_URL, scanDay=scan_day, namesDay=names_day, mainAlly=MAIN_ALLIANCE,
                 updated=date.today().isoformat())
     with open(os.path.join(HERE, 'dashboard_template.html'), encoding='utf-8') as f:
         html = f.read()

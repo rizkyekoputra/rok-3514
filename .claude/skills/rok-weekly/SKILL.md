@@ -58,6 +58,14 @@ Changing an account's type applies retroactively to every week.
 When the user drops a new `TOP500-<date>-….xlsx`: `.venv/bin/python .claude/skills/rok-weekly/scripts/import_scan.py FILE`,
 rerun `track.py`, push, publish. The master list, alliances and farm hints update from it.
 
+## New member export (latest names)
+
+`data-from-ingame/3514_<from>_<to>_statsExport.xlsx` is the in-game member export for the whole kingdom.
+`.venv/bin/python .claude/skills/rok-weekly/scripts/import_export.py FILE` (check renames) then `--write`:
+writes `tracker/names/<to-date>.csv` (latest name + power per ID, wins over scan and week names on the dashboard)
+and records renames in `accounts.csv`. Governors below the TOP500 scan join the master list without an alliance.
+Its kill points / kills cover only its date range, so they are not used as lifetime stats.
+
 ## Dashboard tabs
 
 Players (master list + player view) · Weekly activity · Fines · Review (R4 mode only: proposals waiting for the R5,
