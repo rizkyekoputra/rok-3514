@@ -4,18 +4,23 @@
 Reads:
   accounts.csv      governor_id, name, type (main/farm), confirmed
   weeks/<monday>.csv governor_id, name, fort_rank, forts, tech_rank, tech  (blank = not captured)
-  fines_paid.csv    governor_id, name, week, gold_paid, note
+  fines_paid.csv    governor_id, name, week, gold_paid, note  (entered by hand)
+  fines_online.csv  same columns, pulled from the R4 fines ledger (Google Sheet) by --pull
 
 Writes:
   status.csv                 current offense status per account
   reports/<monday>.md        weekly report for each week file
 
-Usage: python3 track.py
+Usage: python3 track.py          rebuild from local files
+       python3 track.py --pull   first refresh fines_online.csv from the ledger
 """
 import csv
+import hashlib
 import json
 import os
 import re
+import sys
+import urllib.request
 from datetime import date, timedelta
 
 MIN_FORTS = 70
@@ -25,12 +30,15 @@ MAIL_LIMIT = 2000  # in-game mail character limit
 BANK = 'KINGDOM 3514'  # bank KD account that receives fines
 CLEAR_AFTER = 2  # consecutive passing weeks that clear all recorded offenses
 
+# R4 fines ledger (Apps Script web app in fines_ledger/); the dashboard reads and writes it.
+FINES_URL = 'https://script.google.com/macros/s/AKfycbxjPVSNgqPqh5ki0M_dEydbNi2kFoV2O6xjH8qS84i9BrJhKKW3FfEwBC82XMDeGVz6/exec'
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 # Accounts not yet in accounts.csv: "Farm" anywhere in the name, or an F<number> suffix.
 FARM_NAME = re.compile(r'farm|\bF\d+\s*$', re.I)
 
-# Top-10 fort rewards; farms and R4/R5 are not eligible. Every R4 gets R4_REWARD.
+# Top-10 fort rewards; farms and the R5 are not eligible, R4s are. Every R4 also gets R4_REWARD.
 REWARDS = ['Legendary Trophy + 10K VIP', 'Epic Trophy + 5K VIP', 'Epic Trophy'] + \
           ['Elite Trophy'] * 5 + ['Advanced Trophy'] * 2
 R4_REWARD = 'Advanced Trophy'
@@ -65,6 +73,29 @@ def gold(n):
     return f'{n / 1e3:g}K gold'
 
 
+def fine_id(k, wk):
+    """Stable public id for one week's fine, so the dashboard never needs Governor IDs."""
+    return hashlib.sha1(f'3514|{k}|{wk}'.encode()).hexdigest()[:10]
+
+
+def pull_payments():
+    """Ledger payments -> fines_online.csv, matched to fines in the last offense_log.csv."""
+    fines = {fine_id(r['governor_id'], r['week']): r for r in read('offense_log.csv') if num(r['fine_gold'])}
+    with urllib.request.urlopen(FINES_URL, timeout=30) as resp:
+        paid = json.load(resp)['paid']
+    with open(os.path.join(HERE, 'fines_online.csv'), 'w', newline='', encoding='utf-8-sig') as f:
+        w = csv.writer(f)
+        w.writerow(['governor_id', 'name', 'week', 'gold_paid', 'note'])
+        for fid, p in sorted(paid.items(), key=lambda kv: kv[1]['time']):
+            if fid in fines:
+                r = fines[fid]
+                w.writerow([r['governor_id'], r['name'], r['week'], int(p['amount']),
+                            f"marked by {p['by']} {p['time'][:10]}"])
+            else:
+                print(f'Ledger payment {fid} matches no fine in offense_log.csv, skipped')
+    print(f'Pulled {len(paid)} payment(s) from the fines ledger')
+
+
 def penalty(offense, missing, unpaid):
     """Return (fine_in_gold, action text) for the Nth offense."""
     if offense == 1:
@@ -81,15 +112,19 @@ def penalty(offense, missing, unpaid):
 
 def main():
     accounts = {key(a): a for a in read('accounts.csv')}
-    paid = {}
-    for p in read('fines_paid.csv'):
-        k = (key(p), p['week'])
-        paid[k] = paid.get(k, 0) + (num(p['gold_paid']) or 0)
+    paid, by_hand = {}, {}
+    for src in ('fines_paid.csv', 'fines_online.csv'):
+        for p in read(src):
+            k = (key(p), p['week'])
+            paid[k] = paid.get(k, 0) + (num(p['gold_paid']) or 0)
+            if src == 'fines_paid.csv':
+                by_hand[k] = paid[k]
 
     weeks = sorted(f[:-4] for f in os.listdir(os.path.join(HERE, 'weeks')) if f.endswith('.csv'))
     state = {}  # key -> current offense status
     log = []  # every offense and clearance, kept even after a record is wiped
     history = []  # (week, report lines) for the dashboard
+    fines = []  # every fine, for the dashboard's fines panel
 
     for wk in weeks:
         rows = read(f'weeks/{wk}.csv')
@@ -124,6 +159,9 @@ def main():
                     row.update(offense=s['offenses'], action=act, due=s['unpaid'])
                     log.append([wk, k, s['name'], s['role'], forts, row['miss_f'],
                                 f"offense {s['offenses']}", act, fine, s['unpaid']])
+                    if fine:
+                        fines.append(dict(id=fine_id(k, wk), k=k, n=s['name'], wk=wk, a=fine, m=row['miss_f'],
+                                          h=by_hand.get((k, wk), 0)))
             s['unpaid'] = max(0, s['unpaid'] - paid.get((k, wk), 0))
             lines.append(row)
         seen = {key(r) for r in rows}
@@ -149,7 +187,7 @@ def main():
                     'fine_gold', 'total_owed_gold'])
         w.writerows(log)
 
-    write_dashboard(history, state, accounts)
+    write_dashboard(history, state, accounts, fines)
 
 
 def write_report(wk, lines):
@@ -160,7 +198,7 @@ def write_report(wk, lines):
     farm_low = [l for l in lines if l['type'] == 'farm' and l['miss_f']]
     tech_low = sorted([l for l in lines if l['miss_t'] and l['type'] == 'main'], key=lambda l: -l['miss_t'])
     cleared = [l for l in lines if l['action'].startswith('Cleared')]
-    ranked = sorted([l for l in lines if l['forts'] is not None and l['type'] == 'main' and not l['role']],
+    ranked = sorted([l for l in lines if l['forts'] is not None and l['type'] == 'main' and l['role'] != 'R5'],
                     key=lambda l: -l['forts'])
     r4 = [l for l in lines if l['role'] == 'R4']
 
@@ -172,7 +210,7 @@ def write_report(wk, lines):
            f'| Main accounts below tech minimum | {len(tech_low)} |',
            f'| Farms below fort minimum (no penalty) | {len(farm_low)} |',
            f'| Offenses cleared this week | {len(cleared)} |', '',
-           '## Ranking rewards', '', 'R5 and R4 are excluded from the top 10.', '',
+           '## Ranking rewards', '', 'Farms and the R5 are excluded from the top 10; R4s can place.', '',
            '| Place | Player | Forts | Reward |', '|---|---|---|---|']
     for i, l in enumerate(ranked[:len(REWARDS)]):
         reward = REWARDS[i]
@@ -269,7 +307,7 @@ def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low):
              '<b><color=navy>WEEKLY REQUIREMENTS</color></b>',
              f'[ FORT ] Minimum <b>{MIN_FORTS} Forts/week</b>',
              f'[ TECH ] Minimum <b>{MIN_TECH // 1000}K Tech Donations/week</b>', '',
-             '<b>RANKING REWARDS</b> <i>(main accounts; farms, R4 and R5 excluded)</i>',
+             '<b>RANKING REWARDS</b> <i>(main accounts incl. R4; farms and R5 excluded)</i>',
              f'<color=#DAA520><b>1st:</b></color> {REWARDS[0]} + $5 Flux <i>(min {FLUX_FORTS} Forts)</i>',
              f'<color=#808080><b>2nd:</b></color> {REWARDS[1]}',
              f'<color=#CD7F32><b>3rd:</b></color> {REWARDS[2]}',
@@ -326,7 +364,7 @@ def split_mail(title, head, intro, items, outro):
             chunks = trial
     return build(chunks)
 
-def write_dashboard(history, state, accounts):
+def write_dashboard(history, state, accounts, fines):
     """Fill dashboard_template.html with this season's data -> dashboard/index.html (public page).
     Only names and weekly numbers go out; no Governor IDs."""
     ids, players = {}, []
@@ -344,8 +382,10 @@ def write_dashboard(history, state, accounts):
         s, a = state.get(k, {}), accounts.get(k, {})
         players[i].update(o=s.get('offenses', 0), u=s.get('unpaid', 0), lt=s.get('lifetime', 0),
                           pn=[n for n in a.get('previous_names', '').split(';') if n])
+    # p = player index; Governor IDs stay local. h = paid by hand (fines_paid.csv), not in the ledger.
+    fines = [dict({x: v for x, v in f.items() if x != 'k'}, p=ids.get(f['k'])) for f in fines]
     data = dict(weeks=[wk for wk, _ in history], minF=MIN_FORTS, minT=MIN_TECH, players=players,
-                updated=date.today().isoformat())
+                fines=fines, finesUrl=FINES_URL, updated=date.today().isoformat())
     with open(os.path.join(HERE, 'dashboard_template.html'), encoding='utf-8') as f:
         html = f.read()
     os.makedirs(os.path.join(HERE, 'dashboard'), exist_ok=True)
@@ -354,4 +394,6 @@ def write_dashboard(history, state, accounts):
 
 
 if __name__ == '__main__':
+    if '--pull' in sys.argv:
+        pull_payments()
     main()

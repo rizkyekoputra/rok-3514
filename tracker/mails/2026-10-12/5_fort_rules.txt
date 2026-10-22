@@ -6,7 +6,7 @@
 [ FORT ] Minimum <b>70 Forts/week</b>
 [ TECH ] Minimum <b>50K Tech Donations/week</b>
 
-<b>RANKING REWARDS</b> <i>(main accounts; farms, R4 and R5 excluded)</i>
+<b>RANKING REWARDS</b> <i>(main accounts incl. R4; farms and R5 excluded)</i>
 <color=#DAA520><b>1st:</b></color> Legendary Trophy + 10K VIP + $5 Flux <i>(min 200 Forts)</i>
 <color=#808080><b>2nd:</b></color> Epic Trophy + 5K VIP
 <color=#CD7F32><b>3rd:</b></color> Epic Trophy

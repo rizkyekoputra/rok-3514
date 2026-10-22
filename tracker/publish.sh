@@ -1,9 +1,10 @@
 #!/bin/sh
 # Rebuild reports, mails and the dashboard, then push the dashboard to GitHub Pages.
 # Only dashboard/index.html is published; raw data files stay on this laptop.
+# Payments R4s marked on the dashboard are pulled from the fines ledger first.
 set -e
 cd "$(dirname "$0")"
-python3 track.py
+python3 track.py --pull
 cd dashboard
 if [ ! -d .git ]; then
   git init -q -b main

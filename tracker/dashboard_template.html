@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
 <title>3514 Weekly Activity</title>
 <style>
 :root {
@@ -87,6 +88,16 @@ tbody tr:hover { background: var(--chip-bg); }
 .below { color: var(--critical); font-weight: 600; }
 .below::after { content: " ▼"; font-size: 10px; }
 .empty { color: var(--text-muted); padding: 24px 0; text-align: center; }
+.officer { margin-top: 12px; padding: 8px 12px; border-radius: 8px; background: var(--chip-bg); font-size: 13px;
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.officer[hidden] { display: none; }
+.officer.bad { color: var(--critical); }
+button.act { font: inherit; font-size: 12px; border-radius: 6px; padding: 4px 10px; cursor: pointer;
+  border: 1px solid var(--series-1); background: var(--series-1); color: #fff; }
+button.act.ghost { background: none; color: var(--text-secondary); border-color: var(--border); }
+button.act:disabled { opacity: .5; cursor: wait; }
+#finesBody tr { cursor: default; }
+.paid { color: var(--good); font-weight: 600; }
 footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
 </style>
 </head>
@@ -99,6 +110,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
     </div>
     <button class="theme" id="themeBtn" type="button">Theme</button>
   </header>
+  <div class="officer" id="officerBar" hidden></div>
 
   <div class="controls">
     <label class="sub" for="weekSel">Week</label>
@@ -129,6 +141,26 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       <datalist id="playerList"></datalist>
     </div>
     <div id="playerView"><div class="empty">Pick a player above or click a row in the table.</div></div>
+  </div>
+
+  <div class="card" id="finesCard">
+    <h2>Fines</h2>
+    <div class="sub" id="finesSub">Fines from the 2nd offense on, and whether they have been paid.</div>
+    <div class="controls">
+      <input type="search" id="finesSearch" placeholder="Filter by name…" autocomplete="off">
+      <select id="finesSel">
+        <option value="unpaid">Unpaid</option>
+        <option value="paid">Paid</option>
+        <option value="all">All fines</option>
+      </select>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th>Player</th><th id="finesActTh" hidden></th><th>Week</th><th class="num">Missing forts</th><th class="num">Fine</th><th>Status</th>
+      </tr></thead>
+      <tbody id="finesBody"></tbody>
+    </table></div>
+    <div class="sub" id="finesCount"></div>
   </div>
 
   <div class="card">
@@ -353,7 +385,7 @@ function renderPlayer() {
       <span class="name">${esc(p.n)}</span>
       <span class="chip">${roleTxt(p)}</span>
       ${chip(p.o, isFarm(p))}
-      ${!isFarm(p) && p.u ? `<span class="chip">Unpaid fines: ${gold(p.u)} gold</span>` : ''}
+      ${!isFarm(p) && unpaidOf(p) ? `<span class="chip">Unpaid fines: ${gold(unpaidOf(p))} gold</span>` : ''}
     </div>
     <div class="sub">${now ? `${weekLabel(week)}: <b>${fmt(now.f)}</b> forts · <b>${now.x == null ? 'not captured' : fmt(now.x)}</b> tech` : `Not in the ranking for ${weekLabel(week)}` + (lw ? ` (last seen ${weekLabel(lw)})` : '')}
       ${!isFarm(p) ? ` · lifetime offenses: ${p.lt}` : ''}${p.pn && p.pn.length ? ` · previously: ${p.pn.map(esc).join(', ')}` : ''}</div>
@@ -391,6 +423,88 @@ function renderTable() {
   $('tableCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'} · ${weekLabel(week)} · ▼ = below minimum`;
 }
 
+// ---------- fines ledger (Apps Script web app; R4s write with a personal ?key= link) ----------
+const F = DATA.fines || [];
+let ledger = null, officer = null, r4key = null;  // ledger: {fine_id: {amount, by, time}} once loaded
+const paidOf = f => (f.h || 0) + (ledger && ledger[f.id] ? ledger[f.id].amount : 0);
+const unpaidOf = p => ledger ? F.filter(f => P[f.p] === p).reduce((a, f) => a + Math.max(0, f.a - paidOf(f)), 0) : p.u;
+
+// R4 mode only while ?key= is in the address; nothing is stored, so the plain link is always read-only.
+function readKey() {
+  r4key = new URLSearchParams(location.search).get('key');
+  try { localStorage.removeItem('r4key'); } catch (e) {}  // drop keys saved by the earlier version of this page
+}
+function forgetKey() { location.href = location.pathname; }
+
+async function loadLedger() {
+  if (!DATA.finesUrl) return;
+  try {
+    const r = await fetch(DATA.finesUrl + (r4key ? '?key=' + encodeURIComponent(r4key) : ''));
+    const j = await r.json();
+    ledger = j.paid || {}; officer = j.officer || null;
+  } catch (e) {
+    $('finesSub').textContent = 'Could not load the latest payments; showing the last published totals.';
+  }
+  renderOfficer(); renderFines(); renderPlayer();
+}
+
+function renderOfficer() {
+  const bar = $('officerBar');
+  bar.hidden = !r4key || !ledger;
+  bar.classList.toggle('bad', !officer);
+  bar.innerHTML = officer
+    ? `<span>Logged in as <b>${esc(officer)}</b> (R4) · <a href="#finesCard">Go to fines ↓</a> to mark them as paid.</span><button class="act ghost" id="logoutBtn" type="button">Leave R4 mode</button>`
+    : `<span>This R4 link is not valid or has been revoked. Ask the R5 for a new one.</span><button class="act ghost" id="logoutBtn" type="button">Dismiss</button>`;
+  const b = $('logoutBtn'); if (b) b.addEventListener('click', forgetKey);
+  $('finesActTh').hidden = !officer;
+}
+
+function renderFines() {
+  const q = $('finesSearch').value.trim().toLowerCase(), sel = $('finesSel').value;
+  const rows = F.map(f => ({f, paid: paidOf(f), name: f.p != null ? P[f.p].n : f.n}))
+    .filter(r => (!q || r.name.toLowerCase().includes(q) || r.f.n.toLowerCase().includes(q)) &&
+      (sel === 'all' || (sel === 'paid') === (r.paid >= r.f.a)))
+    .sort((a, b) => b.f.wk.localeCompare(a.f.wk) || b.f.a - a.f.a);
+  $('finesBody').innerHTML = rows.map(({f, paid, name}) => {
+    const l = ledger && ledger[f.id], full = paid >= f.a;
+    const status = full ? `<span class="paid">✓ Paid</span>${l ? ` <span class="muted">${esc(l.by)}, ${l.time.slice(0, 10)}</span>` : ''}`
+      : paid ? `${gold(paid)} of ${gold(f.a)} paid${l ? ` <span class="muted">${esc(l.by)}</span>` : ''}` : '<span class="below">Unpaid</span>';
+    const act = !officer ? '' : `<td>${l ? `<button class="act ghost" data-undo="${f.id}" type="button">Undo</button>`
+      : `<button class="act" data-pay="${f.id}" type="button">Mark paid</button>`}</td>`;
+    return `<tr><td>${esc(name)}</td>${act}<td>${weekLabel(f.wk)}</td><td class="num">${f.m}</td><td class="num">${gold(f.a)}</td><td>${status}</td></tr>`;
+  }).join('') || `<tr><td colspan="${officer ? 6 : 5}" class="empty">No fines match.</td></tr>`;
+  const owed = F.reduce((a, f) => a + Math.max(0, f.a - paidOf(f)), 0);
+  $('finesCount').textContent = `${rows.length} fine${rows.length === 1 ? '' : 's'} · ${gold(owed)} gold still unpaid in total` +
+    (ledger ? '' : ' (last published totals)');
+}
+
+async function sendPayment(f, action, amount) {
+  const r = await fetch(DATA.finesUrl, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
+    body: JSON.stringify({key: r4key, fine_id: f.id, player: f.p != null ? P[f.p].n : f.n, week: f.wk, amount, action})});
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'not saved');
+}
+
+$('finesBody').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-pay], button[data-undo]');
+  if (!b || !officer) return;
+  const f = F.find(f => f.id === (b.dataset.pay || b.dataset.undo)), name = f.p != null ? P[f.p].n : f.n;
+  let action = 'undo', amount = 0;
+  if (b.dataset.pay) {
+    const due = f.a - (f.h || 0);
+    const v = prompt(`Gold paid by ${name} for ${weekLabel(f.wk)} (fine ${gold(f.a)}). You can type 9M or 9000000:`, due);
+    if (v == null) return;
+    const m = String(v).trim().toUpperCase().match(/^([\d.,]+)\s*([KMB]?)$/);  // "9M", "1.5B", "9,000,000"
+    amount = m ? Number(m[1].replace(/,/g, '')) * ({K: 1e3, M: 1e6, B: 1e9}[m[2]] || 1) : NaN;
+    if (!(amount > 0)) return alert('Enter the amount of gold paid.');
+    action = 'paid';
+  } else if (!confirm(`Undo the payment recorded for ${name} (${weekLabel(f.wk)})?`)) return;
+  b.disabled = true;
+  try { await sendPayment(f, action, amount); await loadLedger(); }
+  catch (err) { alert('Not saved: ' + err.message + '. Try again.'); b.disabled = false; }
+});
+['finesSearch', 'finesSel'].forEach(id => $(id).addEventListener('input', renderFines));
+
 function selectPlayer(p) {
   current = p; $('playerSearch').value = p.n; renderPlayer();
   history.replaceState(null, '', '#p=' + encodeURIComponent(p.n));
@@ -426,13 +540,15 @@ $('themeBtn').addEventListener('click', () => {
   root.dataset.theme = dark ? 'light' : 'dark';
   try { localStorage.setItem('theme', root.dataset.theme); } catch (e) {}
 });
-$('footer').textContent = `Updated ${DATA.updated}. Fort counts are per player; a fort destroyed in a rally counts for every participant. Farms, R4 and R5 are excluded from rewards; farms have no penalty.`;
+$('footer').textContent = `Updated ${DATA.updated}. Fort counts are per player; a fort destroyed in a rally counts for every participant. Farms and the R5 are excluded from rewards; farms have no penalty.`;
 const fromHash = decodeURIComponent((location.hash.match(/p=([^&]+)/) || [])[1] || '');
 if (fromHash) current = P.find(p => p.n === fromHash) || null;
 let rt;
 addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { renderOverview(); renderPlayer(); }, 150); });
-renderAll();
+readKey();
+renderAll(); renderFines();
 if (current) $('playerSearch').value = current.n;
+loadLedger();
 </script>
 </body>
 </html>

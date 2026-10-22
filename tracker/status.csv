@@ -16,7 +16,7 @@
 116658943,Лехачь,main,,2,0,16500000,1M gold per missing fort + unpaid fines,2,0,2026-10-12
 name:иэхт,иэхт,main,,2,0,21500000,1M gold per missing fort + unpaid fines,2,0,2026-10-12
 35959280,чм чм,main,,2,0,22500000,1M gold per missing fort + unpaid fines,2,0,2026-10-12
-143927794,ᴳᴼ 乛iSeng,main,,2,0,35000000,1M gold per missing fort + unpaid fines,2,0,2026-10-12
+143927794,ᴳᴼ 乛iSeng,main,,2,0,0,1M gold per missing fort + unpaid fines,2,0,2026-10-12
 171854288,ᴹᴬᴰMladen,main,,2,0,34000000,1M gold per missing fort + unpaid fines,2,0,2026-10-12
 181007209,なおちん,main,,2,0,1000000,1M gold per missing fort + unpaid fines,2,0,2026-10-12
 12132610,么Angelzᴳᵈ,main,,2,0,35000000,1M gold per missing fort + unpaid fines,2,0,2026-10-12
@@ -31,7 +31,7 @@ name:Aм,Aм,main,,1,1,0,500K gold per missing fort,1,0,2026-10-05
 62179665,Kangak,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
 175932098,Lorenzaメtreme,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
 143465265,Momo Xtreme,main,,1,0,0,500K gold per missing fort,1,0,2026-10-05
-167152470,Nyyaaa,main,,1,1,0,500K gold per missing fort,1,0,2026-10-05
+167152470,Nyyaaa,main,R4,1,1,0,500K gold per missing fort,1,0,2026-10-05
 169620110,PISANGkeju,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
 181014308,Phuc loc,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
 205685285,SIINISTA,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
@@ -109,7 +109,7 @@ name:KNTLkecil F4,KNTLkecil F4,farm,,0,0,0,-,0,0,
 180710733,SAXAA F1,farm,,0,0,0,-,0,0,
 180974743,SAXAA F2,farm,,0,0,0,-,0,0,
 180891655,Sau Farm,farm,,0,0,0,-,0,0,
-145988051,Saxaa メtreme,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+145988051,Saxaa メtreme,main,R4,0,2,0,Forgiven + Low Contribution label,0,0,
 124169478,SenOpati ᵀᴹ,main,,0,1,0,Forgiven + Low Contribution label,0,0,
 128919567,Senopati ᵀᴹ,main,,0,1,0,Forgiven + Low Contribution label,0,0,
 66139477,SenoritaSTONKS,farm,,0,0,0,-,0,0,
@@ -142,7 +142,7 @@ name:KNTLkecil F4,KNTLkecil F4,farm,,0,0,0,-,0,0,
 name:susuKNTLfarmx,susuKNTLfarmx,farm,,0,0,0,-,0,0,
 name:susuKNTLfarmz,susuKNTLfarmz,farm,,0,0,0,-,0,0,
 65787218,susuKNTLmaniez,main,,0,2,0,Forgiven + Low Contribution label,0,0,
-158118163,xxYxx,main,,0,1,0,Forgiven + Low Contribution label,0,0,
+158118163,xxYxx,main,R4,0,1,0,Forgiven + Low Contribution label,0,0,
 7542395,xynee,main,,0,2,0,Forgiven + Low Contribution label,0,0,
 193600497,xynee 01,farm,,0,0,0,-,0,0,
 180576879,ʳˡᶠDRAGON,main,,0,1,0,Forgiven + Low Contribution label,0,0,
@@ -155,12 +155,12 @@ name:susuKNTLfarmz,susuKNTLfarmz,farm,,0,0,0,-,0,0,
 190986564,ツ 3D,main,R4,0,1,0,Forgiven + Low Contribution label,0,0,
 145249382,ツ 3D farm 1,farm,,0,0,0,-,0,0,
 191969224,ツ 3D farm 2,farm,,0,0,0,-,0,0,
-181195856,メ S L A Y E R メ,main,,0,1,0,Forgiven + Low Contribution label,0,0,
+181195856,メ S L A Y E R メ,main,R4,0,1,0,Forgiven + Low Contribution label,0,0,
 173812467,乂DDoms1,farm,,0,0,0,-,0,0,
 173086933,乂DDoms2,farm,,0,0,0,-,0,0,
 177598328,乂DDoms3,farm,,0,0,0,-,0,0,
 194359727,么 EVENEZ,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-196791907,么 QUEEN,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+196791907,么 QUEEN,main,R4,0,2,0,Forgiven + Low Contribution label,0,0,
 106884408,亗VăN KăY亗,main,,0,2,0,Forgiven + Low Contribution label,0,0,
 127431256,戰乄LORD,main,,0,1,0,Forgiven + Low Contribution label,0,0,
 120215581,戰乄LORD 1,main,,0,1,0,Forgiven + Low Contribution label,0,0,

@@ -15,7 +15,9 @@ to read the rankings accurately, match names to Governor IDs, and keep `accounts
 | `tracker/track.py` | Recomputes everything from scratch: offenses, fines, clearance, reports, mails, dashboard. Rules are constants at the top (`MIN_FORTS`, `MIN_TECH`, `REWARDS`, `BANK`, `MAIL_LIMIT`…) |
 | `tracker/accounts.csv` | One row per account: `governor_id, name, type (main/farm), role (R4/R5/blank), confirmed, previous_names`. Accounts with no ID are keyed by name |
 | `tracker/weeks/<monday>.csv` | One file per week: `governor_id, name, fort_rank, forts, tech_rank, tech` (blank = not captured) |
-| `tracker/fines_paid.csv` | `governor_id, name, week, gold_paid, note`. `week` = the Monday of the week the fine was issued |
+| `tracker/fines_paid.csv` | `governor_id, name, week, gold_paid, note`. `week` = the Monday of the week the fine was issued. Hand-entered payments only |
+| `tracker/fines_online.csv` | Same columns, payments R4s marked on the dashboard; written by `track.py --pull` (generated) |
+| `tracker/fines_ledger/` | Apps Script (clasp project, owned by the Google account clasp is logged in as) bound to the "3514 Fines" Google Sheet: `Officers` tab = one personal dashboard key per R4, `Payments` tab = append-only payment log. `track.py` `FINES_URL` points at its web app |
 | `tracker/reports/<monday>.md` | Weekly report (generated) |
 | `tracker/mails/<monday>/` | In-game alliance mails, RoK rich text, each ≤ 2000 chars (generated) |
 | `tracker/status.csv`, `tracker/offense_log.csv` | Current status and full offense history (generated) |
@@ -31,7 +33,7 @@ Never hand-edit generated files; change inputs and rerun `python3 tracker/track.
 - Fort penalties apply to **main accounts, including R4 and R5**; farms never get penalties.
   1st forgiven + Low Contribution label · 2nd 500K gold × missing forts · 3rd 1M gold × missing + unpaid fines · 4th must migrate (or zeroed).
 - **2 passing weeks in a row wipe all current offenses**; history stays in `offense_log.csv`; unpaid fines stay owed.
-- Rewards: top 10 by forts among main accounts, **farms, R4 and R5 excluded**. 1 Legendary Trophy + 10K VIP (+$5 Flux if ≥200 forts), 2 Epic Trophy + 5K VIP, 3 Epic Trophy, 4–8 Elite Trophy, 9–10 Advanced Trophy; every R4 gets an Advanced Trophy.
+- Rewards: top 10 by forts among main accounts **including R4**; **farms and the R5 excluded**. 1 Legendary Trophy + 10K VIP (+$5 Flux if ≥200 forts), 2 Epic Trophy + 5K VIP, 3 Epic Trophy, 4–8 Elite Trophy, 9–10 Advanced Trophy; every R4 also gets an Advanced Trophy (on top of any top-10 reward).
 - Fines are paid to the bank KD account **KINGDOM 3514** (the R5).
 - Fort counts are per-participant credits (every rally member gets credit). A sum of forts is **"fort credits"**, never "forts destroyed".
 
@@ -40,6 +42,9 @@ Never hand-edit generated files; change inputs and rerun `python3 tracker/track.
 A name containing "farm" or ending in `F<number>` is a farm. Everything else defaults to **main with `confirmed = no`** —
 always list new unconfirmed mains that failed the minimum and ask the user if they are farms.
 When the user says an account is a farm (or R4), set `type`/`role` and `confirmed = yes` in `accounts.csv` and rerun.
+For a new or removed R4, also update the `R4` list in `tracker/fines_ledger/Code.js`, then from that folder
+`clasp push -f && clasp update-deployment <deployment id from FINES_URL>`, and have the user run `setup` in the
+script editor (adds a key + link for new names; to remove an R4, set their `status` to `revoked` in the Officers tab).
 Changing an account's type applies retroactively to every week.
 
 ## Processing a week
@@ -69,7 +74,8 @@ Changing an account's type applies retroactively to every week.
 
 ## Other requests
 
-- **Fine paid**: append to `tracker/fines_paid.csv` (week = Monday of the week the fine was issued), rerun.
+- **Fine paid**: R4s mark payments on the dashboard with their personal `?key=` link; `publish.sh` pulls them.
+  Only if the user reports one directly, append to `tracker/fines_paid.csv` (week = Monday the fine was issued) and rerun.
 - **Rule change**: edit the constants in `tracker/track.py`; the rules mail (`5_fort_rules.txt`) regenerates from them.
 - **Missing rank or wrong number** reported by the user: fix the week CSV row, rerun.
 
