@@ -3,13 +3,13 @@
 
 <size=24><color=navy>══════ ✿ ══════</color></size>
 
-Fort Credits: <b>16,421</b> (main accounts: 12,169)
+Fort Credits: <b>16,421</b> (main accounts: 11,634)
 <i>Sum of every member's fort count. A fort destroyed in a rally counts once for each participant, so this is not the number of unique forts destroyed.</i>
-Total Tech Donations: <b>7,619,600</b> (main accounts: 5,800,500)
+Total Tech Donations: <b>7,619,600</b> (main accounts: 5,492,500)
 <i>Sum of all 149 members in the ranking, farms included.</i>
 
-Main accounts reaching 70 Forts: <b>74/112</b>
-Main accounts reaching 50K Tech: <b>72/112</b>
+Main accounts reaching 70 Forts: <b>69/107</b>
+Main accounts reaching 50K Tech: <b>67/107</b>
 
 <b><color=navy>TOP FORT REWARDS</color></b>
 <color=#DAA520><b>1.</b></color> N A H K O D A (802) – Legendary Trophy + 10K VIP + $5 Flux
