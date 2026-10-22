@@ -2,7 +2,7 @@
 """Import one KvK's tracking sheet into tracker/kvk/ and seed name history from it.
 
 Every KvK sheet has its own layout; this recognises them by their headers and keeps what each one has:
-  KP sheets     (KvK 4-7)    KP gained vs a target, KP %, fines, MIGRATED/ZEROED/paid notes, deads when present
+  KP sheets     (KvK 3-7)    KP gained vs a target, KP %, fines, MIGRATED/ZEROED/paid notes, deads when present
   DKP sheet     (KvK 8)        DKP gained vs target, DKP %
   Acclaim sheets(KvK 9, 10)    acclaim (vs target acclaim when present), status; several scans -> first/last
 Older KvKs have no acclaim (it was added to the game later), newer ones no KP target; missing = blank.
@@ -77,8 +77,9 @@ def main():
         metric, vi, tgi, pi = 'DKP', col('DKP Achievement'), col('Target KP'), col('DKP%')
     elif col('Target Acclaim') is not None:
         metric, vi, tgi, pi = 'Acclaim', accl, col('Initial Target', 'Target Acclaim'), col('Acclaim Progress %')
-    elif col('Total KP') is not None:
-        metric, vi, tgi, pi = 'KP', col('Total KP'), col('KP Required', 'Target KP (50% of power)', 'Target KP'), col('KP %')
+    elif col('Total KP', 'KP Gained') is not None:
+        metric, vi, tgi, pi = ('KP', col('Total KP', 'KP Gained'), col('KP Required', 'Target KP (50% of power)', 'Target KP'),
+                               col('KP %'))
     elif col('Last Scan Final') is not None:  # KvK 7: target was 100% of power (KP % = KP / power)
         metric, vi, tgi, pi = 'KP', col('Last Scan Final'), None, col('KP %')
     elif accl is not None:
