@@ -12,7 +12,7 @@ const R4 = ['Totos メtreme', 'Dobelメtreme', 'RockyメGirang', 'Depati Amir', 
             'Saxaa メtreme', 'Nyyaaa', '么 QUEEN', 'xxYxx', 'メ S L A Y E R メ'];
 // Officers who may also approve/reject farm/main changes on the dashboard (besides the admin in the sheet menu).
 // Also settable per row: approver = yes in the Officers tab.
-const APPROVERS = ['ＡＧＡＭ'];
+const APPROVERS = ['Totos メtreme', 'ＡＧＡＭ'];
 const HEADERS = {
   Officers: ['name', 'key', 'status', 'link', 'approver'],
   Payments: ['time', 'fine_id', 'player', 'week', 'amount', 'by', 'action'],
