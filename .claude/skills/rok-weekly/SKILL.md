@@ -14,6 +14,7 @@ to read the rankings accurately, match names to Governor IDs, and keep `accounts
 |---|---|
 | `tracker/track.py` | Recomputes everything from scratch: offenses, fines, clearance, reports, mails, dashboard. Rules are constants at the top (`MIN_FORTS`, `MIN_TECH`, `REWARDS`, `BANK`, `MAIL_LIMIT`…) |
 | `tracker/accounts.csv` | One row per account: `governor_id, name, type (main/farm), role (R4/R5/blank), confirmed, previous_names`. Accounts with no ID are keyed by name |
+| `tracker/scans/<date>.csv` | Kingdom scans (from `TOP500-<date>-….xlsx` via `scripts/import_scan.py`). The newest one is the **master player list** on the dashboard's Players tab: every governor with alliance, power, kill points. Events are tracked for `MAIN_ALLIANCE` ([14-X]THE MORTICIANS) only |
 | `tracker/weeks/<monday>.csv` | One file per week: `governor_id, name, fort_rank, forts, tech_rank, tech` (blank = not captured) |
 | `tracker/fines_paid.csv` | `governor_id, name, week, gold_paid, note`. `week` = the Monday of the week the fine was issued. Hand-entered payments only |
 | `tracker/fines_online.csv` | Same columns, payments R4s marked on the dashboard; written by `track.py --pull` (generated) |
@@ -51,6 +52,17 @@ For a new or removed R4, also update the `R4` list in `tracker/fines_ledger/Code
 **3514 → Create keys for missing R4s** in the sheet (adds a key + link for new names; to remove an R4, set their
 `status` to `revoked` in the Officers tab). **3514 → New key for selected R4** rotates one R4's key.
 Changing an account's type applies retroactively to every week.
+
+## New kingdom scan
+
+When the user drops a new `TOP500-<date>-….xlsx`: `.venv/bin/python .claude/skills/rok-weekly/scripts/import_scan.py FILE`,
+rerun `track.py`, push, publish. The master list, alliances and farm hints update from it.
+
+## Dashboard tabs
+
+Players (master list + player view) · Weekly activity · Fines · Review (R4 mode only: proposals waiting for the R5,
+and unconfirmed accounts in the alliance with farm hints from `farm_hints()` in `track.py`). Links: `#t=<tab>`, `#t=players&p=<name>`.
+Future events (KvK, MGE, AoO, 20 GH…) get their own tab and data folder, sharing the master list, R4 keys and fines ledger.
 
 ## Processing a week
 

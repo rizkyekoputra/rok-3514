@@ -6,6 +6,7 @@ Reads:
   weeks/<monday>.csv governor_id, name, fort_rank, forts, tech_rank, tech  (blank = not captured)
   fines_paid.csv    governor_id, name, week, gold_paid, note  (entered by hand)
   fines_online.csv  same columns, pulled from the R4 fines ledger (Google Sheet) by --pull
+  scans/<date>.csv  latest kingdom scan = master player list (made by import_scan.py from the TOP500 xlsx)
   accounts_online.csv  governor_id, name, type, approved_by, decided: farm/main changes R4s proposed and the
                     R5 approved in the ledger (--pull); they override accounts.csv
 
@@ -22,6 +23,7 @@ import json
 import os
 import re
 import sys
+import unicodedata
 import urllib.request
 from datetime import date, timedelta
 
@@ -39,6 +41,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 # Accounts not yet in accounts.csv: "Farm" anywhere in the name, or an F<number> suffix.
 FARM_NAME = re.compile(r'farm|\bF\d+\s*$', re.I)
+# Farm-looking name endings stripped to find the main a farm belongs to ("NAHKODA F1", "EdėlwėiS 02", "Totos Farm").
+FARM_TAIL = re.compile(r'(\s*(farm\w*|f\s*\d+|f|\d+))+\s*$', re.I)
+# Events are tracked for this alliance only; the master list shows every governor in the scan.
+MAIN_ALLIANCE = '[14-X]THE MORTICIANS'
 
 # Top-10 fort rewards; farms and the R5 are not eligible, R4s are. Every R4 also gets R4_REWARD.
 REWARDS = ['Legendary Trophy + 10K VIP', 'Epic Trophy + 5K VIP', 'Epic Trophy'] + \
@@ -398,9 +404,40 @@ def split_mail(title, head, intro, items, outro):
             chunks = trial
     return build(chunks)
 
+def latest_scan():
+    """(date, {key: row}) of the newest scans/<date>.csv, or ('', {})."""
+    d = os.path.join(HERE, 'scans')
+    days = sorted(f[:-4] for f in os.listdir(d) if f.endswith('.csv')) if os.path.isdir(d) else []
+    if not days:
+        return '', {}
+    return days[-1], {key(r): r for r in read(f'scans/{days[-1]}.csv')}
+
+
+def core(name):
+    """Name folded for comparing accounts: NFKC, case-folded, letters and digits only."""
+    return ''.join(c for c in unicodedata.normalize('NFKC', name).casefold() if c.isalnum())
+
+
+def farm_hints(p, mains):
+    """Why an unconfirmed account might be a farm (shown to R4s; they decide)."""
+    hints = []
+    if FARM_NAME.search(p['n']):
+        hints.append('Name looks like a farm')
+    base = core(FARM_TAIL.sub('', p['n']))
+    if len(base) >= 4 and base != core(p['n']):
+        owner = next((m for m in mains if m != p['n'] and core(m).startswith(base)), None)
+        if owner:
+            hints.append(f'Name matches {owner}')
+    if 'farm' in p.get('a', '').casefold():
+        hints.append(f"In a farm alliance ({p['a']})")
+    if p.get('pw') and p.get('kp') is not None and p['kp'] < p['pw']:
+        hints.append('Low kill points for its power')
+    return hints
+
+
 def write_dashboard(history, state, accounts, fines):
     """Fill dashboard_template.html with this season's data -> dashboard/index.html (public page).
-    Only names and weekly numbers go out; no Governor IDs."""
+    Players = everyone in the weekly rankings plus everyone in the latest scan. No Governor IDs go out."""
     ids, players = {}, []
     for wk, lines in history:
         for l in lines:
@@ -412,14 +449,31 @@ def write_dashboard(history, state, accounts, fines):
             p = players[ids[l['key']]]
             p.update(n=l['name'], t=l['type'], r=l['role'])
             p['w'][wk] = dict(f=l['forts'], x=l['tech'], o=l['offense'] or 0, d=l['due'] or 0)
+    scan_day, scan = latest_scan()
+    for k, r in scan.items():  # scan-only governors: not in the alliance rankings (yet)
+        if k not in ids:
+            a = accounts.get(k, {})
+            ids[k] = len(players)
+            players.append(dict(n=r['name'], t=a.get('type') or ('farm' if FARM_NAME.search(r['name']) else 'main'),
+                                r=a.get('role', ''), w={}))
     for k, i in ids.items():
-        s, a = state.get(k, {}), accounts.get(k, {})
-        players[i].update(id=account_id(k), o=s.get('offenses', 0), u=s.get('unpaid', 0), lt=s.get('lifetime', 0),
-                          pn=[n for n in a.get('previous_names', '').split(';') if n])
+        s, a, r = state.get(k, {}), accounts.get(k, {}), scan.get(k)
+        p = players[i]
+        p.update(id=account_id(k), o=s.get('offenses', 0), u=s.get('unpaid', 0), lt=s.get('lifetime', 0),
+                 pn=[n for n in a.get('previous_names', '').split(';') if n],
+                 c=a.get('confirmed') == 'yes' or bool(p.get('r')))  # c = type confirmed by the R5/R4s
+        if r:  # a = alliance, pw = power, kp = kill points, dd = deads, rg = resources gathered (latest scan)
+            p.update(a=r['alliance'] if r['alliance'] != '-' else '', pw=num(r['power']), kp=num(r['killpoints']),
+                     dd=num(r['deads']), rg=num(r['rss_gathered']))
+    mains = [p['n'] for p in players if p['t'] == 'main' and p['c']] + [p['n'] for p in players if p['t'] == 'main' and not p['c']]
+    for p in players:
+        if not p['c']:
+            p['h'] = farm_hints(p, mains)
     # p = player index; Governor IDs stay local. h = paid by hand (fines_paid.csv), not in the ledger.
     fines = [dict({x: v for x, v in f.items() if x != 'k'}, p=ids.get(f['k'])) for f in fines]
     data = dict(weeks=[wk for wk, _ in history], minF=MIN_FORTS, minT=MIN_TECH, players=players,
-                fines=fines, finesUrl=FINES_URL, updated=date.today().isoformat())
+                fines=fines, finesUrl=FINES_URL, scanDay=scan_day, mainAlly=MAIN_ALLIANCE,
+                updated=date.today().isoformat())
     with open(os.path.join(HERE, 'dashboard_template.html'), encoding='utf-8') as f:
         html = f.read()
     os.makedirs(os.path.join(HERE, 'dashboard'), exist_ok=True)
