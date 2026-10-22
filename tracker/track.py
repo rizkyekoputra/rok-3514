@@ -490,7 +490,7 @@ def farm_hints(p, mains):
 
 def write_dashboard(history, state, accounts, fines):
     """Fill dashboard_template.html with this season's data -> dashboard/index.html (public page).
-    Players = everyone in the weekly rankings plus everyone in the latest scan. No Governor IDs go out."""
+    Players = everyone in the weekly rankings plus everyone in the latest scan (with Governor ID)."""
     ids, players = {}, []
     for wk, lines in history:
         for l in lines:
@@ -513,7 +513,7 @@ def write_dashboard(history, state, accounts, fines):
     for k, i in ids.items():
         s, a, r = state.get(k, {}), accounts.get(k, {}), scan.get(k)
         p = players[i]
-        p.update(id=account_id(k), o=s.get('offenses', 0), u=s.get('unpaid', 0), lt=s.get('lifetime', 0),
+        p.update(id=account_id(k), g='' if k.startswith('name:') else k, o=s.get('offenses', 0), u=s.get('unpaid', 0), lt=s.get('lifetime', 0),
                  pn=[n for n in a.get('previous_names', '').split(';') if n],
                  c=a.get('confirmed') == 'yes' or bool(p.get('r')))  # c = type confirmed (accounts.csv, admin approval, or R4/R5)
         if r:  # a = alliance, pw = power, kp = kill points, dd = deads, rg = resources gathered (latest scan)

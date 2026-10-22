@@ -177,7 +177,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       <h2>Master list</h2>
       <div class="sub" id="rosterSub"></div>
       <div class="controls">
-        <input type="search" id="rosterSearch" placeholder="Search any player…" autocomplete="off">
+        <input type="search" id="rosterSearch" placeholder="Search name or ID…" autocomplete="off">
         <select id="allySel"></select>
         <select id="rosterType">
           <option value="all">Any type</option>
@@ -191,7 +191,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       <div class="table-wrap"><table>
         <thead><tr>
           <th class="sel" id="rosterSelTh" hidden><input type="checkbox" id="rosterAll" aria-label="Select all shown"></th>
-          <th data-rk="n">Player</th><th data-rk="a">Alliance</th>
+          <th data-rk="n">Player</th><th data-rk="g">ID</th><th data-rk="a">Alliance</th>
           <th class="num" data-rk="pw">Power</th><th class="num" data-rk="kp">Kill points</th>
           <th data-rk="t">Type</th><th>Status</th><th id="rosterActTh" hidden></th>
         </tr></thead>
@@ -537,6 +537,7 @@ function renderPlayer() {
   $('playerView').innerHTML = `
     <div class="player-head">
       <span class="name">${esc(p.n)}</span>
+      ${p.g ? `<span class="chip" style="font-variant-numeric:tabular-nums">ID ${p.g}</span>` : ''}
       <span class="chip">${typeTxt(p)}</span>${p.r ? `<span class="chip">${p.r}</span>` : ''}
       ${p.c ? '' : `<span class="chip">${strong(p) ? '<span class="dot" style="background:var(--serious)"></span>Likely farm · ' : ''}not confirmed</span>`}
       ${ranked ? chip(p.o, isFarm(p)) : ''}
@@ -587,20 +588,20 @@ function statusCell(p) {
 }
 function renderRoster() {
   const q = $('rosterSearch').value.trim().toLowerCase(), ally = $('allySel').value, t = $('rosterType').value;
-  const rows = P.filter(p => (q || ally === 'all' || (p.a || '') === ally) && (!q || p.n.toLowerCase().includes(q) || (p.pn || []).some(n => n.toLowerCase().includes(q))) &&
+  const rows = P.filter(p => (q || ally === 'all' || (p.a || '') === ally) && (!q || p.n.toLowerCase().includes(q) || (p.g || '').includes(q) || (p.pn || []).some(n => n.toLowerCase().includes(q))) &&
     (t === 'all' || (t === 'review' ? !p.c : t === 'likely' ? !p.c && strong(p) : p.t === t)));
   rows.sort((a, b) => {
-    const va = a[rSortK] ?? (rSortK === 'n' || rSortK === 'a' || rSortK === 't' ? '' : -1), vb = b[rSortK] ?? (typeof va === 'string' ? '' : -1);
+    const va = a[rSortK] ?? (['n', 'a', 't', 'g'].includes(rSortK) ? '' : -1), vb = b[rSortK] ?? (typeof va === 'string' ? '' : -1);
     return (typeof va === 'string' ? va.localeCompare(vb) : va - vb) * rSortDir;
   });
   const can = p => officer && !p.r && !typeState(p);  // R4/R5 and accounts with a change in flight can't be selected
   rosterShown = rows.filter(can);
   $('rosterBody').innerHTML = rows.map(p => `<tr data-i="${P.indexOf(p)}">
       ${officer ? `<td class="sel">${can(p) ? `<input type="checkbox" data-sel="${P.indexOf(p)}"${picked.has(P.indexOf(p)) ? ' checked' : ''} aria-label="Select ${esc(p.n)}">` : ''}</td>` : ''}
-      <td>${esc(p.n)}</td><td>${p.a ? esc(p.a) : '<span class="muted">–</span>'}</td>
+      <td>${esc(p.n)}</td><td class="muted" style="font-variant-numeric:tabular-nums">${p.g || '–'}</td><td>${p.a ? esc(p.a) : '<span class="muted">–</span>'}</td>
       <td class="num">${short(p.pw)}</td><td class="num">${short(p.kp)}</td>
       <td>${typeTxt(p)}</td><td>${statusCell(p)}</td>${officer ? `<td style="white-space:nowrap">${typeButtons(p)}</td>` : ''}</tr>`).join('') ||
-    `<tr><td colspan="${officer ? 8 : 6}" class="empty">No players match.</td></tr>`;
+    `<tr><td colspan="${officer ? 9 : 7}" class="empty">No players match.</td></tr>`;
   $('rosterActTh').hidden = $('rosterSelTh').hidden = !officer;
   renderBulk();
   $('rosterCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'}` + (q && ally !== 'all' ? ' · searching all alliances' : '');
