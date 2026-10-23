@@ -659,6 +659,16 @@ $('rosterAll').addEventListener('change', e => {
   rosterShown.forEach(p => e.target.checked ? picked.add(P.indexOf(p)) : picked.delete(P.indexOf(p)));
   renderRoster();
 });
+// Saves: the button says "Saving…" while the (sometimes slow) web app answers; once it confirms, the page shows
+// the change at once and refreshes everything from the sheet in the background.
+function saving(b) { b.disabled = true; b.dataset.label = b.textContent; b.textContent = 'Saving…'; }
+function notSaved(b, err) { alert('Not saved: ' + err.message + '. Try again.'); b.disabled = false; b.textContent = b.dataset.label; }
+function saved() { renderOfficer(); renderFines(); renderPlayer(); renderTable(); renderRoster(); renderReview(); loadLedger(); }
+function typeSaved(ids, type, approved) {
+  const now = new Date().toISOString();
+  ids.forEach(id => { changes[id] = approved ? {type, by: officer, decided: now} : {...changes[id], pending: {type, by: officer, time: now}}; });
+}
+
 $('bulkBar').addEventListener('click', async e => {
   const b = e.target.closest('button[data-bulk]');
   if (!b) return;
@@ -668,7 +678,7 @@ $('bulkBar').addEventListener('click', async e => {
   const names = list.slice(0, 12).map(p => p.n).join(', ') + (list.length > 12 ? ` and ${list.length - 12} more` : '');
   if (!confirm(`${approver ? 'Set' : 'Propose'} ${list.length} account${list.length === 1 ? '' : 's'} as ${type}?\n\n${names}` +
       (approver ? `\n\nEvery week is recalculated with the ${type} rules.` : '\n\nAn approver has to approve them.'))) return;
-  b.disabled = true;
+  saving(b);
   try {
     const r = await fetch(DATA.finesUrl, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
       body: JSON.stringify({key: r4key, action: type, accounts: list.map(p => ({account_id: p.id, player: p.n}))})});
@@ -677,8 +687,9 @@ $('bulkBar').addEventListener('click', async e => {
     alert(j.approved ? `Saved ${j.count}. The dashboard updates ${String(j.recalc).startsWith('started') ? 'in a few minutes' : 'within the hour'}.`
       : `Proposed ${j.count}. An approver will review them.`);
     picked.clear();
-    await loadLedger();
-  } catch (err) { alert('Not saved: ' + err.message + '. Try again.'); b.disabled = false; }
+    typeSaved(list.map(p => p.id), type, j.approved);
+    saved();
+  } catch (err) { notSaved(b, err); }
 });
 
 // ---------- review (R4 mode) ----------
@@ -829,15 +840,16 @@ document.addEventListener('click', async e => {
     ? `Confirm ${p.n} as a ${type} account?\n\nAn approver still has to approve it.`
     : `Propose ${p.n} as a ${type} account?\n\nAn approver has to approve it; after that every week is recalculated with the ${type} rules` + rules;
   if (!confirm(msg)) return;
-  b.disabled = true;
+  saving(b);
   try {
     const r = await fetch(DATA.finesUrl, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
       body: JSON.stringify({key: r4key, account_id: p.id, player: p.n, action: type})});
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || 'not saved');
     if (j.approved) alert(`Saved. The dashboard updates ${String(j.recalc).startsWith('started') ? 'in a few minutes' : 'within the hour'}.`);
-    await loadLedger();
-  } catch (err) { alert('Not saved: ' + err.message + '. Try again.'); b.disabled = false; }
+    typeSaved([p.id], type, j.approved);
+    saved();
+  } catch (err) { notSaved(b, err); }
 });
 
 document.addEventListener('click', async e => {
@@ -846,15 +858,17 @@ document.addEventListener('click', async e => {
   const p = P[+b.dataset.i], c = (changes[p.id] || {}).pending, ok = b.dataset.decide === 'approve';
   if (!c || !confirm(`${ok ? 'Approve' : 'Reject'}: ${p.n} → ${c.type === p.t ? 'confirm ' + c.type : c.type}?` +
       (ok ? '\n\nEvery week is recalculated with the new type.' : ''))) return;
-  b.disabled = true;
+  saving(b);
   try {
     const r = await fetch(DATA.finesUrl, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
       body: JSON.stringify({key: r4key, account_id: p.id, action: b.dataset.decide})});
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || 'not saved');
     if (ok) alert(`Approved. The dashboard updates ${String(j.recalc).startsWith('started') ? 'in a few minutes' : 'within the hour'}.`);
-    await loadLedger();
-  } catch (err) { alert('Not saved: ' + err.message + '. Try again.'); b.disabled = false; }
+    const {pending, ...rest} = changes[p.id];
+    changes[p.id] = ok ? {type: c.type, by: c.by, decided: new Date().toISOString()} : rest;
+    saved();
+  } catch (err) { notSaved(b, err); }
 });
 
 $('finesBody').addEventListener('click', async e => {
@@ -871,9 +885,14 @@ $('finesBody').addEventListener('click', async e => {
     if (!(amount > 0)) return alert('Enter the amount of gold paid.');
     action = 'paid';
   } else if (!confirm(`Undo the payment recorded for ${name} (${weekLabel(f.wk)})?`)) return;
-  b.disabled = true;
-  try { await sendPayment(f, action, amount); await loadLedger(); }
-  catch (err) { alert('Not saved: ' + err.message + '. Try again.'); b.disabled = false; }
+  saving(b);
+  try {
+    await sendPayment(f, action, amount);
+    ledger = {...ledger};
+    if (action === 'paid') ledger[f.id] = {amount, by: officer, time: new Date().toISOString()};
+    else delete ledger[f.id];
+    saved();
+  } catch (err) { notSaved(b, err); }
 });
 ['finesSearch', 'finesSel'].forEach(id => $(id).addEventListener('input', renderFines));
 
