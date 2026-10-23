@@ -11,6 +11,8 @@ Reads:
                     per ID, plus governors below the TOP500 scan. names/<date>_kvk<N>.csv = names in that KvK
                     (history only)
   kvk/kvks.csv, kvk/kvk<N>.csv  past KvK results per governor (import_kvk.py), shown in the player pop-up
+  ledger.json       last pulled ledger state (payments, account changes, SHA-256 of active R4 keys), published so the
+                    dashboard works before the slow web app answers
   accounts_online.csv  governor_id, name, type, approved_by, decided: farm/main changes R4s proposed and the
                     admin approved in the ledger (--pull); they override accounts.csv
 
@@ -109,6 +111,9 @@ def pull_ledger():
                 raise
             print('Ledger slow to answer, retrying once')
     pull_accounts(ledger.get('accounts', {}))
+    with open(os.path.join(HERE, 'ledger.json'), 'w', encoding='utf-8') as f:
+        json.dump({x: ledger.get(x, {} if x != 'officers' else []) for x in ('paid', 'accounts', 'officers')},
+                  f, ensure_ascii=False, indent=1, sort_keys=True)
     paid = ledger['paid']
     fines = {fine_id(r['governor_id'], r['week']): r for r in read('offense_log.csv') if num(r['fine_gold'])}
     with open(os.path.join(HERE, 'fines_online.csv'), 'w', newline='', encoding='utf-8-sig') as f:
@@ -548,8 +553,11 @@ def write_dashboard(history, state, accounts, fines):
             p['h'] = farm_hints(p, mains)
     # p = player index; Governor IDs stay local. h = paid by hand (fines_paid.csv), not in the ledger.
     fines = [dict({x: v for x, v in f.items() if x != 'k'}, p=ids.get(f['k'])) for f in fines]
+    lp = os.path.join(HERE, 'ledger.json')
+    ledger = json.load(open(lp, encoding='utf-8')) if os.path.exists(lp) else {}
     data = dict(weeks=[wk for wk, _ in history], minF=MIN_FORTS, minT=MIN_TECH, players=players,
                 fines=fines, finesUrl=FINES_URL, scanDay=scan_day, namesDay=names_day, mainAlly=MAIN_ALLIANCE, kvks=kvks,
+                ledger=dict(paid=ledger.get('paid', {}), accounts=ledger.get('accounts', {})), officers=ledger.get('officers', []),
                 updated=date.today().isoformat())
     with open(os.path.join(HERE, 'dashboard_template.html'), encoding='utf-8') as f:
         html = f.read()

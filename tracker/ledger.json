@@ -1,0 +1,128 @@
+{
+ "accounts": {
+  "34f36552d5": {
+   "by": "Totos メtreme",
+   "decided": "2026-10-22T03:03:55.841Z",
+   "type": "main"
+  }
+ },
+ "officers": [
+  {
+   "a": true,
+   "h": "58b7a351ff85482a669d5ce1924d5f78f1932d476b51beed2330ce33acf01f69",
+   "n": "Totos メtreme"
+  },
+  {
+   "a": false,
+   "h": "2482256957c6b19787ff49412e3d25464399c4c06c357d2483305ff66c226f4e",
+   "n": "Dobelメtreme"
+  },
+  {
+   "a": false,
+   "h": "f10e108fb695fb91ed48f6d2566b7aefa68c0bddc786b145549d0ef75683f91e",
+   "n": "RockyメGirang"
+  },
+  {
+   "a": false,
+   "h": "bc7fae4291e3a8adf61f611443899c2c7e8c2e4572c51590e5d227f0c0b5c507",
+   "n": "Depati Amir"
+  },
+  {
+   "a": true,
+   "h": "65eda19d8d3b215086e43a8ff0411e201d4ccaead2387b022e5af7979630ab5f",
+   "n": "ＡＧＡＭ"
+  },
+  {
+   "a": false,
+   "h": "b7424e638e419b5328b94ecf3b2ca721ad7638ea4f6b23969a60300d26fafa51",
+   "n": "MʀメSENOPATI"
+  },
+  {
+   "a": false,
+   "h": "ece585bff159f8f05aea1d713fb7d22ec0efb22d4307d01eb7baa1a436241754",
+   "n": "JDメ"
+  },
+  {
+   "a": false,
+   "h": "2a9a644447bbd939c1fbea5b8a8b8b6eeaf32c512be12025bfa735cc9bdcd35e",
+   "n": "ツ 3D"
+  },
+  {
+   "a": false,
+   "h": "4c6f951e655f7ab6ac29bef82fbebfec34940faf83c4ff81d2e0cdbe393caf53",
+   "n": "Saxaa メtreme"
+  },
+  {
+   "a": false,
+   "h": "777786e0f4da18c1fe474d4dd9cfd8939cd995ade6a046a55f2aa958bd2ec08a",
+   "n": "Nyyaaa"
+  },
+  {
+   "a": false,
+   "h": "2bb0b6a384b9a2f2f6577d23c344da2429bf30dd7198df08a4d969c2d04ec4ca",
+   "n": "么 QUEEN"
+  },
+  {
+   "a": false,
+   "h": "94fe36c1085219ca32a69021f578546bdea237c51c076339d092d429b26ddf36",
+   "n": "xxYxx"
+  },
+  {
+   "a": false,
+   "h": "588fa350cbae1d64711d778d094f5a3f9f046f85962ac2c3186b3d4f3f9c7333",
+   "n": "メ S L A Y E R メ"
+  }
+ ],
+ "paid": {
+  "3fc278363a": {
+   "amount": 16500000,
+   "by": "ＡＧＡＭ",
+   "time": "2026-10-22T06:59:39.599Z"
+  },
+  "774ba88fe4": {
+   "amount": 35000000,
+   "by": "ＡＧＡＭ",
+   "time": "2026-10-22T02:20:18.240Z"
+  },
+  "8278e36ca4": {
+   "amount": 13000000,
+   "by": "ＡＧＡＭ",
+   "time": "2026-10-22T07:11:12.078Z"
+  },
+  "a5b10b395f": {
+   "amount": 1000000,
+   "by": "ＡＧＡＭ",
+   "time": "2026-10-22T04:32:57.209Z"
+  },
+  "c22961a1e8": {
+   "amount": 35000000,
+   "by": "ＡＧＡＭ",
+   "time": "2026-10-22T02:19:24.369Z"
+  },
+  "cc1f900938": {
+   "amount": 26500000,
+   "by": "ＡＧＡＭ",
+   "time": "2026-10-22T07:13:25.104Z"
+  },
+  "ed904b115d": {
+   "amount": 19500000,
+   "by": "ＡＧＡＭ",
+   "time": "2026-10-22T07:00:32.495Z"
+  },
+  "f4fee0d1cd": {
+   "amount": 35000000,
+   "by": "ＡＧＡＭ",
+   "time": "2026-10-22T07:13:05.860Z"
+  },
+  "f98c64ec56": {
+   "amount": 14500000,
+   "by": "ＡＧＡＭ",
+   "time": "2026-10-22T07:00:34.903Z"
+  },
+  "fdf74b3ee1": {
+   "amount": 34000000,
+   "by": "ＡＧＡＭ",
+   "time": "2026-10-22T04:34:09.313Z"
+  }
+ }
+}

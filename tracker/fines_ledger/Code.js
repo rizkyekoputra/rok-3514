@@ -160,7 +160,16 @@ function doGet(e) {
     else paid[fid] = {amount: Number(amount), by, time: new Date(time).toISOString()};
   });
   const o = officer(e.parameter.key);
-  return out({paid, accounts: accountChanges(), officer: o && o.name, approver: !!(o && o.approver)});
+  return out({paid, accounts: accountChanges(), officer: o && o.name, approver: !!(o && o.approver), officers: officerList()});
+}
+
+// SHA-256 of each active key (never the key): published with the dashboard so an R4 link works at once,
+// without waiting for this web app. Writes are still checked against the real key here.
+const sha256 = s => Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, s, Utilities.Charset.UTF_8)
+  .map(b => ((b + 256) % 256).toString(16).padStart(2, '0')).join('');
+function officerList() {
+  return rows('Officers').filter(r => r[1] && r[2] === 'active')
+    .map(r => ({h: sha256(String(r[1])), n: r[0], a: r[4] === 'yes' || APPROVERS.includes(r[0])}));
 }
 
 // POST (text/plain JSON), either

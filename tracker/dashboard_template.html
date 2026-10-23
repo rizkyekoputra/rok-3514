@@ -732,15 +732,32 @@ function readKey() {
 }
 function forgetKey() { location.href = location.pathname; }
 
+// Instant R4 check: the page carries the SHA-256 of each active key (never the key), so R4 mode does not wait
+// for the Google web app, which can take a minute to answer. The web app still checks the real key on every write.
+async function identify() {
+  if (!r4key || !window.crypto || !crypto.subtle) return false;
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(r4key));
+  const h = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  const o = (DATA.officers || []).find(o => o.h === h);
+  if (o) { officer = o.n; approver = !!o.a; }
+  return !!o;
+}
+
+// Live payments and account changes from the web app (slow at times: 60 s timeout, one retry). Until it answers,
+// the page shows the copy published with it (DATA.ledger).
 async function loadLedger() {
   if (!DATA.finesUrl) return;
-  try {
-    const r = await fetch(DATA.finesUrl + (r4key ? '?key=' + encodeURIComponent(r4key) : ''),
-      AbortSignal.timeout ? {signal: AbortSignal.timeout(20000)} : {});
-    const j = await r.json();
-    ledger = j.paid || {}; officer = j.officer || null; approver = !!j.approver; changes = j.accounts || {};
-  } catch (e) {
-    $('finesSub').textContent = 'Could not load the latest payments; showing the last published totals.';
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const r = await fetch(DATA.finesUrl + (r4key ? '?key=' + encodeURIComponent(r4key) : ''),
+        AbortSignal.timeout ? {signal: AbortSignal.timeout(60000)} : {});
+      const j = await r.json();
+      ledger = j.paid || {}; changes = j.accounts || {};
+      if (r4key) { officer = j.officer || null; approver = !!j.approver; }
+      break;
+    } catch (e) {
+      if (attempt === 2) $('finesSub').textContent = `Could not reach the sheet just now; showing data from the last update (${DATA.updated}).`;
+    }
   }
   renderOfficer(); renderFines(); renderPlayer(); renderTable(); renderRoster(); renderReview();
 }
@@ -948,11 +965,13 @@ let rt;
 addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (tab === 'activity') renderOverview(); renderPlayer(); }, 150); });
 // With ?key= the page stays behind the "Checking" screen until the key is verified, then renders in R4 mode.
 readKey();
+if (DATA.ledger) { ledger = DATA.ledger.paid || {}; changes = DATA.ledger.accounts || {}; }
 (async () => {
-  if (r4key) await loadLedger();
+  const known = await identify();
+  if (r4key && !known) await loadLedger();  // key not in the published list (e.g. just made): ask the sheet
   document.body.classList.remove('gating');
-  renderAll(); renderFines(); route();
-  if (!r4key) loadLedger();
+  renderAll(); renderFines(); renderOfficer(); route();
+  if (!r4key || known) loadLedger();  // refresh in the background
 })();
 </script>
 </body>
