@@ -669,7 +669,8 @@ def farm_hints(p, mains):
 
 def write_dashboard(history, state, accounts, fines, mges):
     """Fill dashboard_template.html with this season's data -> dashboard/index.html (public page).
-    Players = everyone in the weekly rankings plus everyone in the latest scan (with Governor ID)."""
+    Players = everyone in the weekly rankings plus everyone in the latest scan (with Governor ID), plus governors who
+    left the kingdom but are in an older scan, name list or KvK sheet (x = last date seen; found by search only)."""
     ids, players = {}, []
     for wk, lines in history:
         for l in lines:
@@ -689,6 +690,17 @@ def write_dashboard(history, state, accounts, fines, mges):
             ids[k] = len(players)
             players.append(dict(n=r['name'], t=a.get('type') or 'main',
                                 r=a.get('role', ''), w={}))
+    runs_by = name_history(history)
+    kvks, kv = kvk_records()
+    kvk_day = {m['k']: m['d'] for m in kvks}
+    for k in sorted(set(runs_by) | set(kv)):  # left the kingdom: seen before, but not in the latest sources
+        if k in ids or k.startswith('name:'):
+            continue
+        runs, a = runs_by.get(k, []), accounts.get(k, {})
+        seen = max([r[2] for r in runs if r[2]] + [kvk_day.get(x[0], '') for x in kv.get(k, [])])
+        name = runs[-1][0] if runs else max(kv[k], key=lambda x: x[0])[7]
+        ids[k] = len(players)
+        players.append(dict(n=name, t=a.get('type') or 'main', r=a.get('role', ''), w={}, x=seen))
     for k, i in ids.items():
         s, a, r = state.get(k, {}), accounts.get(k, {}), scan.get(k)
         p = players[i]
@@ -707,7 +719,6 @@ def write_dashboard(history, state, accounts, fines, mges):
             if names_day >= scan_day or p.get('pw') is None:
                 p['pw'] = num(new['power'])
     # hn = name history, oldest first: [name, first seen, last seen, sources]; '' dates = before tracking
-    runs_by = name_history(history)
     for k, i in ids.items():
         p, runs = players[i], runs_by.get(k, [])
         if runs and runs[-1][0] != p['n']:  # current name = the one seen most recently in any source
@@ -717,7 +728,6 @@ def write_dashboard(history, state, accounts, fines, mges):
         hn = [[n, '', '', ''] for n in p['pn'] if n not in named] + [[n, a, b, ', '.join(l)] for n, a, b, l in runs]
         if len(hn) > 1:
             p['hn'] = hn
-    kvks, kv = kvk_records()
     for k, i in ids.items():  # kv = past KvKs this governor took part in (matched by Governor ID)
         if k in kv:
             players[i]['kv'] = sorted(kv[k], key=lambda r: r[0])
@@ -729,8 +739,9 @@ def write_dashboard(history, state, accounts, fines, mges):
         mge.append(dict(s=ev['start'], e=ev['end'], t=ev['troop'], c=num(ev['default_cap']), l=mge_label(ev), f=ev['final'] == 'yes',
                         r=[[r['rank'], ids.get(r['key']), r['name'], r['points'], r['slot'], r['cap'], r['over'],
                             r['fine'], r['took']] for r in rows]))
-    mains = [p['n'] for p in players if p['t'] == 'main' and p['c']] + [p['n'] for p in players if p['t'] == 'main' and not p['c']]
-    for p in players:
+    here = [p for p in players if not p.get('x')]  # farm hints only compare governors still in the kingdom
+    mains = [p['n'] for p in here if p['t'] == 'main' and p['c']] + [p['n'] for p in here if p['t'] == 'main' and not p['c']]
+    for p in here:
         if not p['c']:
             p['h'] = farm_hints(p, mains)
     # p = player index; Governor IDs stay local. h = paid by hand (fines_paid.csv), not in the ledger.

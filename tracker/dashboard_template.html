@@ -195,7 +195,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       <h2>Master list</h2>
       <div class="sub" id="rosterSub"></div>
       <div class="controls">
-        <input type="search" id="rosterSearch" placeholder="Search name or ID…" autocomplete="off">
+        <input type="search" id="rosterSearch" placeholder="Search name or ID, also past names and governors who left…" autocomplete="off">
         <select id="allySel"></select>
         <select id="rosterType">
           <option value="all">Any type</option>
@@ -203,6 +203,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
           <option value="farm">Farms</option>
           <option value="review">Needs review</option>
           <option value="likely">Likely farm</option>
+          <option value="left">Left the kingdom</option>
         </select>
       </div>
       <div class="bulk" id="bulkBar" hidden></div>
@@ -631,7 +632,7 @@ function renderPlayer() {
       ${typeNote(p)}
     </div>
     <div class="p-meta">
-      <span>${p.a ? esc(p.a) : p.pw != null ? 'No alliance' : 'Not in the latest scan'}</span>
+      <span>${p.x ? leftChip(p) : p.a ? esc(p.a) : p.pw != null ? 'No alliance' : 'Not in the latest scan'}</span>
       ${ranked ? '' : '<span>Not in the alliance fort/tech rankings</span>'}
       ${!p.hn && p.pn && p.pn.length ? `<span>Previously: ${p.pn.map(esc).join(', ')}</span>` : ''}
     </div>
@@ -672,32 +673,40 @@ function renderPlayer() {
 // ---------- master list ----------
 let rSortK = 'pw', rSortDir = -1;
 function statusCell(p) {
+  if (p.x) return `<span class="muted">Last seen ${dayLabel(p.x)}</span>`;
   const c = changes[p.id] || {}, st = typeState(p);
   if (st === 'pending') return `<span class="chip"><span class="dot" style="background:var(--warning)"></span>${c.pending.type}? waiting for approval</span>`;
   if (st === 'approved') return `<span class="chip"><span class="dot" style="background:var(--series-1)"></span>approved, recalculating</span>`;
   if (p.c) return '<span class="muted">Confirmed</span>';
   return strong(p) ? '<span class="chip"><span class="dot" style="background:var(--serious)"></span>Likely farm</span>' : '<span class="muted">Needs review</span>';
 }
+// Name or ID search: current name, Governor ID, previous names and every name in the name history
+const matches = (p, q) => !q || p.n.toLowerCase().includes(q) || (p.g || '').includes(q) ||
+  (p.pn || []).some(n => n.toLowerCase().includes(q)) || (p.hn || []).some(h => h[0].toLowerCase().includes(q));
+const leftChip = p => `<span class="chip"><span class="dot" style="background:var(--text-secondary)"></span>Left the kingdom · last seen ${dayLabel(p.x)}</span>`;
 function renderRoster() {
   const q = $('rosterSearch').value.trim().toLowerCase(), ally = $('allySel').value, t = $('rosterType').value;
-  const rows = P.filter(p => (q || ally === 'all' || (p.a || '') === ally) && (!q || p.n.toLowerCase().includes(q) || (p.g || '').includes(q) || (p.pn || []).some(n => n.toLowerCase().includes(q))) &&
-    (t === 'all' || (t === 'review' ? !p.c : t === 'likely' ? !p.c && strong(p) : p.t === t)));
+  // Governors who left the kingdom (p.x = last seen) show up only in a search or under "Left the kingdom"
+  const rows = P.filter(p => (t === 'left' ? p.x : !p.x || q) && (q || t === 'left' || ally === 'all' || (p.a || '') === ally) && matches(p, q) &&
+    (t === 'all' || t === 'left' || (t === 'review' ? !p.c : t === 'likely' ? !p.c && strong(p) : p.t === t)));
   rows.sort((a, b) => {
     const va = a[rSortK] ?? (['n', 'a', 't', 'g'].includes(rSortK) ? '' : -1), vb = b[rSortK] ?? (typeof va === 'string' ? '' : -1);
     return (typeof va === 'string' ? va.localeCompare(vb) : va - vb) * rSortDir;
   });
-  const can = p => officer && !p.r && !typeState(p);  // R4/R5 and accounts with a change in flight can't be selected
+  const can = p => officer && !p.r && !typeState(p) && !p.x;  // R4/R5, changes in flight and governors who left can't be selected
   rosterShown = rows.filter(can);
   $('rosterBody').innerHTML = rows.map(p => `<tr data-i="${P.indexOf(p)}">
       ${officer ? `<td class="sel">${can(p) ? `<input type="checkbox" data-sel="${P.indexOf(p)}"${picked.has(P.indexOf(p)) ? ' checked' : ''} aria-label="Select ${esc(p.n)}">` : ''}</td>` : ''}
-      <td>${esc(p.n)}</td><td class="muted" style="font-variant-numeric:tabular-nums">${p.g || '–'}</td><td>${p.a ? esc(p.a) : '<span class="muted">–</span>'}</td>
+      <td>${esc(p.n)}</td><td class="muted" style="font-variant-numeric:tabular-nums">${p.g || '–'}</td><td>${p.a ? esc(p.a) : p.x ? '<span class="muted">Left the kingdom</span>' : '<span class="muted">–</span>'}</td>
       <td class="num">${short(p.pw)}</td><td class="num">${short(p.kp)}</td>
       <td>${typeTxt(p)}</td><td>${statusCell(p)}</td>${officer ? `<td style="white-space:nowrap">${typeButtons(p)}</td>` : ''}</tr>`).join('') ||
     `<tr><td colspan="${officer ? 9 : 7}" class="empty">No players match.</td></tr>`;
   $('rosterActTh').hidden = $('rosterSelTh').hidden = !officer;
   renderBulk();
-  $('rosterCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'}` + (q && ally !== 'all' ? ' · searching all alliances' : '');
-  $('rosterSub').textContent = `Every governor in the kingdom scan and member export, plus anyone seen in the alliance rankings. Click a name for details. Events are tracked for ${DATA.mainAlly} only.`;
+  const gone = rows.filter(p => p.x).length;
+  $('rosterCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'}` + (q && ally !== 'all' ? ' · searching all alliances' : '') +
+    (gone && t !== 'left' ? ` · ${gone} of them left the kingdom` : '');
+  $('rosterSub').textContent = `Every governor in the kingdom scan and member export, plus anyone seen in the alliance rankings. Search also finds governors who left the kingdom (from older scans, name lists and KvK sheets). Click a name for details. Events are tracked for ${DATA.mainAlly} only.`;
 }
 
 // ---------- KvK history tab ----------
@@ -706,20 +715,21 @@ function renderKvk() {
   const n = +$('kvkSel').value, k = KVK[n];
   if (!k) { $('kvkBody').innerHTML = '<tr><td class="empty">No KvK data yet.</td></tr>'; return; }
   const q = $('kvkSearch').value.trim().toLowerCase(), t = $('kvkType').value;
-  const rows = P.map(p => ({p, r: (p.kv || []).find(r => r[0] === n)})).filter(({p, r}) => r &&
-    (t === 'all' || (r[6] || p.t) === t) && (!q || p.n.toLowerCase().includes(q) || r[7].toLowerCase().includes(q) || (p.g || '').includes(q)));
+  const rows = P.map(p => ({p, r: (p.kv || []).find(r => r[0] === n)})).filter(({p, r}) => r && (!p.x || q) &&
+    (t === 'all' || (r[6] || p.t) === t) && (!q || matches(p, q) || r[7].toLowerCase().includes(q)));
   const sk = kvSortK === 3 && rows.every(x => x.r[3] == null) ? 1 : kvSortK;  // no % in this KvK: sort by result
   rows.sort((a, b) => ((a.r[sk] ?? -1) - (b.r[sk] ?? -1)) * kvSortDir);
   const cols = [['Player'], ['ID'], ['Name then'], ['Type'], [k.m, 1], ['Target', 2], ['%', 3], ['Notes']];
   $('kvkHead').innerHTML = cols.map(([h, i]) => `<th${i ? ` class="num" data-kv="${i}"` : ''}>${h}</th>`).join('');
-  $('kvkBody').innerHTML = rows.map(({p, r}) => `<tr data-i="${P.indexOf(p)}"><td>${esc(p.n)}</td>
+  $('kvkBody').innerHTML = rows.map(({p, r}) => `<tr data-i="${P.indexOf(p)}"><td>${esc(p.n)}${p.x ? ' <span class="muted">· left</span>' : ''}</td>
       <td class="muted" style="font-variant-numeric:tabular-nums">${p.g || '–'}</td><td>${r[7] === p.n ? '<span class="muted">same</span>' : esc(r[7])}</td><td>${r[6] ? r[6][0].toUpperCase() + r[6].slice(1) : typeTxt(p)}</td>
       <td class="num">${r[1] == null ? '–' : short(r[1])}</td><td class="num">${r[2] ? short(r[2]) : '<span class="muted">No target</span>'}</td>
       <td class="num">${pctCell(r[3])}</td><td style="white-space:normal">${kvNote(r)}</td></tr>`).join('') ||
-    '<tr><td colspan="8" class="empty">No current players match.</td></tr>';
-  $('kvkCount').textContent = `${rows.length} current governor${rows.length === 1 ? '' : 's'} took part`;
+    '<tr><td colspan="8" class="empty">No players match.</td></tr>';
+  const gone = rows.filter(x => x.p.x).length;
+  $('kvkCount').textContent = `${rows.length} governor${rows.length === 1 ? '' : 's'} took part` + (gone ? ` · ${gone} of them left the kingdom` : ' · still in the kingdom');
   $('kvkSub').textContent = `KvK ${n} · ${kvkWhen(n)}${k.e ? ' (date estimated)' : ''} · measured by ${k.m}` +
-    (k.m === 'Acclaim' ? '' : ' (no acclaim yet in this KvK)') + '. Only governors still in the kingdom are listed, matched by Governor ID.';
+    (k.m === 'Acclaim' ? '' : ' (no acclaim yet in this KvK)') + '. Lists governors still in the kingdom; a search also finds those who left. Matched by Governor ID.';
 }
 $('kvkSel').innerHTML = (DATA.kvks || []).slice().reverse().map(k => `<option value="${k.k}">KvK ${k.k} · ${kvkWhen(k.k)}</option>`).join('');
 ['kvkSel', 'kvkSearch', 'kvkType'].forEach(id => $(id).addEventListener('input', renderKvk));
@@ -1196,7 +1206,7 @@ function typeState(p) {
   return c.pending ? 'pending' : c.type && (c.type !== p.t || !p.c) ? 'approved' : '';
 }
 function typeButtons(p) {
-  if (!officer || p.r || typeState(p)) return '';
+  if (!officer || p.r || typeState(p) || p.x) return '';
   const i = P.indexOf(p), other = isFarm(p) ? 'main' : 'farm';
   return (p.c ? '' : `<button class="act" data-type="${p.t}" data-i="${i}" type="button">Confirm ${p.t}</button> `) +
     `<button class="act ghost" data-type="${other}" data-i="${i}" type="button">${approver ? 'Set as' : 'Propose'} ${other}</button>`;
@@ -1332,7 +1342,7 @@ function setHash() {
 function renderSubtitle() {
   $('subtitle').textContent =
     tab === 'activity' ? `${weekLabel(week)} ${week.slice(0, 4)}${partial(week) ? ` · partial data (${seen(week)} of ${maxSeen} players captured)` : ''} · minimum ${DATA.minF} forts and ${fmt(DATA.minT)} tech per week`
-    : tab === 'players' ? `${fmt(P.length)} governors · alliances from the scan of ${dayLabel(DATA.scanDay)}` + (DATA.namesDay ? ` · names and power from the member export of ${dayLabel(DATA.namesDay)}` : '')
+    : tab === 'players' ? `${fmt(P.filter(p => !p.x).length)} governors · alliances from the scan of ${dayLabel(DATA.scanDay)}` + (DATA.namesDay ? ` · names and power from the member export of ${dayLabel(DATA.namesDay)}` : '')
     : tab === 'fines' ? 'Fines and whether they have been paid'
     : tab === 'mge' ? 'Mightiest Governor: point limits, takeovers and fines'
     : tab === 'kvk' ? 'Past KvK results of governors still in the kingdom'
