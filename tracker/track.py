@@ -50,7 +50,7 @@ CLEAR_AFTER = 2  # consecutive passing weeks that clear all recorded offenses
 # R4 fines ledger (Apps Script web app in fines_ledger/); the dashboard reads and writes it.
 # Players' "I've paid: send proof" (payment claims with screenshots/recordings). Turn on only once the web app version
 # with claims is deployed, or players' submissions fail.
-CLAIMS_ON = False
+CLAIMS_ON = True
 FINES_URL = 'https://script.google.com/macros/s/AKfycbxjPVSNgqPqh5ki0M_dEydbNi2kFoV2O6xjH8qS84i9BrJhKKW3FfEwBC82XMDeGVz6/exec'
 
 HERE = os.path.dirname(os.path.abspath(__file__))
