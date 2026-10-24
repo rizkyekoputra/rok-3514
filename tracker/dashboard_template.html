@@ -357,7 +357,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       <div class="sub" id="kvkSub"></div>
       <div class="controls">
         <select id="kvkSel"></select>
-        <input type="search" id="kvkSearch" placeholder="Filter by name…" autocomplete="off">
+        <input type="search" id="kvkSearch" placeholder="Filter by name or ID…" autocomplete="off">
         <select id="kvkType">
           <option value="all">Main and farm</option>
           <option value="main">Main accounts</option>
@@ -707,16 +707,16 @@ function renderKvk() {
   if (!k) { $('kvkBody').innerHTML = '<tr><td class="empty">No KvK data yet.</td></tr>'; return; }
   const q = $('kvkSearch').value.trim().toLowerCase(), t = $('kvkType').value;
   const rows = P.map(p => ({p, r: (p.kv || []).find(r => r[0] === n)})).filter(({p, r}) => r &&
-    (t === 'all' || (r[6] || p.t) === t) && (!q || p.n.toLowerCase().includes(q) || r[7].toLowerCase().includes(q)));
+    (t === 'all' || (r[6] || p.t) === t) && (!q || p.n.toLowerCase().includes(q) || r[7].toLowerCase().includes(q) || (p.g || '').includes(q)));
   const sk = kvSortK === 3 && rows.every(x => x.r[3] == null) ? 1 : kvSortK;  // no % in this KvK: sort by result
   rows.sort((a, b) => ((a.r[sk] ?? -1) - (b.r[sk] ?? -1)) * kvSortDir);
-  const cols = [['Player'], ['Name then'], ['Type'], [k.m, 1], ['Target', 2], ['%', 3], ['Notes']];
+  const cols = [['Player'], ['ID'], ['Name then'], ['Type'], [k.m, 1], ['Target', 2], ['%', 3], ['Notes']];
   $('kvkHead').innerHTML = cols.map(([h, i]) => `<th${i ? ` class="num" data-kv="${i}"` : ''}>${h}</th>`).join('');
   $('kvkBody').innerHTML = rows.map(({p, r}) => `<tr data-i="${P.indexOf(p)}"><td>${esc(p.n)}</td>
-      <td>${r[7] === p.n ? '<span class="muted">same</span>' : esc(r[7])}</td><td>${r[6] ? r[6][0].toUpperCase() + r[6].slice(1) : typeTxt(p)}</td>
+      <td class="muted" style="font-variant-numeric:tabular-nums">${p.g || '–'}</td><td>${r[7] === p.n ? '<span class="muted">same</span>' : esc(r[7])}</td><td>${r[6] ? r[6][0].toUpperCase() + r[6].slice(1) : typeTxt(p)}</td>
       <td class="num">${r[1] == null ? '–' : short(r[1])}</td><td class="num">${r[2] ? short(r[2]) : '<span class="muted">No target</span>'}</td>
       <td class="num">${pctCell(r[3])}</td><td style="white-space:normal">${kvNote(r)}</td></tr>`).join('') ||
-    '<tr><td colspan="7" class="empty">No current players match.</td></tr>';
+    '<tr><td colspan="8" class="empty">No current players match.</td></tr>';
   $('kvkCount').textContent = `${rows.length} current governor${rows.length === 1 ? '' : 's'} took part`;
   $('kvkSub').textContent = `KvK ${n} · ${kvkWhen(n)}${k.e ? ' (date estimated)' : ''} · measured by ${k.m}` +
     (k.m === 'Acclaim' ? '' : ' (no acclaim yet in this KvK)') + '. Only governors still in the kingdom are listed, matched by Governor ID.';
