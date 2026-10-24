@@ -52,6 +52,19 @@ h2 { font-size: 16px; margin: 0 0 4px; }
 select, input { font: inherit; color: var(--text-primary); background: var(--surface-1);
   border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; min-height: 34px; }
 input[type=search] { flex: 1 1 200px; min-width: 0; }
+/* multi-select dropdown (alliance filter) */
+.ms { position: relative; }
+.ms summary { list-style: none; cursor: pointer; border: 1px solid var(--border); border-radius: 6px; padding: 6px 28px 6px 10px;
+  background: var(--surface-1); white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; position: relative; }
+.ms summary::-webkit-details-marker { display: none; }
+.ms summary::after { content: "▾"; position: absolute; right: 10px; color: var(--text-secondary); }
+.ms-list { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; min-width: 260px; max-width: calc(100vw - 32px); max-height: 320px;
+  overflow: auto; background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 6px; box-shadow: 0 6px 24px rgba(0, 0, 0, .18); }
+.ms-list label { display: flex; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 6px; cursor: pointer; white-space: nowrap; font-size: 13px; }
+.ms-list label:hover { background: var(--chip-bg); }
+.ms-list input { min-height: 0; width: 16px; height: 16px; margin: 0; }
+.ms-list .n { margin-left: auto; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.ms-acts { display: flex; gap: 6px; padding: 2px 2px 6px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
 .calc { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-top: 12px; }
 .calc label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
 .calc input { min-width: 0; font-variant-numeric: tabular-nums; }
@@ -196,7 +209,14 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       <div class="sub" id="rosterSub"></div>
       <div class="controls">
         <input type="search" id="rosterSearch" placeholder="Search name or ID, also past names and governors who left…" autocomplete="off">
-        <select id="allySel"></select>
+        <details class="ms" id="allyMs">
+          <summary id="allySum">All alliances</summary>
+          <div class="ms-list">
+            <div class="ms-acts"><button class="act ghost" id="allyAll" type="button">All alliances</button>
+              <button class="act ghost" id="allyMain" type="button">Only main alliance</button></div>
+            <div id="allyList"></div>
+          </div>
+        </details>
         <select id="rosterCh" title="City hall level">
           <option value="all">Any CH</option>
           <option value="25">CH25</option>
@@ -706,9 +726,9 @@ const goneTxt = p => onMap(p) ? `Not seen since ${p.xs}` : 'Migrated out';
 const goneNote = p => onMap(p) ? 'still on the KvK map, or migrated' : `last seen ${dayLabel(p.x)}${p.xs ? ` (${p.xs})` : ''}`;
 const leftChip = p => `<span class="chip"><span class="dot" style="background:var(--text-secondary)"></span>${goneTxt(p)} · ${goneNote(p)}</span>`;
 function renderRoster() {
-  const q = $('rosterSearch').value.trim().toLowerCase(), ally = $('allySel').value, t = $('rosterType').value, chf = $('rosterCh').value;
+  const q = $('rosterSearch').value.trim().toLowerCase(), t = $('rosterType').value, chf = $('rosterCh').value;
   // Governors not in the kingdom now (p.x = last seen) show up only in a search or under "Not in the kingdom now"
-  const rows = P.filter(p => (chf === 'all' || (chf === '25' ? p.ch >= 25 : !(p.ch >= 25))) && (t === 'left' ? p.x : !p.x || q) && (q || t === 'left' || ally === 'all' || (p.a || '') === ally) && matches(p, q) &&
+  const rows = P.filter(p => (chf === 'all' || (chf === '25' ? p.ch >= 25 : !(p.ch >= 25))) && (t === 'left' ? p.x : !p.x || q) && (q || t === 'left' || !allyPick.size || allyPick.has(p.a || '')) && matches(p, q) &&
     (t === 'all' || t === 'left' || (t === 'review' ? !p.c : t === 'likely' ? !p.c && strong(p) : p.t === t)));
   rows.sort((a, b) => {
     const va = a[rSortK] ?? (['n', 'a', 't', 'g'].includes(rSortK) ? '' : -1), vb = b[rSortK] ?? (typeof va === 'string' ? '' : -1);
@@ -725,7 +745,7 @@ function renderRoster() {
   $('rosterActTh').hidden = $('rosterSelTh').hidden = !officer;
   renderBulk();
   const gone = rows.filter(p => p.x).length;
-  $('rosterCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'}` + (q && ally !== 'all' ? ' · searching all alliances' : '') +
+  $('rosterCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'}` + (q && allyPick.size ? ' · searching all alliances' : '') +
     (gone && t !== 'left' ? ` · ${gone} of them not in the kingdom now` : '');
   $('rosterSub').textContent = `Every governor in the kingdom scan and member export, plus anyone seen in the alliance rankings. CH = city hall level from the CH25 roster (– = not on it: below 25, or not listed yet). Search also finds governors not in the kingdom now (migrated, or still on the last KvK map), from older scans, name lists and KvK sheets. Click a name for details. Events are tracked for ${DATA.mainAlly} only.`;
 }
@@ -1456,11 +1476,23 @@ document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click
 addEventListener('hashchange', route);
 const allies = {};
 P.forEach(p => { if (p.a) allies[p.a] = (allies[p.a] || 0) + 1; });
-$('allySel').innerHTML = `<option value="all">All alliances</option>` +
-  Object.entries(allies).sort((a, b) => b[1] - a[1]).map(([a, n]) => `<option value="${esc(a)}">${esc(a)} (${n})</option>`).join('') +
-  `<option value="">No alliance</option>`;
-$('allySel').value = DATA.mainAlly;
-['rosterSearch', 'allySel', 'rosterType', 'rosterCh'].forEach(id => $(id).addEventListener('input', renderRoster));
+// Alliance filter: tick any number of alliances ("" = no alliance); none ticked = all alliances
+const allyPick = new Set([DATA.mainAlly]);
+const noAlly = P.filter(p => !p.a && !p.x).length;
+$('allyList').innerHTML = Object.entries(allies).sort((a, b) => b[1] - a[1]).concat([['', noAlly]]).map(([a, n]) =>
+  `<label><input type="checkbox" value="${esc(a)}"${allyPick.has(a) ? ' checked' : ''}>${a ? esc(a) : '<i>No alliance</i>'}<span class="n">${n}</span></label>`).join('');
+function allyChanged() {
+  document.querySelectorAll('#allyList input').forEach(i => { i.checked = allyPick.has(i.value); });
+  const one = [...allyPick][0];
+  $('allySum').textContent = !allyPick.size ? 'All alliances' : allyPick.size > 1 ? `${allyPick.size} alliances` : one || 'No alliance';
+  renderRoster();
+}
+$('allyList').addEventListener('change', e => { e.target.checked ? allyPick.add(e.target.value) : allyPick.delete(e.target.value); allyChanged(); });
+$('allyAll').addEventListener('click', () => { allyPick.clear(); allyChanged(); });
+$('allyMain').addEventListener('click', () => { allyPick.clear(); allyPick.add(DATA.mainAlly); allyChanged(); });
+document.addEventListener('click', e => { if (!e.target.closest('#allyMs')) $('allyMs').open = false; });  // close when clicking elsewhere
+allyChanged();
+['rosterSearch', 'rosterType', 'rosterCh'].forEach(id => $(id).addEventListener('input', renderRoster));
 document.querySelectorAll('th[data-rk]').forEach(th => th.addEventListener('click', () => {
   const k = th.dataset.rk;
   rSortDir = rSortK === k ? -rSortDir : (k === 'pw' || k === 'kp' || k === 'ch' ? -1 : 1); rSortK = k; renderRoster();
