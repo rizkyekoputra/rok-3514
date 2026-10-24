@@ -375,7 +375,7 @@ def main():
                     log.append([wk, k, s['name'], s['role'], forts, row['miss_f'],
                                 f"offense {s['offenses']}", act, fine, s['unpaid']])
                     if fine:
-                        fines.append(dict(id=fine_id(k, wk), k=k, n=s['name'], wk=wk, a=fine, m=row['miss_f'],
+                        fines.append(dict(id=fine_id(k, wk), k=k, n=s['name'], wk=wk, a=fine, m=row['miss_f'], o=s['offenses'],
                                           h=by_hand.get((k, wk), 0)))
             s['unpaid'] = max(0, s['unpaid'] - paid.get((k, wk), 0))
             lines.append(row)

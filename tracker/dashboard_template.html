@@ -291,7 +291,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       </div>
       <div class="table-wrap"><table>
         <thead><tr>
-          <th>Player</th><th id="finesActTh" hidden></th><th>Week / event</th><th class="num">Reason</th><th class="num">Fine</th><th>Status</th>
+          <th>Player</th><th id="finesActTh" hidden></th><th>Fine for</th><th class="num">Reason</th><th class="num">Fine</th><th>Status</th>
         </tr></thead>
         <tbody id="finesBody"></tbody>
       </table></div>
@@ -926,7 +926,10 @@ const paidOf = f => (f.h || 0) + (ledger && ledger[f.id] ? ledger[f.id].amount :
 // MGE is R4-only for now: its tab, fines and pop-up section show in R4 mode only
 const shownFines = () => F.filter(f => !f.e || officer);
 // MGE fines carry e (event label) and m = points over the limit; fort fines have m = missing forts
-const fineWhen = f => f.e ? esc(f.e) : weekLabel(f.wk);
+const ORD = n => n + (['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || 'th');
+// Fine label: the MGE event, or "Weekly Fort 12–18 Oct 2nd Offense" (o = offense number of a fort fine)
+const fineLabel = f => f.e || `Weekly Fort ${weekLabel(f.wk)}` + (f.o ? ` ${ORD(f.o)} Offense` : '');
+const fineWhen = f => esc(fineLabel(f));
 const fineWhy = f => f.e ? `${fmt(f.m)} pts over` : `${f.m} forts short`;
 const inRss = (a, rss) => Object.entries(rss).map(([r, x]) => `${gold(a * x)} ${r}`).join(' / ');
 // "9M", "9,000,000", "300M food 200M wood 50M gold" -> gold value, or NaN
@@ -1080,14 +1083,14 @@ $('finesBody').addEventListener('click', async e => {
   let action = 'undo', amount = 0;
   if (b.dataset.pay) {
     const due = f.a - (f.h || 0);
-    const v = prompt(`Paid by ${name} for ${f.e || weekLabel(f.wk)}. Fine ${gold(f.a)} gold = ${inRss(f.a, rssOf(f))}.\n` +
+    const v = prompt(`Paid by ${name} for ${fineLabel(f)}. Fine ${gold(f.a)} gold = ${inRss(f.a, rssOf(f))}.\n` +
       `Type gold (9M or 9000000), or what they sent, mixed if needed: 300M food 200M wood 50M gold`, due);
     if (v == null) return;
     amount = Math.round(paidValue(v, rssOf(f)));
     if (!(amount > 0)) return alert('Enter what was paid, e.g. 9M (gold) or 300M food 50M gold.');
     if (/[a-z]/i.test(v) && !confirm(`Record ${gold(amount)} gold value for ${name}?`)) return;
     action = 'paid';
-  } else if (!confirm(`Undo the payment recorded for ${name} (${weekLabel(f.wk)})?`)) return;
+  } else if (!confirm(`Undo the payment recorded for ${name} (${fineLabel(f)})?`)) return;
   saving(b);
   try {
     await sendPayment(f, action, amount);
