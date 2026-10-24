@@ -203,7 +203,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
           <option value="farm">Farms</option>
           <option value="review">Needs review</option>
           <option value="likely">Likely farm</option>
-          <option value="left">Left the kingdom</option>
+          <option value="left">Not in the kingdom now</option>
         </select>
       </div>
       <div class="bulk" id="bulkBar" hidden></div>
@@ -362,7 +362,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
         <select id="kvkHere">
           <option value="all">Everyone</option>
           <option value="in">In kingdom</option>
-          <option value="out">Migrated out</option>
+          <option value="out">Not in the kingdom now</option>
         </select>
         <select id="kvkType">
           <option value="all">Main and farm</option>
@@ -682,7 +682,7 @@ function renderPlayer() {
 // ---------- master list ----------
 let rSortK = 'pw', rSortDir = -1;
 function statusCell(p) {
-  if (p.x) return `<span class="muted">Last seen ${dayLabel(p.x)}</span>`;
+  if (p.x) return `<span class="muted">${onMap(p) ? goneNote(p) : 'Last seen ' + dayLabel(p.x)}</span>`;
   const c = changes[p.id] || {}, st = typeState(p);
   if (st === 'pending') return `<span class="chip"><span class="dot" style="background:var(--warning)"></span>${c.pending.type}? waiting for approval</span>`;
   if (st === 'approved') return `<span class="chip"><span class="dot" style="background:var(--series-1)"></span>approved, recalculating</span>`;
@@ -692,10 +692,16 @@ function statusCell(p) {
 // Name or ID search: current name, Governor ID, previous names and every name in the name history
 const matches = (p, q) => !q || p.n.toLowerCase().includes(q) || (p.g || '').includes(q) ||
   (p.pn || []).some(n => n.toLowerCase().includes(q)) || (p.hn || []).some(h => h[0].toLowerCase().includes(q));
-const leftChip = p => `<span class="chip"><span class="dot" style="background:var(--text-secondary)"></span>Left the kingdom · last seen ${dayLabel(p.x)}</span>`;
+// Not in the latest scan / member export (p.x = last seen, p.xs = 'KvK <n>' when last seen only in a KvK sheet).
+// Last seen only in the latest KvK: we can't tell "still on the KvK map" from "migrated".
+const LAST_KVK = (DATA.kvks || []).length ? 'KvK ' + Math.max(...DATA.kvks.map(k => k.k)) : '';
+const onMap = p => p.x && p.xs && p.xs === LAST_KVK;
+const goneTxt = p => onMap(p) ? `Not seen since ${p.xs}` : 'Migrated out';
+const goneNote = p => onMap(p) ? 'still on the KvK map, or migrated' : `last seen ${dayLabel(p.x)}${p.xs ? ` (${p.xs})` : ''}`;
+const leftChip = p => `<span class="chip"><span class="dot" style="background:var(--text-secondary)"></span>${goneTxt(p)} · ${goneNote(p)}</span>`;
 function renderRoster() {
   const q = $('rosterSearch').value.trim().toLowerCase(), ally = $('allySel').value, t = $('rosterType').value;
-  // Governors who left the kingdom (p.x = last seen) show up only in a search or under "Left the kingdom"
+  // Governors not in the kingdom now (p.x = last seen) show up only in a search or under "Not in the kingdom now"
   const rows = P.filter(p => (t === 'left' ? p.x : !p.x || q) && (q || t === 'left' || ally === 'all' || (p.a || '') === ally) && matches(p, q) &&
     (t === 'all' || t === 'left' || (t === 'review' ? !p.c : t === 'likely' ? !p.c && strong(p) : p.t === t)));
   rows.sort((a, b) => {
@@ -706,7 +712,7 @@ function renderRoster() {
   rosterShown = rows.filter(can);
   $('rosterBody').innerHTML = rows.map(p => `<tr data-i="${P.indexOf(p)}">
       ${officer ? `<td class="sel">${can(p) ? `<input type="checkbox" data-sel="${P.indexOf(p)}"${picked.has(P.indexOf(p)) ? ' checked' : ''} aria-label="Select ${esc(p.n)}">` : ''}</td>` : ''}
-      <td>${esc(p.n)}</td><td class="muted" style="font-variant-numeric:tabular-nums">${p.g || '–'}</td><td>${p.a ? esc(p.a) : p.x ? '<span class="muted">Left the kingdom</span>' : '<span class="muted">–</span>'}</td>
+      <td>${esc(p.n)}</td><td class="muted" style="font-variant-numeric:tabular-nums">${p.g || '–'}</td><td>${p.a ? esc(p.a) : p.x ? `<span class="muted">${goneTxt(p)}</span>` : '<span class="muted">–</span>'}</td>
       <td class="num">${short(p.pw)}</td><td class="num">${short(p.kp)}</td>
       <td>${typeTxt(p)}</td><td>${statusCell(p)}</td>${officer ? `<td style="white-space:nowrap">${typeButtons(p)}</td>` : ''}</tr>`).join('') ||
     `<tr><td colspan="${officer ? 9 : 7}" class="empty">No players match.</td></tr>`;
@@ -714,8 +720,8 @@ function renderRoster() {
   renderBulk();
   const gone = rows.filter(p => p.x).length;
   $('rosterCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'}` + (q && ally !== 'all' ? ' · searching all alliances' : '') +
-    (gone && t !== 'left' ? ` · ${gone} of them left the kingdom` : '');
-  $('rosterSub').textContent = `Every governor in the kingdom scan and member export, plus anyone seen in the alliance rankings. Search also finds governors who left the kingdom (from older scans, name lists and KvK sheets). Click a name for details. Events are tracked for ${DATA.mainAlly} only.`;
+    (gone && t !== 'left' ? ` · ${gone} of them not in the kingdom now` : '');
+  $('rosterSub').textContent = `Every governor in the kingdom scan and member export, plus anyone seen in the alliance rankings. Search also finds governors not in the kingdom now (migrated, or still on the last KvK map), from older scans, name lists and KvK sheets. Click a name for details. Events are tracked for ${DATA.mainAlly} only.`;
 }
 
 // ---------- KvK history tab ----------
@@ -736,14 +742,14 @@ function renderKvk() {
   $('kvkHead').innerHTML = cols.map(([h, i]) => `<th${i ? ` class="num" data-kv="${i}"` : h === '#' ? ' class="num" style="cursor:default"' : ''}>${h}</th>`).join('');
   $('kvkBody').innerHTML = rows.map(({p, r}) => `<tr data-i="${P.indexOf(p)}"><td class="num muted">${r[1] == null ? '–' : rankOf.get(r[1])}</td><td>${esc(p.n)}</td>
       <td class="muted" style="font-variant-numeric:tabular-nums">${p.g || '–'}</td>
-      <td>${p.x ? `<span class="below" style="font-weight:500">Migrated out</span> <span class="muted">· last seen ${dayLabel(p.x)}</span>` : '<span class="muted">In kingdom</span>'}</td><td>${r[7] === p.n ? '<span class="muted">same</span>' : esc(r[7])}</td><td>${r[6] ? r[6][0].toUpperCase() + r[6].slice(1) : typeTxt(p)}</td>
+      <td style="white-space:normal">${p.x ? `<span class="${onMap(p) ? '' : 'below'}" style="font-weight:500">${goneTxt(p)}</span> <span class="muted">· ${goneNote(p)}</span>` : '<span class="muted">In kingdom</span>'}</td><td>${r[7] === p.n ? '<span class="muted">same</span>' : esc(r[7])}</td><td>${r[6] ? r[6][0].toUpperCase() + r[6].slice(1) : typeTxt(p)}</td>
       <td class="num">${r[1] == null ? '–' : short(r[1])}</td><td class="num">${r[2] ? short(r[2]) : '<span class="muted">No target</span>'}</td>
       <td class="num">${pctCell(r[3])}</td><td style="white-space:normal">${kvNote(r)}</td></tr>`).join('') ||
     '<tr><td colspan="10" class="empty">No players match.</td></tr>';
   const gone = rows.filter(x => x.p.x).length;
-  $('kvkCount').textContent = `${rows.length} governor${rows.length === 1 ? '' : 's'}` + (here === 'all' && gone ? ` · ${rows.length - gone} in the kingdom, ${gone} migrated out` : here === 'out' ? ' migrated out' : here === 'in' ? ' in the kingdom' : '');
+  $('kvkCount').textContent = `${rows.length} governor${rows.length === 1 ? '' : 's'}` + (here === 'all' && gone ? ` · ${rows.length - gone} in the kingdom, ${gone} not in the kingdom now` : here === 'out' ? ' not in the kingdom now' : here === 'in' ? ' in the kingdom' : '');
   $('kvkSub').textContent = `KvK ${n} · ${kvkWhen(n)}${k.e ? ' (date estimated)' : ''} · measured by ${k.m}` +
-    (k.m === 'Acclaim' ? '' : ' (no acclaim yet in this KvK)') + '. # = rank by ' + k.m + ' among everyone in the KvK sheet. Everyone in the sheet is listed; "Migrated out" = no longer in the latest scan or member export. Matched by Governor ID.';
+    (k.m === 'Acclaim' ? '' : ' (no acclaim yet in this KvK)') + '. # = rank by ' + k.m + ' among everyone in the KvK sheet. Everyone in the sheet is listed. Not in the latest scan or member export: "Not seen since KvK <n>" if the last sighting is the latest KvK (still on its map, or migrated), else "Migrated out". Matched by Governor ID.';
 }
 $('kvkSel').innerHTML = (DATA.kvks || []).slice().reverse().map(k => `<option value="${k.k}">KvK ${k.k} · ${kvkWhen(k.k)}</option>`).join('');
 ['kvkSel', 'kvkSearch', 'kvkType', 'kvkHere'].forEach(id => $(id).addEventListener('input', renderKvk));
@@ -1389,7 +1395,7 @@ function renderSubtitle() {
     : tab === 'players' ? `${fmt(P.filter(p => !p.x).length)} governors · alliances from the scan of ${dayLabel(DATA.scanDay)}` + (DATA.namesDay ? ` · names and power from the member export of ${dayLabel(DATA.namesDay)}` : '')
     : tab === 'fines' ? 'Fines and whether they have been paid'
     : tab === 'mge' ? 'Mightiest Governor: point limits, takeovers and fines'
-    : tab === 'kvk' ? 'Past KvK results, including governors who migrated out'
+    : tab === 'kvk' ? 'Past KvK results, including governors not in the kingdom now'
     : 'Farm and main account changes waiting for approval';
 }
 function showTab(t) {

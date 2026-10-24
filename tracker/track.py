@@ -697,10 +697,15 @@ def write_dashboard(history, state, accounts, fines, mges):
         if k in ids or k.startswith('name:'):
             continue
         runs, a = runs_by.get(k, []), accounts.get(k, {})
-        seen = max([r[2] for r in runs if r[2]] + [kvk_day.get(x[0], '') for x in kv.get(k, [])])
+        # (date, source) of every sighting: a scan / member export ('') or a KvK sheet ('KvK <n>')
+        seen_at = [(r[2], ', '.join(r[3])) for r in runs if r[2]] + [(kvk_day.get(x[0], ''), f'KvK {x[0]}') for x in kv.get(k, [])]
+        seen = max(d for d, _ in seen_at)
+        src = {lbl for d, lbl in seen_at if d == seen}
         name = runs[-1][0] if runs else max(kv[k], key=lambda x: x[0])[7]
         ids[k] = len(players)
         players.append(dict(n=name, t=a.get('type') or 'main', r=a.get('role', ''), w={}, x=seen))
+        if '' not in src:  # last seen only in a KvK sheet (xs = 'KvK <n>'): may still be on that KvK's map
+            players[-1]['xs'] = sorted(src)[-1].split(', ')[-1]
     for k, i in ids.items():
         s, a, r = state.get(k, {}), accounts.get(k, {}), scan.get(k)
         p = players[i]
