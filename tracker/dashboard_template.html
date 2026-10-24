@@ -97,8 +97,9 @@ table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nu
 th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 th { font-size: 12px; color: var(--text-secondary); font-weight: 600; cursor: pointer; user-select: none; }
 th.num, td.num { text-align: right; }
-tbody tr { cursor: pointer; }
-tbody tr:hover { background: var(--chip-bg); }
+/* only these lists open the player pop-up (see the row click handler) */
+:is(#tbody, #rosterBody, #kvkBody) tr { cursor: pointer; }
+:is(#tbody, #rosterBody, #kvkBody) tr:hover { background: var(--chip-bg); }
 .below { color: var(--critical); font-weight: 600; }
 .below::after { content: " ▼"; font-size: 10px; }
 .empty { color: var(--text-muted); padding: 24px 0; text-align: center; }
@@ -1380,7 +1381,8 @@ document.querySelectorAll('th[data-k]').forEach(th => th.addEventListener('click
   const k = th.dataset.k;
   sortDir = sortK === k ? -sortDir : (k === 'n' || k === 't' ? 1 : -1); sortK = k; renderTable();
 }));
-['tbody', 'rosterBody', 'pendBody', 'queueBody', 'finesBody', 'kvkBody', 'mgeBody', 'claimsBody'].forEach(id => $(id).addEventListener('click', e => {
+// Player pop-up from the master list, weekly activity and KvK history only
+['tbody', 'rosterBody', 'kvkBody'].forEach(id => $(id).addEventListener('click', e => {
   const tr = e.target.closest('tr[data-i]');
   if (tr && !e.target.closest('button, input, td.sel')) selectPlayer(P[+tr.dataset.i]);
 }));
