@@ -1,8 +1,9 @@
 // 3514 fines ledger behind the public dashboard (bound to the "3514 Fines" sheet).
 // Officers tab: one personal key per R4 (made by setup(), never stored in code or the repo).
 // Payments tab: append-only log; the latest row per fine_id wins, "undo" clears it.
-// Accounts tab: R4 proposals to mark an account farm/main; the admin (sheet owner) approves or rejects them from the 3514 menu,
-// which starts the GitHub Action that recalculates and republishes the dashboard.
+// Accounts tab: proposals to mark an account farm/main; the admin (sheet owner) approves or rejects them from the 3514 menu,
+// which starts the GitHub Action that recalculates and republishes the dashboard. R4 proposals need an approver; players
+// (no key, by = "player: <name>") can propose too, and any R4 may approve or reject those. decided_by records who decided.
 // Claims tab: players' "I've paid" submissions with proof files (screenshots/recordings, kept in a private Drive folder);
 // R4s approve or reject them on the dashboard. Approving appends a Payments row, so it counts like a payment an R4 marked.
 // Proof files are deleted CLAIM.keepDays after the decision (daily trigger made by setup()).
@@ -19,7 +20,7 @@ const APPROVERS = ['Totos メtreme', 'ＡＧＡＭ'];
 const HEADERS = {
   Officers: ['name', 'key', 'status', 'link', 'approver'],
   Payments: ['time', 'fine_id', 'player', 'week', 'amount', 'by', 'action'],
-  Accounts: ['time', 'account_id', 'player', 'type', 'by', 'status', 'decided', 'decided_by'],
+  Accounts: ['time', 'account_id', 'player', 'type', 'by', 'status', 'decided', 'decided_by', 'note'],
   Claims: ['time', 'claim_id', 'fine_id', 'player', 'week', 'fine', 'sent', 'gold_value', 'note', 'expect', 'files', 'bytes',
            'status', 'token', 'decided', 'decided_by', 'reason', 'cleaned'],
 };
@@ -27,6 +28,8 @@ const HEADERS = {
 // status: uploading -> pending (all files in) -> approved | rejected; unfinished uploads become abandoned after a day.
 const CLAIM = {maxFiles: 20, maxBytes: 30 * 1024 * 1024, perFine: 5, open: 100, burst: 20, keepDays: 30,
                types: /^(image\/(jpeg|png|webp|gif|heic|heif)|video\/(mp4|quicktime|webm|3gpp))$/};
+// Player farm/main proposals: at most `open` waiting at once, `burst` new ones per 10 minutes.
+const PLAYER = 'player: ', PROPOSE = {open: 100, burst: 20};
 const C = Object.fromEntries(HEADERS.Claims.map((h, i) => [h, i]));  // Claims column index by header
 
 const book = () => SpreadsheetApp.getActiveSpreadsheet();
@@ -153,16 +156,36 @@ function decide(accountIds, status, by) {
   return n;
 }
 
-// account_id -> {type, by, decided} of the latest approved change, plus pending: the newest proposal after it.
+// account_id -> {type, by (proposer), decided, approvedBy} of the latest approved change, plus pending: the newest
+// proposal after it (pub = proposed by a player, so any R4 may decide it).
 function accountChanges() {
   const acc = {};
-  rows('Accounts').forEach(([time, id, , type, by, status, decided]) => {
+  rows('Accounts').forEach(([time, id, , type, by, status, decided, decidedBy, note]) => {
     const a = acc[id] || (acc[id] = {});
-    if (status === 'approved') Object.assign(a, {type, by, decided: new Date(decided).toISOString()});
-    if (status === 'proposed') a.pending = {type, by, time: new Date(time).toISOString()};
+    if (status === 'approved') Object.assign(a, {type, by, decided: new Date(decided).toISOString(), approvedBy: decidedBy});
+    if (status === 'proposed') a.pending = {type, by, time: new Date(time).toISOString(), pub: String(by).startsWith(PLAYER), note: note || undefined};
     else delete a.pending;
   });
   return acc;
+}
+
+// A player (no key) proposes farm/main for one account
+function propose(req) {
+  if (!/^[0-9a-f]{10}$/.test(req.account_id) || (req.type !== 'farm' && req.type !== 'main')) return {ok: false, error: 'bad request'};
+  const cache = CacheService.getScriptCache(), burst = Number(cache.get('proposals') || 0);
+  if (burst >= PROPOSE.burst) return {ok: false, error: 'many proposals just now, try again in a few minutes'};
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const open = rows('Accounts').filter(r => r[5] === 'proposed');
+    if (open.some(r => r[1] === req.account_id)) return {ok: false, error: 'a change for this account is already waiting for an R4'};
+    if (open.filter(r => String(r[4]).startsWith(PLAYER)).length >= PROPOSE.open) return {ok: false, error: 'too many proposals are waiting, try again later'};
+    const name = String(req.name || '').trim().slice(0, 40) || 'anonymous';
+    tab('Accounts').appendRow([new Date(), req.account_id, plain(req.player), req.type, plain(PLAYER + name), 'proposed', '', '',
+                               String(req.note || '').trim().slice(0, 200).replace(/^([=+\-@])/, "'$1")]);
+    cache.put('proposals', String(burst + 1), 600);
+    return {ok: true};
+  } finally { lock.releaseLock(); }
 }
 
 // GET: {paid: {fine_id: {amount, by, time}}, accounts: accountChanges(), officer: name or null for ?key=}
@@ -190,7 +213,8 @@ function officerList() {
 //   {key, fine_id, player, week, amount, action: "paid" | "undo"}   fine payment
 //   {key, account_id, player, action: "farm" | "main"}               account type change (proposal, or
 //   {key, accounts: [{account_id, player}], action: "farm" | "main"}  applied at once for approvers)
-//   {key, account_id, action: "approve" | "reject"}                  approvers only
+//   {key, account_id, action: "approve" | "reject"}                  approvers, or any R4 for a player's proposal
+//   {action: "propose", account_id, player, type: "farm" | "main", name, note}   player, no key
 //   {action: "claim", fine_id, player, week, fine, sent, gold_value, note, files: [{type, size}]}   player, no key
 //   {action: "claim_file", claim_id, token, name, type, data (base64)}  one proof file; then {action: "claim_done", ...}
 //   {key, action: "claim_view", claim_id, file_id}                     R4: one proof file as base64
@@ -202,14 +226,16 @@ function doPost(e) {
   if (req.action === 'claim') return out(newClaim(req));
   if (req.action === 'claim_file') return out(claimFile(req));
   if (req.action === 'claim_done') return out(claimDone(req));
+  if (req.action === 'propose') return out(propose(req));
   const o = officer(req.key);
   if (!o) return out({ok: false, error: 'invalid key'});
   const by = o.name;
   if (req.action === 'claim_view') return out(claimView(req));
   if (req.action === 'claim_approve' || req.action === 'claim_reject') return out(decideClaim(req, by));
   if (req.action === 'approve' || req.action === 'reject') {
-    if (!o.approver) return out({ok: false, error: 'not an approver'});
     if (!/^[0-9a-f]{10}$/.test(req.account_id)) return out({ok: false, error: 'bad request'});
+    const pend = (accountChanges()[req.account_id] || {}).pending;
+    if (!o.approver && !(pend && pend.pub)) return out({ok: false, error: 'not an approver'});  // player proposals: any R4
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     let n;

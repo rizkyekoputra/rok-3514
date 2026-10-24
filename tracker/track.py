@@ -17,8 +17,8 @@ Reads:
   mge/<start>.csv   rank, governor_id, name, points: final ranking (import_mge.py)
   ledger.json       last pulled ledger state (payments, account changes, SHA-256 of active R4 keys), published so the
                     dashboard works before the slow web app answers
-  accounts_online.csv  governor_id, name, type, approved_by, decided: farm/main changes R4s proposed and the
-                    admin approved in the ledger (--pull); they override accounts.csv
+  accounts_online.csv  governor_id, name, type, approved_by, proposed_by, decided: farm/main changes proposed on the
+                    dashboard (by an R4 or a player) and approved in the ledger (--pull); they override accounts.csv
 
 Writes:
   status.csv                 current offense status per account
@@ -167,14 +167,14 @@ def pull_accounts(changes):
     approved = {i: c for i, c in changes.items() if c.get('type') in ('farm', 'main')}
     with open(os.path.join(HERE, 'accounts_online.csv'), 'w', newline='', encoding='utf-8-sig') as f:
         w = csv.writer(f)
-        w.writerow(['governor_id', 'name', 'type', 'approved_by', 'decided'])
+        w.writerow(['governor_id', 'name', 'type', 'approved_by', 'proposed_by', 'decided'])
         for i, c in sorted(approved.items(), key=lambda kv: kv[1]['decided']):
             if i not in ids:
                 print(f'Ledger account change {i} matches no known account, skipped')
                 continue
             k = ids[i]
             gid = '' if k.startswith('name:') else k
-            w.writerow([gid, names[k], c['type'], f"proposed by {c['by']}", c['decided'][:10]])
+            w.writerow([gid, names[k], c['type'], c.get('approvedBy') or '', c['by'], c['decided'][:10]])
     print(f'Pulled {len(approved)} approved account change(s) from the ledger')
 
 
