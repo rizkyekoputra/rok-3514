@@ -99,7 +99,8 @@ Rules (`mge_results()` in `track.py`, fine rates `MGE_FINE`):
   Finishing in a Top-10 rank allocated to someone else while over the limit is flagged as a **takeover**.
 - Fine per point over: 1,000 food / 1,000 wood / 750 stone / 500 gold, one resource or a mix. Stored in gold value
   (500 gold per point) and paid through the same ledger as fort fines; R4s can type a mix like `300M food 50M gold`.
-  Hand-entered payments go in `fines_paid.csv` with `week = mge:<start>`.
+  Hand-entered payments go in `fines_paid.csv` with `week = mge:<start>`. The sanctions mail sends mixed payers to
+  `MGE_CONTACTS` in `track.py` (ＡＧＡＭ, Totos メtreme) for the exact amounts.
 
 Processing: add the row to `mges.csv` and the slots file (names exactly as in the mail), extract frames from the
 recording (`extract_frames.py`; short fast-scrolling clips need `--fps 4`, else ranks are skipped), transcribe

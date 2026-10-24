@@ -67,6 +67,7 @@ R4_REWARD = 'Advanced Trophy'
 # MGE: fine per point over the player's cap, payable in one resource or a mix (in gold-equivalent, food = wood = 2 gold
 # and stone = 1.5 gold per unit of value, the same rates as the fort fines). Caps live in mge/mges.csv and mge/<start>_slots.csv.
 MGE_FINE = {'food': 1000, 'wood': 1000, 'stone': 750, 'gold': 500}
+MGE_CONTACTS = ['ＡＧＡＭ', 'Totos メtreme']  # named in the sanctions mail for working out a mixed payment
 
 NEXT = {1: 'Forgiven + Low Contribution label',
         2: '500K gold per missing fort',
@@ -282,13 +283,15 @@ def write_mge(mges, paid):
                     f"(<b>{dcap / 1e6:g}M</b> outside the Top 10). Fines are in the next mail."] + foot
         intro = [f'These players went over their MGE point limit: <b>{dcap / 1e6:g}M</b> outside the Top 10, '
                  'or a Top 10 player who took a higher slot. Top 10 players who kept their slot are not fined.',
-                 '<i>Name – points – over the limit</i>', '<i>Fine: pay ONE of these, or a mix</i>', '']
+                 '<i>Name – points – over the limit</i>', '<i>Fine: pay in ANY ONE resource below</i>', '']
         items = [f"• <b>{r['name']}</b> – {short(r['points'])} – +{r['over']:,}" +
                  (f" – <color=red>took #{r['took']}</color>" if r['took'] else '') +
                  f"\n   {rss(r['over'])}" for r in fined]
         outro = ['', '<b>FINE PER POINT OVER THE LIMIT</b>',
                  ' / '.join(f'{v:,} {r.capitalize()}' for r, v in MGE_FINE.items()),
-                 'Pay in one resource or a mix of them.',
+                 'You can pay your fine in <b>any type of resource</b>: Food, Wood, Stone or Gold.',
+                 f"Want to pay with a <b>mix</b> of resources? Contact <b>{' or '.join(MGE_CONTACTS)}</b> "
+                 'for the exact amounts.',
                  f'<b>Send your fine to the bank KD: <color=#DAA520>{BANK}</color></b>'] + foot
         d = os.path.join(HERE, 'mails', f"mge-{ev['mge']}")
         os.makedirs(d, exist_ok=True)
