@@ -56,6 +56,12 @@ input[type=search] { flex: 1 1 200px; min-width: 0; }
 .calc label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
 .calc input { min-width: 0; font-variant-numeric: tabular-nums; }
 .calc-out { margin-top: 12px; line-height: 1.6; }
+.dlg textarea { font: inherit; color: var(--text-primary); background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: 6px; padding: 6px 8px; box-sizing: border-box; }
+.dlg h2 { margin-top: 0; }
+.proof { max-width: 100%; max-height: 75vh; display: block; margin: 8px auto 0; border-radius: 8px; }
+.files li { font-size: 13px; }
+.files .bad { color: var(--critical); }
 .rates { width: auto; margin-top: 4px; }
 .rates th, .rates td { cursor: default; padding: 6px 14px 6px 0; }
 .calc .hint { font: inherit; font-size: 12px; text-align: left; padding: 0; margin-top: -2px; border: 0; background: none; color: var(--series-1); cursor: pointer; min-height: 18px; }
@@ -128,7 +134,9 @@ body.gating .gate { display: flex; flex-direction: column; align-items: center; 
 .badge:empty { display: none; }
 #playerDlg { width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 16px 18px 20px;
   border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); color: var(--text-primary); }
-#playerDlg::backdrop { background: rgba(0, 0, 0, .35); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.dlg { width: min(680px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 16px 18px 20px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); color: var(--text-primary); }
+.dlg::backdrop, #playerDlg::backdrop { background: rgba(0, 0, 0, .35); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 .p-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--text-secondary); font-size: 13px; }
 .p-sec { margin: 16px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
 .p-sec .muted { text-transform: none; letter-spacing: 0; font-weight: 400; }
@@ -282,6 +290,16 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       <div class="calc" id="calcHave"></div>
       <div class="calc-out" id="calcOut"></div>
     </div>
+    <div class="card" id="claimsCard" hidden>
+      <h2>Payment claims</h2>
+      <div class="sub">Players who say they paid, with their proof. Check the bank KD first, then approve (records the payment)
+        or reject (the player sees your reason and can send again). Proof files are deleted 30 days after a decision.</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Player</th><th>Fine for</th><th>Sent</th><th>Proof</th><th>Note</th><th>Sent on</th><th></th></tr></thead>
+        <tbody id="claimsBody"></tbody>
+      </table></div>
+    </div>
+
     <div class="card" id="finesCard">
       <h2>Fines</h2>
       <div class="sub" id="finesSub">Fines and whether they have been paid.</div>
@@ -378,6 +396,14 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
 <dialog id="playerDlg" aria-label="Player details">
   <button class="dlg-close" id="dlgClose" type="button" aria-label="Close">✕</button>
   <div id="playerView"></div>
+</dialog>
+<dialog id="claimDlg" class="dlg" aria-label="Send payment proof">
+  <button class="dlg-close" data-close type="button" aria-label="Close">✕</button>
+  <div id="claimView"></div>
+</dialog>
+<dialog id="fileDlg" class="dlg" aria-label="Proof file">
+  <button class="dlg-close" data-close type="button" aria-label="Close">✕</button>
+  <div id="fileView"></div>
 </dialog>
 <div id="tip"></div>
 
@@ -795,6 +821,155 @@ $('calcHave').addEventListener('click', e => {
 });
 renderCalc();
 
+// ---------- payment claims: players send proof, R4s approve or reject (fines_ledger/Code.js) ----------
+// Keep in sync with CLAIM in fines_ledger/Code.js
+const CLAIM_MAX_FILES = 20, CLAIM_MAX_BYTES = 30 * 1024 * 1024;
+const CLAIM_TYPES = /^(image\/(jpeg|png|webp|gif|heic|heif)|video\/(mp4|quicktime|webm|3gpp))$/;
+const EXT_TYPE = {heic: 'image/heic', heif: 'image/heif', mov: 'video/quicktime', mp4: 'video/mp4', webm: 'video/webm', '3gp': 'video/3gpp',
+                  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp'};
+let claims = {}, claimList = [];  // claims: fine_id -> {s: status, t, why} (public); claimList: every open/recent claim (R4s)
+const typeOf = file => file.type || EXT_TYPE[(file.name.split('.').pop() || '').toLowerCase()] || '';
+const mb = n => (n / 1048576).toFixed(n < 10 * 1048576 ? 1 : 0) + 'MB';
+async function post(body) {
+  const r = await fetch(DATA.finesUrl, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify(body)});
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'not saved');
+  return j;
+}
+const base64 = file => new Promise((ok, fail) => {
+  const rd = new FileReader();
+  rd.onload = () => ok(String(rd.result).split(',')[1]);
+  rd.onerror = () => fail(new Error('could not read ' + file.name));
+  rd.readAsDataURL(file);
+});
+
+// Fines list status: proof waiting / rejected, and the player's "I've paid" button
+function claimStatus(f) {
+  const c = claims[f.id];
+  if (c && c.s === 'pending') return ' <span class="chip"><span class="dot" style="background:var(--warning)"></span>Proof sent · waiting for an R4</span>';
+  const why = c && c.s === 'rejected' ? ` <span class="muted">Proof rejected: ${esc(c.why || 'no reason given')}</span>` : '';
+  return why + (officer || f.pv || !DATA.finesUrl || !DATA.claimsOn ? '' : ` <button class="act ghost" data-claim="${f.id}" type="button">I've paid: send proof</button>`);
+}
+
+function openClaim(f) {
+  const name = f.p != null ? P[f.p].n : f.n, rss = rssOf(f), paid = paidOf(f);
+  $('claimView').innerHTML = `<h2>Send payment proof</h2>
+    <div class="sub">${esc(name)} · ${esc(fineLabel(f))} · fine <b>${gold(f.a)}</b> gold value${paid ? ` · ${gold(paid)} already recorded` : ''}</div>
+    <div class="sub" style="margin-top:12px">What did you send to the bank KD <b>${esc(DATA.bank || '')}</b>? One resource or a mix.</div>
+    <div class="calc" id="clHave">${Object.keys(rss).map(r => `<label>${cap(r)}<input type="text" inputmode="decimal" data-cl="${r}" placeholder="0" autocomplete="off"></label>`).join('')}</div>
+    <div class="calc-out" id="clSum"></div>
+    <label class="sub" style="display:block;margin-top:12px">Proof: screenshots or a screen recording showing the resources you sent
+      (up to ${CLAIM_MAX_FILES} files, ${CLAIM_MAX_BYTES / 1048576}MB in total)
+      <input type="file" id="clFiles" multiple accept="image/*,video/mp4,video/quicktime,video/webm,video/3gpp,.heic,.mov" style="display:block;margin-top:6px"></label>
+    <ul class="files" id="clFileList"></ul>
+    <label class="sub" style="display:block;margin-top:8px">Note for the R4s (optional)
+      <textarea id="clNote" rows="2" maxlength="300" style="display:block;width:100%;margin-top:4px"></textarea></label>
+    <div class="controls"><button class="act" id="clSend" type="button">Send proof</button><span class="sub" id="clMsg"></span></div>`;
+  const sentValue = () => [...document.querySelectorAll('#clHave input')].reduce((a, i) => a + amount(i.value) / rss[i.dataset.cl], 0);
+  const check = () => {
+    const files = [...$('clFiles').files], total = files.reduce((a, x) => a + x.size, 0), v = sentValue(), due = f.a - paid;
+    $('clSum').innerHTML = isNaN(v) ? '<span class="below">Use numbers like 300M or 1,575,569.</span>'
+      : v ? `Worth <b>${payFmt(v)}</b> gold value · ${v >= due ? '<span class="paid">covers the fine</span>' : `<span class="below">${payFmt(due - v)} short</span>`}` : '';
+    $('clFileList').innerHTML = files.map(x => `<li${CLAIM_TYPES.test(typeOf(x)) ? '' : ' class="bad"'}>${esc(x.name)} · ${mb(x.size)}${CLAIM_TYPES.test(typeOf(x)) ? '' : ' · not a screenshot or recording'}</li>`).join('') +
+      (files.length ? `<li class="${files.length > CLAIM_MAX_FILES || total > CLAIM_MAX_BYTES ? 'bad' : 'muted'}">${files.length} file${files.length === 1 ? '' : 's'}, ${mb(total)} in total</li>` : '');
+    return {files, total, v};
+  };
+  $('clHave').addEventListener('input', e => { groupDigits(e.target); check(); });
+  $('clFiles').addEventListener('change', check);
+  $('clSend').addEventListener('click', async () => {
+    const {files, total, v} = check(), b = $('clSend');
+    const err = isNaN(v) || !v ? 'Fill in what you sent.' : !files.length ? 'Attach a screenshot or recording.'
+      : files.length > CLAIM_MAX_FILES ? `Attach at most ${CLAIM_MAX_FILES} files.` : total > CLAIM_MAX_BYTES ? `Files are over ${CLAIM_MAX_BYTES / 1048576}MB in total.`
+      : files.some(x => !CLAIM_TYPES.test(typeOf(x))) ? 'Only screenshots (JPG, PNG, WebP, HEIC) and recordings (MP4, MOV, WebM).' : '';
+    if (err) { $('clMsg').innerHTML = `<span class="below">${err}</span>`; return; }
+    const sent = [...document.querySelectorAll('#clHave input')].filter(i => amount(i.value) > 0)
+      .map(i => `${payFull(amount(i.value))} ${cap(i.dataset.cl)}`).join(' + ');
+    saving(b);
+    try {
+      const {claim_id, token} = await post({action: 'claim', fine_id: f.id, player: name, week: f.wk, fine: fineLabel(f), sent,
+        gold_value: Math.round(v), note: $('clNote').value.trim(), files: files.map(x => ({type: typeOf(x), size: x.size}))});
+      for (let i = 0; i < files.length; i++) {
+        $('clMsg').textContent = `Uploading ${i + 1} of ${files.length}…`;
+        await post({action: 'claim_file', claim_id, token, name: files[i].name, type: typeOf(files[i]), data: await base64(files[i])});
+      }
+      await post({action: 'claim_done', claim_id, token});
+      claims = {...claims, [f.id]: {s: 'pending', t: new Date().toISOString()}};
+      $('claimView').innerHTML = `<h2>Proof sent</h2><div class="sub">Thanks, ${esc(name)}. An R4 will check the bank KD and confirm your payment.
+        Until then this fine shows "Proof sent · waiting for an R4".</div>`;
+      renderFines();
+    } catch (e) { $('clMsg').innerHTML = `<span class="below">Not sent: ${esc(e.message)}. Try again.</span>`; b.disabled = false; b.textContent = b.dataset.label; }
+  });
+  $('claimDlg').showModal();
+}
+
+// R4s: claims waiting for a decision first, then the recent decisions
+function renderClaims() {
+  $('claimsCard').hidden = !officer;
+  if (!officer) return;
+  const order = {pending: 0, approved: 1, rejected: 1};
+  const list = claimList.slice().sort((a, b) => order[a.status] - order[b.status] || (b.decided || b.time).localeCompare(a.decided || a.time));
+  $('claimsBody').innerHTML = list.map(c => {
+    const f = F.find(x => x.id === c.fine_id);
+    const proof = c.cleaned ? '<span class="muted">deleted</span>' : c.files.map((x, i) =>
+      `<button class="act ghost" data-view="${c.id}|${x.id}" type="button" title="${esc(x.n)} · ${mb(x.s)}">${x.t.startsWith('video') ? '▶' : '🖼'} ${i + 1}</button>`).join(' ');
+    const act = c.status === 'pending'
+      ? `<button class="act" data-approve="${c.id}" type="button">Approve</button> <button class="act ghost" data-reject="${c.id}" type="button">Reject</button>`
+      : `<span class="${c.status === 'approved' ? 'paid' : 'muted'}">${c.status === 'approved' ? '✓ Approved' : 'Rejected'}</span> <span class="muted">${esc(c.by)}, ${c.decided.slice(0, 10)}${c.reason ? ' · ' + esc(c.reason) : ''}</span>`;
+    return `<tr${f && f.p != null ? ` data-i="${f.p}"` : ''}><td>${esc(c.player)}</td><td>${esc(f ? fineLabel(f) : c.fine)}</td>
+      <td style="white-space:normal">${esc(c.sent)}<br><span class="muted">${gold(c.gold)} gold value of ${f ? gold(f.a) : '?'}</span></td>
+      <td>${proof}</td><td style="white-space:normal">${c.note ? esc(c.note) : '<span class="muted">–</span>'}</td>
+      <td>${c.time.slice(0, 10)}</td><td>${act}</td></tr>`;
+  }).join('') || '<tr><td colspan="7" class="empty">No payment claims.</td></tr>';
+}
+
+$('claimsBody').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-view], button[data-approve], button[data-reject]');
+  if (!b || !officer) return;
+  if (b.dataset.view) {
+    const [claim_id, file_id] = b.dataset.view.split('|');
+    $('fileView').innerHTML = '<div class="sub">Loading the file…</div>';
+    $('fileDlg').showModal();
+    try {
+      const j = await post({key: r4key, action: 'claim_view', claim_id, file_id});
+      const bytes = Uint8Array.from(atob(j.data), ch => ch.charCodeAt(0)), url = URL.createObjectURL(new Blob([bytes], {type: j.type}));
+      $('fileView').innerHTML = `<div class="sub">${esc(j.name)} · <a href="${url}" download="${esc(j.name)}">Download</a></div>` +
+        (j.type.startsWith('video') ? `<video class="proof" src="${url}" controls playsinline></video>` : `<img class="proof" src="${url}" alt="Payment proof">`);
+    } catch (err) { $('fileView').innerHTML = `<div class="below">Could not load: ${esc(err.message)}</div>`; }
+    return;
+  }
+  const c = claimList.find(x => x.id === (b.dataset.approve || b.dataset.reject)), f = F.find(x => x.id === c.fine_id);
+  let body;
+  if (b.dataset.approve) {
+    const before = f ? paidOf(f) - (f.h || 0) : 0;  // what the ledger already records for this fine
+    const v = prompt(`Approve ${c.player}: ${c.sent} (${gold(c.gold)} gold value).\nCheck the bank KD first.\n\n` +
+      `Total paid to record for this fine, in gold value${before ? ` (already recorded ${gold(before)})` : ''}:`, Math.round(before + c.gold));
+    if (v == null) return;
+    const total = amount(v);
+    if (!(total > 0)) return alert('Enter the total in gold value, e.g. 35M or 35000000.');
+    body = {action: 'claim_approve', amount: Math.round(total)};
+  } else {
+    const why = prompt(`Reject the proof from ${c.player}? The player sees this reason and can send again:`, 'Not received in the bank KD');
+    if (!why || !why.trim()) return;
+    body = {action: 'claim_reject', reason: why.trim()};
+  }
+  saving(b);
+  try {
+    await post({key: r4key, claim_id: c.id, ...body});
+    Object.assign(c, {status: body.amount ? 'approved' : 'rejected', by: officer, decided: new Date().toISOString(), reason: body.reason || ''});
+    claims = {...claims, [c.fine_id]: {s: c.status, t: c.decided, why: body.reason}};
+    if (body.amount && f) ledger = {...ledger, [f.id]: {amount: body.amount, by: officer, time: c.decided}};
+    saved();
+  } catch (err) { notSaved(b, err); }
+});
+$('finesBody').addEventListener('click', e => {
+  const b = e.target.closest('button[data-claim]');
+  if (b) openClaim(F.find(f => f.id === b.dataset.claim));
+});
+document.querySelectorAll('.dlg').forEach(d => {
+  d.addEventListener('click', e => { if (e.target === d || e.target.closest('[data-close]')) d.close(); });
+  d.addEventListener('close', () => { d.querySelectorAll('video').forEach(v => v.pause()); });
+});
+
 // ---------- MGE tab ----------
 // an MGE row: [rank, player index or null, name then, points, slot, limit (null = no cap), over, fine, took slot]
 const MGE = Object.fromEntries((DATA.mges || []).map(m => [m.s, m]));
@@ -975,7 +1150,7 @@ async function loadLedger() {
       const r = await fetch(DATA.finesUrl + (r4key ? '?key=' + encodeURIComponent(r4key) : ''),
         AbortSignal.timeout ? {signal: AbortSignal.timeout(60000)} : {});
       const j = await r.json();
-      ledger = j.paid || {}; changes = j.accounts || {};
+      ledger = j.paid || {}; changes = j.accounts || {}; claims = j.claims || {}; claimList = j.claimList || [];
       if (r4key) { officer = j.officer || null; approver = !!j.approver; }
       break;
     } catch (e) {
@@ -998,6 +1173,7 @@ function renderOfficer() {
 }
 
 function renderFines() {
+  renderClaims();
   const q = $('finesSearch').value.trim().toLowerCase(), sel = $('finesSel').value;
   const rows = shownFines().map(f => ({f, paid: paidOf(f), name: f.p != null ? P[f.p].n : f.n}))
     .filter(r => (!q || r.name.toLowerCase().includes(q) || r.f.n.toLowerCase().includes(q)) &&
@@ -1005,8 +1181,9 @@ function renderFines() {
     .sort((a, b) => b.f.wk.localeCompare(a.f.wk) || b.f.a - a.f.a);
   $('finesBody').innerHTML = rows.map(({f, paid, name}) => {
     const l = ledger && ledger[f.id], full = paid >= f.a;
-    const status = full ? `<span class="paid">✓ Paid</span>${l ? ` <span class="muted">${esc(l.by)}, ${l.time.slice(0, 10)}</span>` : ''}`
-      : paid ? `${gold(paid)} of ${gold(f.a)} paid${l ? ` <span class="muted">${esc(l.by)}</span>` : ''}` : '<span class="below">Unpaid</span>';
+    const status = (full ? `<span class="paid">✓ Paid</span>${l ? ` <span class="muted">${esc(l.by)}, ${l.time.slice(0, 10)}</span>` : ''}`
+      : paid ? `${gold(paid)} of ${gold(f.a)} paid${l ? ` <span class="muted">${esc(l.by)}</span>` : ''}` : '<span class="below">Unpaid</span>') +
+      (full ? '' : claimStatus(f));
     const act = !officer ? '' : f.pv ? '<td><span class="muted">Provisional</span></td>' : `<td>${l ? `<button class="act ghost" data-undo="${f.id}" type="button">Undo</button>`
       : `<button class="act" data-pay="${f.id}" type="button">Mark paid</button>`}</td>`;
     return `<tr${f.p != null ? ` data-i="${f.p}"` : ''}><td>${esc(name)}</td>${act}<td>${fineWhen(f)}</td><td class="num">${fineWhy(f)}</td><td class="num">${gold(f.a)}</td><td>${status}</td></tr>`;
@@ -1169,7 +1346,7 @@ document.querySelectorAll('th[data-k]').forEach(th => th.addEventListener('click
   const k = th.dataset.k;
   sortDir = sortK === k ? -sortDir : (k === 'n' || k === 't' ? 1 : -1); sortK = k; renderTable();
 }));
-['tbody', 'rosterBody', 'pendBody', 'queueBody', 'finesBody', 'kvkBody', 'mgeBody'].forEach(id => $(id).addEventListener('click', e => {
+['tbody', 'rosterBody', 'pendBody', 'queueBody', 'finesBody', 'kvkBody', 'mgeBody', 'claimsBody'].forEach(id => $(id).addEventListener('click', e => {
   const tr = e.target.closest('tr[data-i]');
   if (tr && !e.target.closest('button, input, td.sel')) selectPlayer(P[+tr.dataset.i]);
 }));

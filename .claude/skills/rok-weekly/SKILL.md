@@ -159,6 +159,15 @@ Future events (KvK, AoO, 20 GH…) get their own tab and data folder, sharing th
 
 ## Other requests
 
+- **Payment claims (players)**: on the Fines tab every unpaid fine has "I've paid: send proof" (when `CLAIMS_ON` in
+  `track.py` is true). The player enters what they sent (a mix is fine) and attaches up to 20 screenshots/recordings, 30MB
+  in total (`CLAIM` in `fines_ledger/Code.js`, mirrored as `CLAIM_*` in the template). Files go to a private Drive folder
+  of the ledger's Google account; the claim is a row in the sheet's `Claims` tab. R4s see **Payment claims** on the Fines
+  tab, view the proof and approve (appends a Payments row with the total paid, so it counts like "Mark paid") or reject
+  with a reason the player sees. One waiting claim per fine, at most 5 per fine and 100 waiting overall, 20 new claims per
+  10 minutes. A daily trigger (made by `setup()`) deletes proof files 30 days after the decision, and unfinished uploads
+  after a day. The script needs the `drive.file` and `script.scriptapp` scopes: after changing them the ledger account
+  must run `setup` once in the script editor to grant them, before `clasp update-deployment`.
 - **Fine paid**: R4s mark payments on the dashboard with their personal `?key=` link (gold, or a resource mix like
   `300M food 50M gold`, converted to gold value); `publish.sh` pulls them.
   Only if the user reports one directly, append to `tracker/fines_paid.csv` (week = Monday the fine was issued, or

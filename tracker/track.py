@@ -48,6 +48,9 @@ DASHBOARD_URL = 'https://rizkyekoputra.github.io/rok-3514-dashboard/'  # public 
 CLEAR_AFTER = 2  # consecutive passing weeks that clear all recorded offenses
 
 # R4 fines ledger (Apps Script web app in fines_ledger/); the dashboard reads and writes it.
+# Players' "I've paid: send proof" (payment claims with screenshots/recordings). Turn on only once the web app version
+# with claims is deployed, or players' submissions fail.
+CLAIMS_ON = False
 FINES_URL = 'https://script.google.com/macros/s/AKfycbxjPVSNgqPqh5ki0M_dEydbNi2kFoV2O6xjH8qS84i9BrJhKKW3FfEwBC82XMDeGVz6/exec'
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -736,7 +739,7 @@ def write_dashboard(history, state, accounts, fines, mges):
     ledger = json.load(open(lp, encoding='utf-8')) if os.path.exists(lp) else {}
     data = dict(weeks=[wk for wk, _ in history], minF=MIN_FORTS, minT=MIN_TECH, players=players,
                 fines=fines, finesUrl=FINES_URL, scanDay=scan_day, namesDay=names_day, mainAlly=MAIN_ALLIANCE, kvks=kvks,
-                mges=mge, mgeFine=MGE_FINE, fineKinds=FINE_KINDS,
+                mges=mge, mgeFine=MGE_FINE, fineKinds=FINE_KINDS, bank=BANK, claimsOn=CLAIMS_ON,
                 ledger=dict(paid=ledger.get('paid', {}), accounts=ledger.get('accounts', {})), officers=ledger.get('officers', []),
                 updated=date.today().isoformat())
     with open(os.path.join(HERE, 'dashboard_template.html'), encoding='utf-8') as f:

@@ -3,6 +3,9 @@
 // Payments tab: append-only log; the latest row per fine_id wins, "undo" clears it.
 // Accounts tab: R4 proposals to mark an account farm/main; the admin (sheet owner) approves or rejects them from the 3514 menu,
 // which starts the GitHub Action that recalculates and republishes the dashboard.
+// Claims tab: players' "I've paid" submissions with proof files (screenshots/recordings, kept in a private Drive folder);
+// R4s approve or reject them on the dashboard. Approving appends a Payments row, so it counts like a payment an R4 marked.
+// Proof files are deleted CLAIM.keepDays after the decision (daily trigger made by setup()).
 // Deployed as a Web app: execute as the owner, access "Anyone" (keys gate writes, reads are public).
 
 const DASHBOARD = 'https://rizkyekoputra.github.io/rok-3514-dashboard/';
@@ -17,7 +20,14 @@ const HEADERS = {
   Officers: ['name', 'key', 'status', 'link', 'approver'],
   Payments: ['time', 'fine_id', 'player', 'week', 'amount', 'by', 'action'],
   Accounts: ['time', 'account_id', 'player', 'type', 'by', 'status', 'decided', 'decided_by'],
+  Claims: ['time', 'claim_id', 'fine_id', 'player', 'week', 'fine', 'sent', 'gold_value', 'note', 'expect', 'files', 'bytes',
+           'status', 'token', 'decided', 'decided_by', 'reason', 'cleaned'],
 };
+// Limits for player claims (keep maxFiles/maxBytes/types in sync with CLAIM_* in ../dashboard_template.html).
+// status: uploading -> pending (all files in) -> approved | rejected; unfinished uploads become abandoned after a day.
+const CLAIM = {maxFiles: 20, maxBytes: 30 * 1024 * 1024, perFine: 5, open: 100, burst: 20, keepDays: 30,
+               types: /^(image\/(jpeg|png|webp|gif|heic|heif)|video\/(mp4|quicktime|webm|3gpp))$/};
+const C = Object.fromEntries(HEADERS.Claims.map((h, i) => [h, i]));  // Claims column index by header
 
 const book = () => SpreadsheetApp.getActiveSpreadsheet();
 const tab = name => book().getSheetByName(name);
@@ -115,6 +125,9 @@ function setup() {
     tab('Officers').appendRow([n, key, 'active', DASHBOARD + '?key=' + key]);
   });
   console.log(`Officers listed: ${known.length}; keys created for ${added.length}: ${added.join(', ')}`);
+  if (!ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'cleanupClaims'))
+    ScriptApp.newTrigger('cleanupClaims').timeBased().everyDays(1).atHour(3).create();
+  claimsFolder();
   const blank = book().getSheetByName('Sheet1');
   if (blank && book().getSheets().length > 2 && blank.getLastRow() === 0) book().deleteSheet(blank);
   return added;
@@ -160,7 +173,8 @@ function doGet(e) {
     else paid[fid] = {amount: Number(amount), by, time: new Date(time).toISOString()};
   });
   const o = officer(e.parameter.key);
-  return out({paid, accounts: accountChanges(), officer: o && o.name, approver: !!(o && o.approver), officers: officerList()});
+  return out({paid, accounts: accountChanges(), officer: o && o.name, approver: !!(o && o.approver), officers: officerList(),
+              claims: publicClaims(), claimList: o ? officerClaims() : undefined});
 }
 
 // SHA-256 of each active key (never the key): published with the dashboard so an R4 link works at once,
@@ -177,12 +191,22 @@ function officerList() {
 //   {key, account_id, player, action: "farm" | "main"}               account type change (proposal, or
 //   {key, accounts: [{account_id, player}], action: "farm" | "main"}  applied at once for approvers)
 //   {key, account_id, action: "approve" | "reject"}                  approvers only
+//   {action: "claim", fine_id, player, week, fine, sent, gold_value, note, files: [{type, size}]}   player, no key
+//   {action: "claim_file", claim_id, token, name, type, data (base64)}  one proof file; then {action: "claim_done", ...}
+//   {key, action: "claim_view", claim_id, file_id}                     R4: one proof file as base64
+//   {key, action: "claim_approve", claim_id, amount} | {key, action: "claim_reject", claim_id, reason}
 function doPost(e) {
   let req;
   try { req = JSON.parse(e.postData.contents); } catch (err) { return out({ok: false, error: 'bad request'}); }
+  // players (no key): send a payment claim and its proof files
+  if (req.action === 'claim') return out(newClaim(req));
+  if (req.action === 'claim_file') return out(claimFile(req));
+  if (req.action === 'claim_done') return out(claimDone(req));
   const o = officer(req.key);
   if (!o) return out({ok: false, error: 'invalid key'});
   const by = o.name;
+  if (req.action === 'claim_view') return out(claimView(req));
+  if (req.action === 'claim_approve' || req.action === 'claim_reject') return out(decideClaim(req, by));
   if (req.action === 'approve' || req.action === 'reject') {
     if (!o.approver) return out({ok: false, error: 'not an approver'});
     if (!/^[0-9a-f]{10}$/.test(req.account_id)) return out({ok: false, error: 'bad request'});
@@ -226,4 +250,144 @@ function locked(write, by) {
   lock.waitLock(10000);  // two R4s tapping at once
   try { write(); } finally { lock.releaseLock(); }
   return out({ok: true, by});
+}
+
+// ---------- payment claims ----------
+
+function claimsFolder() {
+  const props = PropertiesService.getScriptProperties(), id = props.getProperty('CLAIMS_FOLDER');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (err) { /* deleted: make a new one */ } }
+  const f = DriveApp.createFolder('3514 payment claims (proof files)');
+  props.setProperty('CLAIMS_FOLDER', f.getId());
+  return f;
+}
+
+// [{r: sheet row (1-based), v: values}] of the Claims tab
+function claimRows() { return rows('Claims').map((v, i) => ({r: i + 2, v})); }
+const findClaim = id => claimRows().find(c => c.v[C.claim_id] === id);
+const setCells = (c, cols) => Object.entries(cols).forEach(([h, val]) => tab('Claims').getRange(c.r, C[h] + 1).setValue(val));
+const fileList = c => { try { return JSON.parse(c.v[C.files] || '[]'); } catch (err) { return []; } };
+const iso = d => d ? new Date(d).toISOString() : '';
+
+function newClaim(req) {
+  const files = Array.isArray(req.files) ? req.files : [], bytes = files.reduce((a, f) => a + Number(f && f.size || 0), 0);
+  const gold = Number(req.gold_value);
+  if (!/^[0-9a-f]{10}$/.test(req.fine_id) || !/^\d{4}-\d{2}-\d{2}$/.test(req.week) || !(gold >= 0 && gold <= 1e13))
+    return {ok: false, error: 'bad request'};
+  if (!files.length || files.length > CLAIM.maxFiles) return {ok: false, error: `attach 1 to ${CLAIM.maxFiles} files`};
+  if (files.some(f => !CLAIM.types.test(String(f.type)) || !(Number(f.size) > 0)))
+    return {ok: false, error: 'only screenshots (JPG, PNG, WebP, HEIC) and recordings (MP4, MOV, WebM)'};
+  if (bytes > CLAIM.maxBytes) return {ok: false, error: `files are over ${CLAIM.maxBytes / 1048576}MB in total`};
+  const cache = CacheService.getScriptCache(), burst = Number(cache.get('claims') || 0);
+  if (burst >= CLAIM.burst) return {ok: false, error: 'many claims just now, try again in a few minutes'};
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const all = claimRows().map(c => c.v), mine = all.filter(v => v[C.fine_id] === req.fine_id && v[C.status] !== 'abandoned');
+    if (mine.some(v => v[C.status] === 'pending')) return {ok: false, error: 'proof for this fine is already waiting for an R4'};
+    if (mine.length >= CLAIM.perFine) return {ok: false, error: 'too many claims for this fine, please contact an R4'};
+    if (all.filter(v => v[C.status] === 'pending' || v[C.status] === 'uploading').length >= CLAIM.open)
+      return {ok: false, error: 'too many claims are waiting, try again later'};
+    const id = newKey().slice(0, 12), token = newKey();
+    const row = HEADERS.Claims.map(() => '');
+    Object.assign(row, {[C.time]: new Date(), [C.claim_id]: id, [C.fine_id]: req.fine_id, [C.player]: plain(req.player),
+      [C.week]: req.week, [C.fine]: plain(req.fine), [C.sent]: plain(req.sent), [C.gold_value]: gold,
+      [C.note]: String(req.note || '').slice(0, 300).replace(/^([=+\-@])/, "'$1"),
+      [C.expect]: JSON.stringify({n: files.length, bytes}), [C.files]: '[]', [C.bytes]: 0, [C.status]: 'uploading', [C.token]: token});
+    tab('Claims').appendRow(row);
+    cache.put('claims', String(burst + 1), 600);
+    return {ok: true, claim_id: id, token};
+  } finally { lock.releaseLock(); }
+}
+
+// one uploaded proof file (sent one by one so each request stays small)
+function claimFile(req) {
+  const c = findClaim(req.claim_id);
+  if (!c || !req.token || c.v[C.token] !== req.token || c.v[C.status] !== 'uploading') return {ok: false, error: 'claim not open for upload'};
+  if (!CLAIM.types.test(String(req.type))) return {ok: false, error: 'file type not allowed'};
+  const expect = JSON.parse(c.v[C.expect]), list = fileList(c);
+  let bytes;
+  try { bytes = Utilities.base64Decode(String(req.data || '')); } catch (err) { return {ok: false, error: 'bad file'}; }
+  const used = Number(c.v[C.bytes]) + bytes.length;
+  if (!bytes.length || list.length >= expect.n || used > Math.min(expect.bytes, CLAIM.maxBytes)) return {ok: false, error: 'file over the limit'};
+  const name = `${c.v[C.claim_id]}_${list.length + 1}_` + String(req.name || 'proof').replace(/[^\w.\-]+/g, '_').slice(-60);
+  const file = claimsFolder().createFile(Utilities.newBlob(bytes, req.type, name));
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const now = findClaim(req.claim_id), nowList = fileList(now);
+    nowList.push({id: file.getId(), n: String(req.name || name).slice(0, 80), t: req.type, s: bytes.length});
+    setCells(now, {files: JSON.stringify(nowList), bytes: Number(now.v[C.bytes]) + bytes.length});
+    return {ok: true, count: nowList.length};
+  } finally { lock.releaseLock(); }
+}
+
+function claimDone(req) {
+  const c = findClaim(req.claim_id);
+  if (!c || !req.token || c.v[C.token] !== req.token || c.v[C.status] !== 'uploading') return {ok: false, error: 'claim not open'};
+  if (!fileList(c).length) return {ok: false, error: 'no files arrived'};
+  setCells(c, {status: 'pending', token: ''});
+  return {ok: true};
+}
+
+// public: fine_id -> {s: status, t: time, why: reason if rejected} of the latest claim per fine
+function publicClaims() {
+  const res = {};
+  claimRows().forEach(({v}) => {
+    if (v[C.status] === 'uploading' || v[C.status] === 'abandoned') return;
+    res[v[C.fine_id]] = {s: v[C.status], t: iso(v[C.time]), why: v[C.status] === 'rejected' ? v[C.reason] : undefined};
+  });
+  return res;
+}
+
+// R4s: claims waiting for a decision, plus the ones decided in the last CLAIM.keepDays days
+function officerClaims() {
+  const since = Date.now() - CLAIM.keepDays * 864e5;
+  return claimRows().map(c => c.v).filter(v => v[C.status] === 'pending' ||
+      ((v[C.status] === 'approved' || v[C.status] === 'rejected') && new Date(v[C.decided]).getTime() > since))
+    .map(v => ({id: v[C.claim_id], fine_id: v[C.fine_id], player: v[C.player], week: v[C.week], fine: v[C.fine],
+      sent: v[C.sent], gold: Number(v[C.gold_value]), note: v[C.note], files: (() => { try { return JSON.parse(v[C.files]); } catch (e) { return []; } })(),
+      status: v[C.status], time: iso(v[C.time]), decided: iso(v[C.decided]), by: v[C.decided_by], reason: v[C.reason],
+      cleaned: !!v[C.cleaned]}));
+}
+
+function claimView(req) {
+  const c = findClaim(req.claim_id), f = c && fileList(c).find(x => x.id === req.file_id);
+  if (!f || c.v[C.cleaned]) return {ok: false, error: 'file not found (deleted after 30 days?)'};
+  const blob = DriveApp.getFileById(f.id).getBlob();
+  return {ok: true, type: f.t, name: f.n, data: Utilities.base64Encode(blob.getBytes())};
+}
+
+function decideClaim(req, by) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const c = findClaim(req.claim_id);
+    if (!c || c.v[C.status] !== 'pending') return {ok: false, error: 'claim is not waiting for a decision'};
+    if (req.action === 'claim_reject') {
+      const reason = String(req.reason || '').trim().slice(0, 200).replace(/^([=+\-@])/, "'$1");
+      if (!reason) return {ok: false, error: 'give a reason'};
+      setCells(c, {status: 'rejected', decided: new Date(), decided_by: by, reason});
+      return {ok: true, by};
+    }
+    const amount = Number(req.amount);
+    if (!(amount > 0 && amount <= 1e12)) return {ok: false, error: 'bad amount'};
+    // the latest Payments row per fine is its total paid, so the dashboard sends previous payments + this claim
+    tab('Payments').appendRow([new Date(), c.v[C.fine_id], c.v[C.player], c.v[C.week], amount, by, 'paid']);
+    setCells(c, {status: 'approved', decided: new Date(), decided_by: by});
+    return {ok: true, by};
+  } finally { lock.releaseLock(); }
+}
+
+// Daily: delete proof files CLAIM.keepDays after the decision, and files of uploads never finished (after a day).
+function cleanupClaims() {
+  const now = Date.now();
+  claimRows().forEach(c => {
+    const v = c.v, st = v[C.status];
+    const done = (st === 'approved' || st === 'rejected') && !v[C.cleaned] && now - new Date(v[C.decided]).getTime() > CLAIM.keepDays * 864e5;
+    const stale = st === 'uploading' && now - new Date(v[C.time]).getTime() > 864e5;
+    if (!done && !stale) return;
+    fileList(c).forEach(f => { try { DriveApp.getFileById(f.id).setTrashed(true); } catch (err) { /* already gone */ } });
+    setCells(c, stale ? {status: 'abandoned', token: '', cleaned: new Date()} : {cleaned: new Date()});
+  });
 }
