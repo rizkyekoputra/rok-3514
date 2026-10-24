@@ -47,8 +47,8 @@ dashboard's MGE tab.
 
 1. **Before the weekly reset**, screen-record (or screenshot) the **Fort Destroyer** and
    **Mad Scientist** (tech) rankings from rank 1 to the last rank. Scroll slowly.
-   An in-game member export (`*_statsExport.xlsx`) helps match renamed players.
-2. Put the files in a new folder, e.g. `Activity 19-25 oct 2026/`.
+   An in-game member export (`*_statsExport.xlsx`, kept in `data-from-ingame/`) helps match renamed players.
+2. Put the files in a new folder under `weekly-activity/`, e.g. `weekly-activity/Activity 19-25 oct 2026/`.
 3. In Claude Code, opened in this folder, say **"process this week"**. The
    [`rok-weekly`](.claude/skills/rok-weekly/SKILL.md) skill reads the rankings, matches names to
    Governor IDs, runs the tracker and summarises the results.
@@ -74,7 +74,9 @@ payment log and recalculates everything.
 | `tracker/dashboard_template.html` | Dashboard page; filled with data by `track.py` |
 | `tracker/publish.sh` | Pushes the dashboard to GitHub Pages |
 | `.claude/skills/rok-weekly/` | Claude Code skill and helper scripts (video frames, name matching) |
-| `Activity …/` | Raw screenshots, recordings and member exports per week |
+| `weekly-activity/Activity …/` | Raw fort/tech ranking screenshots and recordings per week |
+| `event/<event>/<name (dates)>/` | Raw event rankings, e.g. `event/mge/mge-infa (19-24 oct 2026)/` |
+| `data-from-ingame/` | In-game member exports (`3514_<from>_<to>_statsExport.xlsx`) |
 | `3514 Ch25.xlsx`, `TOP500-…xlsx`, `3514_*.csv` | Ch25 roster and kingdom scans with the derived CSVs |
 
 Generated files (`reports/`, `mails/`, `status.csv`, `offense_log.csv`, `dashboard/`) should not be

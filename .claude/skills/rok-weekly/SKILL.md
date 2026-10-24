@@ -1,6 +1,6 @@
 ---
 name: rok-weekly
-description: Process a week of Rise of Kingdoms 3514 alliance activity (fort destroyer + tech donation rankings from screenshots or screen recordings), update the offense tracker, and produce the weekly report, in-game mails and public dashboard. Also MGE (Mightiest Governor) point limits, takeovers and fines. Use when the user drops a new "Activity <dates>" folder or an MGE ranking/allocation mail, says "process this week", marks accounts as farm/R4, records a paid fine, or changes the weekly or MGE rules.
+description: Process a week of Rise of Kingdoms 3514 alliance activity (fort destroyer + tech donation rankings from screenshots or screen recordings), update the offense tracker, and produce the weekly report, in-game mails and public dashboard. Also MGE (Mightiest Governor) point limits, takeovers and fines. Use when the user drops a new "weekly-activity/Activity <dates>" folder or an MGE ranking/allocation mail, says "process this week", marks accounts as farm/R4, records a paid fine, or changes the weekly or MGE rules.
 ---
 
 # RoK 3514 weekly activity
@@ -30,7 +30,8 @@ to read the rankings accurately, match names to Governor IDs, and keep `accounts
 | `event/mge/<name (dates)>/` | Raw MGE ranking recordings / screenshots the user provides |
 | `tracker/dashboard_template.html` → `tracker/dashboard/index.html` | Public dashboard (generated; `dashboard/` is its own git repo) |
 | `tracker/publish.sh` | Rebuilds and pushes the dashboard to GitHub Pages |
-| `Activity <d-d mon yyyy>/` | Raw screenshots / videos / member export the user provides each week |
+| `weekly-activity/Activity <d-d mon yyyy>/` | Raw ranking screenshots / videos the user provides each week |
+| `data-from-ingame/` | In-game member exports `3514_<from>_<to>_statsExport.xlsx` (see **New member export**) |
 
 Never hand-edit generated files; change inputs and rerun `python3 tracker/track.py`.
 
@@ -135,8 +136,8 @@ Future events (KvK, AoO, 20 GH…) get their own tab and data folder, sharing th
 
 0. Python helpers need the project venv: `.venv/bin/python` (Pillow + openpyxl). If `.venv` is missing:
    `python3 -m venv .venv && .venv/bin/pip install pillow openpyxl`.
-1. **Find the inputs** in the new `Activity …` folder: fort ranking, tech ranking (skip "Resource Assistance"),
-   and usually a member export `*_statsExport.xlsx` (Character ID, Username, Power…). The week's Monday is the file name.
+1. **Find the inputs** in the new `weekly-activity/Activity …` folder: fort ranking, tech ranking (skip "Resource Assistance"),
+   and the newest member export `data-from-ingame/*_statsExport.xlsx` (Character ID, Username, Power…). The week's Monday is the file name.
 2. **Screen recordings**: for each video run
    `.venv/bin/python .claude/skills/rok-weekly/scripts/extract_frames.py VIDEO <scratch>/fort` (or `/tech`).
    Read every `start_*.png` first — **rank 1 is only visible in the first fraction of a second**.
