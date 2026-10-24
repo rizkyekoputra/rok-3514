@@ -11,6 +11,7 @@ Reads:
                     per ID, plus governors below the TOP500 scan. names/<date>_kvk<N>.csv = names in that KvK
                     (history only)
   kvk/kvks.csv, kvk/kvk<N>.csv  past KvK results per governor (import_kvk.py), shown in the player pop-up
+  ch/<date>.csv     governor_id, name, ch: city hall levels (import_ch.py, e.g. the CH25 roster); highest level seen wins
   mge/mges.csv      mge (= start date), start, end, troop, default_cap, final: one row per MGE (final = yes once the
                     ranking is the end-of-event one; until then its fines are provisional and can't be marked paid)
   mge/<start>_slots.csv  slot, name, governor_id, cap: the Top-10 allocation (blank cap = no cap)
@@ -633,6 +634,16 @@ def name_history(history):
     return runs
 
 
+def city_halls():
+    """{key: [highest city hall level in any ch/<date>.csv, latest name, latest date]} (levels never go down)."""
+    d, ch = os.path.join(HERE, 'ch'), {}
+    for f in sorted(os.listdir(d)) if os.path.isdir(d) else []:
+        if f.endswith('.csv'):
+            for r in read(f'ch/{f}'):
+                ch[key(r)] = [max(ch.get(key(r), [0])[0], num(r['ch']) or 0), r['name'], f[:10]]
+    return ch
+
+
 def kvk_records():
     """(kvks, {key: [[kvk, value, target, pct, fine, status, type, name then], ...]}) from tracker/kvk/."""
     kvks = [dict(k=int(m['kvk']), d=m['date'], e=m['estimated'] == 'yes', m=m['metric']) for m in read('kvk/kvks.csv')]
@@ -706,6 +717,11 @@ def write_dashboard(history, state, accounts, fines, mges):
         players.append(dict(n=name, t=a.get('type') or 'main', r=a.get('role', ''), w={}, x=seen))
         if '' not in src:  # last seen only in a KvK sheet (xs = 'KvK <n>'): may still be on that KvK's map
             players[-1]['xs'] = sorted(src)[-1].split(', ')[-1]
+    ch = city_halls()
+    for k, (lvl, name, day) in ch.items():  # on a city hall list only (e.g. the CH25 roster): searchable too
+        if k not in ids and not k.startswith('name:'):
+            ids[k] = len(players)
+            players.append(dict(n=name, t=accounts.get(k, {}).get('type') or 'main', r='', w={}, x=day, xs=f'CH{lvl} list'))
     for k, i in ids.items():
         s, a, r = state.get(k, {}), accounts.get(k, {}), scan.get(k)
         p = players[i]
@@ -733,6 +749,9 @@ def write_dashboard(history, state, accounts, fines, mges):
         hn = [[n, '', '', ''] for n in p['pn'] if n not in named] + [[n, a, b, ', '.join(l)] for n, a, b, l in runs]
         if len(hn) > 1:
             p['hn'] = hn
+    for k, i in ids.items():  # ch = city hall level (only where known, e.g. on the CH25 roster)
+        if ch.get(k):
+            players[i]['ch'] = ch[k][0]
     for k, i in ids.items():  # kv = past KvKs this governor took part in (matched by Governor ID)
         if k in kv:
             players[i]['kv'] = sorted(kv[k], key=lambda r: r[0])

@@ -197,6 +197,11 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       <div class="controls">
         <input type="search" id="rosterSearch" placeholder="Search name or ID, also past names and governors who left…" autocomplete="off">
         <select id="allySel"></select>
+        <select id="rosterCh" title="City hall level">
+          <option value="all">Any CH</option>
+          <option value="25">CH25</option>
+          <option value="below">Not CH25 / unknown</option>
+        </select>
         <select id="rosterType">
           <option value="all">Any type</option>
           <option value="main">Main accounts</option>
@@ -211,6 +216,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
         <thead><tr>
           <th class="sel" id="rosterSelTh" hidden><input type="checkbox" id="rosterAll" aria-label="Select all shown"></th>
           <th data-rk="n">Player</th><th data-rk="g">ID</th><th data-rk="a">Alliance</th>
+          <th class="num" data-rk="ch" title="City hall level (from the CH25 roster; – = not on it)">CH</th>
           <th class="num" data-rk="pw">Power</th><th class="num" data-rk="kp">Kill points</th>
           <th data-rk="t">Type</th><th>Status</th><th id="rosterActTh" hidden></th>
         </tr></thead>
@@ -635,7 +641,7 @@ function renderPlayer() {
     <div class="player-head">
       <span class="name">${esc(p.n)}</span>
       ${p.g ? `<span class="chip" style="font-variant-numeric:tabular-nums">ID ${p.g}</span>` : ''}
-      <span class="chip">${typeTxt(p)}</span>${p.r ? `<span class="chip">${p.r}</span>` : ''}
+      <span class="chip">${typeTxt(p)}</span>${p.r ? `<span class="chip">${p.r}</span>` : ''}${p.ch ? `<span class="chip">CH${p.ch}</span>` : ''}
       ${p.c ? '' : `<span class="chip">${strong(p) ? '<span class="dot" style="background:var(--serious)"></span>Likely farm · ' : ''}not confirmed</span>`}
       ${ranked ? chip(p.o, isFarm(p)) : ''}
       ${typeNote(p)}
@@ -700,9 +706,9 @@ const goneTxt = p => onMap(p) ? `Not seen since ${p.xs}` : 'Migrated out';
 const goneNote = p => onMap(p) ? 'still on the KvK map, or migrated' : `last seen ${dayLabel(p.x)}${p.xs ? ` (${p.xs})` : ''}`;
 const leftChip = p => `<span class="chip"><span class="dot" style="background:var(--text-secondary)"></span>${goneTxt(p)} · ${goneNote(p)}</span>`;
 function renderRoster() {
-  const q = $('rosterSearch').value.trim().toLowerCase(), ally = $('allySel').value, t = $('rosterType').value;
+  const q = $('rosterSearch').value.trim().toLowerCase(), ally = $('allySel').value, t = $('rosterType').value, chf = $('rosterCh').value;
   // Governors not in the kingdom now (p.x = last seen) show up only in a search or under "Not in the kingdom now"
-  const rows = P.filter(p => (t === 'left' ? p.x : !p.x || q) && (q || t === 'left' || ally === 'all' || (p.a || '') === ally) && matches(p, q) &&
+  const rows = P.filter(p => (chf === 'all' || (chf === '25' ? p.ch >= 25 : !(p.ch >= 25))) && (t === 'left' ? p.x : !p.x || q) && (q || t === 'left' || ally === 'all' || (p.a || '') === ally) && matches(p, q) &&
     (t === 'all' || t === 'left' || (t === 'review' ? !p.c : t === 'likely' ? !p.c && strong(p) : p.t === t)));
   rows.sort((a, b) => {
     const va = a[rSortK] ?? (['n', 'a', 't', 'g'].includes(rSortK) ? '' : -1), vb = b[rSortK] ?? (typeof va === 'string' ? '' : -1);
@@ -713,15 +719,15 @@ function renderRoster() {
   $('rosterBody').innerHTML = rows.map(p => `<tr data-i="${P.indexOf(p)}">
       ${officer ? `<td class="sel">${can(p) ? `<input type="checkbox" data-sel="${P.indexOf(p)}"${picked.has(P.indexOf(p)) ? ' checked' : ''} aria-label="Select ${esc(p.n)}">` : ''}</td>` : ''}
       <td>${esc(p.n)}</td><td class="muted" style="font-variant-numeric:tabular-nums">${p.g || '–'}</td><td>${p.a ? esc(p.a) : p.x ? `<span class="muted">${goneTxt(p)}</span>` : '<span class="muted">–</span>'}</td>
-      <td class="num">${short(p.pw)}</td><td class="num">${short(p.kp)}</td>
+      <td class="num">${p.ch || '<span class="muted">–</span>'}</td><td class="num">${short(p.pw)}</td><td class="num">${short(p.kp)}</td>
       <td>${typeTxt(p)}</td><td>${statusCell(p)}</td>${officer ? `<td style="white-space:nowrap">${typeButtons(p)}</td>` : ''}</tr>`).join('') ||
-    `<tr><td colspan="${officer ? 9 : 7}" class="empty">No players match.</td></tr>`;
+    `<tr><td colspan="${officer ? 10 : 8}" class="empty">No players match.</td></tr>`;
   $('rosterActTh').hidden = $('rosterSelTh').hidden = !officer;
   renderBulk();
   const gone = rows.filter(p => p.x).length;
   $('rosterCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'}` + (q && ally !== 'all' ? ' · searching all alliances' : '') +
     (gone && t !== 'left' ? ` · ${gone} of them not in the kingdom now` : '');
-  $('rosterSub').textContent = `Every governor in the kingdom scan and member export, plus anyone seen in the alliance rankings. Search also finds governors not in the kingdom now (migrated, or still on the last KvK map), from older scans, name lists and KvK sheets. Click a name for details. Events are tracked for ${DATA.mainAlly} only.`;
+  $('rosterSub').textContent = `Every governor in the kingdom scan and member export, plus anyone seen in the alliance rankings. CH = city hall level from the CH25 roster (– = not on it: below 25, or not listed yet). Search also finds governors not in the kingdom now (migrated, or still on the last KvK map), from older scans, name lists and KvK sheets. Click a name for details. Events are tracked for ${DATA.mainAlly} only.`;
 }
 
 // ---------- KvK history tab ----------
@@ -1454,10 +1460,10 @@ $('allySel').innerHTML = `<option value="all">All alliances</option>` +
   Object.entries(allies).sort((a, b) => b[1] - a[1]).map(([a, n]) => `<option value="${esc(a)}">${esc(a)} (${n})</option>`).join('') +
   `<option value="">No alliance</option>`;
 $('allySel').value = DATA.mainAlly;
-['rosterSearch', 'allySel', 'rosterType'].forEach(id => $(id).addEventListener('input', renderRoster));
+['rosterSearch', 'allySel', 'rosterType', 'rosterCh'].forEach(id => $(id).addEventListener('input', renderRoster));
 document.querySelectorAll('th[data-rk]').forEach(th => th.addEventListener('click', () => {
   const k = th.dataset.rk;
-  rSortDir = rSortK === k ? -rSortDir : (k === 'pw' || k === 'kp' ? -1 : 1); rSortK = k; renderRoster();
+  rSortDir = rSortK === k ? -rSortDir : (k === 'pw' || k === 'kp' || k === 'ch' ? -1 : 1); rSortK = k; renderRoster();
 }));
 const root = document.documentElement;
 try { const t = localStorage.getItem('theme'); if (t) root.dataset.theme = t; } catch (e) {}

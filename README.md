@@ -67,6 +67,7 @@ payment log and recalculates everything.
 | `tracker/weeks/<monday>.csv` | One file per week: fort and tech rank and value per player |
 | `tracker/fines_paid.csv` | Fines that have been paid |
 | `tracker/mge/` | MGE events, Top-10 allocations and final rankings |
+| `tracker/ch/` | City hall levels from the CH25 roster (master list CH column and filter) |
 | `tracker/reports/<monday>.md` | Weekly report: summary, rewards, penalties, low tech, farms |
 | `tracker/mails/<monday>/` | In-game mails (RoK rich text, max 2,000 characters each) |
 | `tracker/status.csv` | Each player's current offenses, passing streak and unpaid fines |

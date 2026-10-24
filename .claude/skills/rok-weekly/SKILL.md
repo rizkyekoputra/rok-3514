@@ -25,6 +25,7 @@ to read the rankings accurately, match names to Governor IDs, and keep `accounts
 | `tracker/reports/<monday>.md` | Weekly report (generated) |
 | `tracker/mails/<monday>/` | In-game alliance mails, RoK rich text, each ≤ 2000 chars (generated) |
 | `tracker/status.csv`, `tracker/offense_log.csv` | Current status and full offense history (generated) |
+| `tracker/ch/<date>.csv` | City hall levels (`governor_id, name, ch`), from `scripts/import_ch.py`; the highest level seen per governor is the master list's **CH** column/filter (KvK is CH25 only) |
 | `tracker/mge/` | MGE inputs: `mges.csv`, `<start>_slots.csv` (Top-10 allocation), `<start>.csv` (ranking). See **MGE** below |
 | `tracker/mge_log.csv`, `tracker/reports/mge-<start>.md`, `tracker/mails/mge-<start>/` | MGE over-limit fines and takeovers, report, sanctions mail (generated) |
 | `event/mge/<name (dates)>/` | Raw MGE ranking recordings / screenshots the user provides |
@@ -68,6 +69,15 @@ Changing an account's type applies retroactively to every week.
 
 When the user drops a new `TOP500-<date>-….xlsx`: `.venv/bin/python .claude/skills/rok-weekly/scripts/import_scan.py FILE`,
 rerun `track.py`, push, publish. The master list, alliances and farm hints update from it.
+
+## City hall levels (CH25 roster)
+
+No scan or member export has city hall levels; the CH25 roster (`3514 Ch25.xlsx`: Old/New/combined lists of CH25
+governors) is the source. `.venv/bin/python .claude/skills/rok-weekly/scripts/import_ch.py FILE --date YYYY-MM-DD --ch 25`
+(check), then `--write` -> `tracker/ch/<date>.csv`, rerun `track.py`. A sheet with a "City Hall"/"CH" column is read as is
+(no `--ch`). Levels never go down, so older files stay; governors on a list but in no other data are added as not in the
+kingdom now (`xs = 'CH25 list'`). "–" on the dashboard = not on any list (below 25, or not listed yet): import a newer
+roster when players reach CH25. Imported: 2026-10-17 roster (529 governors).
 
 ## New member export (latest names)
 
