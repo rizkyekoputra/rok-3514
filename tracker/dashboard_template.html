@@ -710,7 +710,7 @@ function renderRoster() {
 }
 
 // ---------- KvK history tab ----------
-let kvSortK = 3, kvSortDir = -1;
+let kvSortK = 1, kvSortDir = -1;  // default: by the KvK's measure (KP / DKP / Acclaim), so rows follow the # rank
 function renderKvk() {
   const n = +$('kvkSel').value, k = KVK[n];
   if (!k) { $('kvkBody').innerHTML = '<tr><td class="empty">No KvK data yet.</td></tr>'; return; }
