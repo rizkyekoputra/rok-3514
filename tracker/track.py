@@ -70,6 +70,13 @@ R4_REWARD = 'Advanced Trophy'
 MGE_FINE = {'food': 1000, 'wood': 1000, 'stone': 750, 'gold': 500}
 MGE_CONTACTS = ['ＡＧＡＭ', 'Totos メtreme']  # named in the sanctions mail for working out a mixed payment
 
+# What a fine can be paid with, per kind of fine: units of each resource worth 1 gold of the fine. Each event keeps its
+# own rates (they may differ); the dashboard's calculator and "Mark paid" use the rates of the fine's kind.
+FINE_KINDS = {
+    'mge': dict(label='MGE', rss={r: v / MGE_FINE['gold'] for r, v in MGE_FINE.items()}),
+    'fort': dict(label='Fort', rss={'food': 2, 'wood': 2, 'stone': 1.5, 'gold': 1}),  # 500K gold = 1M food/wood = 750K stone
+}
+
 NEXT = {1: 'Forgiven + Low Contribution label',
         2: '500K gold per missing fort',
         3: '1M gold per missing fort + unpaid fines',
@@ -401,7 +408,7 @@ def main():
             if r['fine']:
                 fines.append(dict(id=fine_id(r['key'], 'mge|' + ev['mge']), k=r['key'], n=r['name'], wk=ev['mge'],
                                   a=r['fine'], m=r['over'], h=by_hand.get((r['key'], 'mge:' + ev['mge']), 0),
-                                  e=mge_label(ev), pv=ev['final'] != 'yes'))
+                                  e=mge_label(ev), pv=ev['final'] != 'yes', t='mge'))
     write_mge(mges, paid)
     write_dashboard(history, state, accounts, fines, mges)
 
@@ -724,7 +731,7 @@ def write_dashboard(history, state, accounts, fines, mges):
     ledger = json.load(open(lp, encoding='utf-8')) if os.path.exists(lp) else {}
     data = dict(weeks=[wk for wk, _ in history], minF=MIN_FORTS, minT=MIN_TECH, players=players,
                 fines=fines, finesUrl=FINES_URL, scanDay=scan_day, namesDay=names_day, mainAlly=MAIN_ALLIANCE, kvks=kvks,
-                mges=mge, mgeFine=MGE_FINE,
+                mges=mge, mgeFine=MGE_FINE, fineKinds=FINE_KINDS,
                 ledger=dict(paid=ledger.get('paid', {}), accounts=ledger.get('accounts', {})), officers=ledger.get('officers', []),
                 updated=date.today().isoformat())
     with open(os.path.join(HERE, 'dashboard_template.html'), encoding='utf-8') as f:

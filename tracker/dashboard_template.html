@@ -265,11 +265,14 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       <h2>Fine calculator</h2>
       <div class="sub" id="calcSub"></div>
       <div class="controls">
+        <label class="sub" for="calcKind">Fine for</label>
+        <select id="calcKind"></select>
         <input type="text" id="calcFine" inputmode="decimal" placeholder="Your fine, e.g. 1,575,569 or 787.79M" autocomplete="off" style="flex:1 1 220px;min-width:0">
         <select id="calcUnit">
           <option value="pts">points over the MGE limit</option>
           <option value="gold">gold (fine amount)</option>
         </select>
+        <button class="act ghost" id="calcReset" type="button">Reset</button>
       </div>
       <div class="sub" style="margin-top:12px">What you pay with (leave empty if none). Type the full number (commas are added for you) or a short form like 300M or 1.5B.</div>
       <div class="calc" id="calcHave"></div>
@@ -692,8 +695,10 @@ $('kvkHead').addEventListener('click', e => {
 });
 
 // ---------- fine calculator (R4-only for now, see renderOfficer; holds no player data, only the exchange rates) ----------
-// Fines can be paid in food/wood/stone/gold (or a mix); MGE_RATE = gold value of one unit of each resource.
-const MGE_RATE = Object.fromEntries(Object.entries(DATA.mgeFine || {gold: 1}).map(([r, v]) => [r, (DATA.mgeFine || {gold: 1}).gold / v]));
+// Fines can be paid in food/wood/stone/gold (or a mix), at the rates of their kind (FINE_KINDS in track.py):
+// KINDS[kind].rss[r] = units of resource r worth 1 gold of the fine. Fort fines have no t; MGE fines have t = 'mge'.
+const KINDS = DATA.fineKinds || {fort: {label: 'Fort', rss: {gold: 1}}};
+const rssOf = f => KINDS[f.t || 'fort'].rss;
 // Rounded UP to 2 decimals of M/B, so paying the shown amount always covers the rest (same as the mail).
 const payFmt = n => n >= 1e9 ? Math.ceil(n / 1e7) / 100 + 'B' : n >= 1e6 ? Math.ceil(n / 1e4) / 100 + 'M' : fmt(Math.ceil(n));
 const amount = v => {  // "300M", "1.5b", "1,575,569", "" -> number (0 for empty, NaN if unreadable)
@@ -716,12 +721,22 @@ function groupDigits(i) {
   for (let n = 0; pos < v.length && n < digitsBefore; pos++) if (/\d/.test(v[pos])) n++;
   i.setSelectionRange(pos, pos);
 }
-$('calcHave').innerHTML = Object.keys(MGE_RATE).map(r => `<label>${cap(r)}<input type="text" inputmode="decimal" data-rss="${r}" placeholder="0" autocomplete="off">` +
-  `<button class="hint" type="button" data-fill="${r}" hidden></button></label>`).join('');
-$('calcSub').textContent = 'Pay in any one resource, or mix them: enter your fine and what you already have, and see what is left. ' +
-  `${Object.entries(DATA.mgeFine).map(([r, v]) => `${fmt(v)} ${r}`).join(' = ')} in value (the MGE fine per point over the limit; fort fines use the same rates).`;
+$('calcKind').innerHTML = Object.entries(KINDS).map(([k, x]) => `<option value="${k}">${esc(x.label)} fine</option>`).join('');
+const calcRss = () => KINDS[$('calcKind').value].rss;
+// Resource fields of the chosen kind of fine (typed amounts are kept when switching)
+function calcFields() {
+  const was = Object.fromEntries([...document.querySelectorAll('#calcHave input')].map(i => [i.dataset.rss, i.value]));
+  $('calcHave').innerHTML = Object.keys(calcRss()).map(r => `<label>${cap(r)}<input type="text" inputmode="decimal" data-rss="${r}" placeholder="0" autocomplete="off" value="${esc(was[r] || '')}">` +
+    `<button class="hint" type="button" data-fill="${r}" hidden></button></label>`).join('');
+  const mge = $('calcKind').value === 'mge', rss = calcRss();
+  $('calcUnit').hidden = !mge;  // only MGE fines are counted in points; other fines are entered in gold
+  if (!mge) $('calcUnit').value = 'gold';
+  $('calcSub').textContent = 'Pay in any one resource, or mix them: enter your fine and what you already have, and see what is left. ' +
+    `${KINDS[$('calcKind').value].label} rates: 1M gold = ${Object.entries(rss).filter(([r]) => r !== 'gold').map(([r, x]) => `${payFmt(x * 1e6)} ${r}`).join(' = ')}` +
+    (mge ? ` (MGE: ${Object.entries(DATA.mgeFine).map(([r, v]) => `${fmt(v)} ${r}`).join(' / ')} per point over the limit).` : '.');
+}
 function renderCalc() {
-  const raw = amount($('calcFine').value), pts = $('calcUnit').value === 'pts';
+  const raw = amount($('calcFine').value), pts = $('calcKind').value === 'mge' && $('calcUnit').value === 'pts', rss = calcRss();
   const due = pts ? raw * DATA.mgeFine.gold : raw;
   const have = [...document.querySelectorAll('#calcHave input')].map(i => [i.dataset.rss, amount(i.value)]);
   const bad = have.filter(([, v]) => isNaN(v)).map(([r]) => cap(r));
@@ -731,14 +746,14 @@ function renderCalc() {
     $('calcOut').innerHTML = '<span class="muted">Enter your fine to start.</span>'; return;
   }
   if (isNaN(due) || bad.length) { $('calcOut').innerHTML = `<span class="below">Can't read ${isNaN(due) ? 'the fine' : bad.join(', ')}</span>: use numbers like 787.79M or 1,575,569.`; return; }
-  const paid = have.reduce((a, [r, v]) => a + v * MGE_RATE[r], 0), left = due - paid;
+  const paid = have.reduce((a, [r, v]) => a + v / rss[r], 0), left = due - paid;
   // Suggest the rest under every empty resource once something is typed: tap to fill it in
   const started = have.some(([, v]) => v > 0);
   document.querySelectorAll('#calcHave [data-fill]').forEach(b => {
     const r = b.dataset.fill, input = document.querySelector(`#calcHave [data-rss="${r}"]`), empty = !input.value.trim();
     b.hidden = !(started && empty && left > 0);
-    if (!b.hidden) { b.dataset.v = payFull(left / MGE_RATE[r]); b.textContent = `↑ tap to fill the rest: ${b.dataset.v}`; }
-    input.placeholder = b.hidden ? '0' : `rest: ${payFmt(left / MGE_RATE[r])}`;  // the suggestion sits in the empty field itself
+    if (!b.hidden) { b.dataset.v = payFull(left * rss[r]); b.textContent = `↑ tap to fill the rest: ${b.dataset.v}`; }
+    input.placeholder = b.hidden ? '0' : `rest: ${payFmt(left * rss[r])}`;  // the suggestion sits in the empty field itself
   });
   const used = have.filter(([, v]) => v > 0).map(([r, v]) => `${payFmt(v)} ${cap(r)}`).join(' + ');
   $('calcOut').innerHTML = `<div class="stats">
@@ -746,14 +761,23 @@ function renderCalc() {
       <div class="stat"><div class="v">${payFmt(paid)}</div><div class="l">Covered (gold value)${used ? ' · ' + esc(used) : ''}</div></div>
       <div class="stat ${left > 0 ? 'bad' : 'good'}"><div class="v">${left > 0 ? payFmt(left) : '0'}</div><div class="l">Still to pay (gold value)</div></div>
     </div>` + (left > 0
-      ? `<div style="margin-top:10px"><b>Pay the rest with ONE of:</b> ${Object.entries(MGE_RATE).map(([r, x]) => `<b>${payFmt(left / x)}</b> ${cap(r)}`).join(' · ')}</div>`
+      ? `<div style="margin-top:10px"><b>Pay the rest with ONE of:</b> ${Object.entries(rss).map(([r, x]) => `<b>${payFmt(left * x)}</b> ${cap(r)}`).join(' · ')}</div>`
       // a tiny extra only comes from rounding the suggestions up: don't flag it as overpaying
       : `<div style="margin-top:10px" class="paid">✓ Fully covered${-left > due * 0.005 ? ` (${payFmt(-left)} gold value more than the fine)` : ''}.</div>`) +
     `<div class="sub" style="margin-top:6px">Send everything to the bank KD, then tell an R4 what you sent.</div>`;
 }
 $('calcFine').addEventListener('input', e => { groupDigits(e.target); renderCalc(); });
 $('calcUnit').addEventListener('input', renderCalc);
+$('calcKind').addEventListener('input', () => { calcFields(); renderCalc(); });
+$('calcReset').addEventListener('click', () => {
+  document.querySelectorAll('#calcFine, #calcHave input').forEach(i => { i.value = ''; });
+  $('calcUnit').value = 'pts';
+  calcFields();
+  renderCalc();
+  $('calcFine').focus();
+});
 $('calcHave').addEventListener('input', e => { if (e.target.matches('input')) groupDigits(e.target); renderCalc(); });
+calcFields();
 $('calcHave').addEventListener('click', e => {
   const b = e.target.closest('button[data-fill]');
   if (!b) return;
@@ -904,12 +928,12 @@ const shownFines = () => F.filter(f => !f.e || officer);
 // MGE fines carry e (event label) and m = points over the limit; fort fines have m = missing forts
 const fineWhen = f => f.e ? esc(f.e) : weekLabel(f.wk);
 const fineWhy = f => f.e ? `${fmt(f.m)} pts over` : `${f.m} forts short`;
-const inRss = a => Object.entries(MGE_RATE).map(([r, x]) => `${gold(a / x)} ${r}`).join(' / ');
+const inRss = (a, rss) => Object.entries(rss).map(([r, x]) => `${gold(a * x)} ${r}`).join(' / ');
 // "9M", "9,000,000", "300M food 200M wood 50M gold" -> gold value, or NaN
-function paidValue(v) {
+function paidValue(v, rss) {
   const txt = String(v).toLowerCase().replace(/,/g, ''), re = /([\d.]+)\s*([kmb]?)\s*(food|wood|stone|gold)?/g;
   let total = 0, n = 0;
-  for (const m of txt.matchAll(re)) { total += Number(m[1]) * ({k: 1e3, m: 1e6, b: 1e9}[m[2]] || 1) * MGE_RATE[m[3] || 'gold']; n++; }
+  for (const m of txt.matchAll(re)) { total += Number(m[1]) * ({k: 1e3, m: 1e6, b: 1e9}[m[2]] || 1) / rss[m[3] || 'gold']; n++; }
   return n && !txt.replace(re, '').replace(/[\s+&/]|and/g, '') ? total : NaN;
 }
 const unpaidOf = p => ledger ? shownFines().filter(f => P[f.p] === p).reduce((a, f) => a + Math.max(0, f.a - paidOf(f)), 0) : p.u;
@@ -1056,10 +1080,10 @@ $('finesBody').addEventListener('click', async e => {
   let action = 'undo', amount = 0;
   if (b.dataset.pay) {
     const due = f.a - (f.h || 0);
-    const v = prompt(`Paid by ${name} for ${f.e || weekLabel(f.wk)}. Fine ${gold(f.a)} gold = ${inRss(f.a)}.\n` +
+    const v = prompt(`Paid by ${name} for ${f.e || weekLabel(f.wk)}. Fine ${gold(f.a)} gold = ${inRss(f.a, rssOf(f))}.\n` +
       `Type gold (9M or 9000000), or what they sent, mixed if needed: 300M food 200M wood 50M gold`, due);
     if (v == null) return;
-    amount = Math.round(paidValue(v));
+    amount = Math.round(paidValue(v, rssOf(f)));
     if (!(amount > 0)) return alert('Enter what was paid, e.g. 9M (gold) or 300M food 50M gold.');
     if (/[a-z]/i.test(v) && !confirm(`Record ${gold(amount)} gold value for ${name}?`)) return;
     action = 'paid';
