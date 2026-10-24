@@ -717,19 +717,23 @@ function renderKvk() {
   const q = $('kvkSearch').value.trim().toLowerCase(), t = $('kvkType').value;
   const rows = P.map(p => ({p, r: (p.kv || []).find(r => r[0] === n)})).filter(({p, r}) => r && (!p.x || q) &&
     (t === 'all' || (r[6] || p.t) === t) && (!q || matches(p, q) || r[7].toLowerCase().includes(q)));
+  // Rank = place by this KvK's measure among everyone in its sheet (governors who left included), ties share a rank
+  const vals = P.map(p => (p.kv || []).find(r => r[0] === n)).filter(r => r && r[1] != null).map(r => r[1]).sort((a, b) => b - a);
+  const rankOf = new Map();
+  vals.forEach((v, i) => { if (!rankOf.has(v)) rankOf.set(v, i + 1); });
   const sk = kvSortK === 3 && rows.every(x => x.r[3] == null) ? 1 : kvSortK;  // no % in this KvK: sort by result
   rows.sort((a, b) => ((a.r[sk] ?? -1) - (b.r[sk] ?? -1)) * kvSortDir);
-  const cols = [['Player'], ['ID'], ['Name then'], ['Type'], [k.m, 1], ['Target', 2], ['%', 3], ['Notes']];
-  $('kvkHead').innerHTML = cols.map(([h, i]) => `<th${i ? ` class="num" data-kv="${i}"` : ''}>${h}</th>`).join('');
-  $('kvkBody').innerHTML = rows.map(({p, r}) => `<tr data-i="${P.indexOf(p)}"><td>${esc(p.n)}${p.x ? ' <span class="muted">· left</span>' : ''}</td>
+  const cols = [['#'], ['Player'], ['ID'], ['Name then'], ['Type'], [k.m, 1], ['Target', 2], ['%', 3], ['Notes']];
+  $('kvkHead').innerHTML = cols.map(([h, i]) => `<th${i ? ` class="num" data-kv="${i}"` : h === '#' ? ' class="num" style="cursor:default"' : ''}>${h}</th>`).join('');
+  $('kvkBody').innerHTML = rows.map(({p, r}) => `<tr data-i="${P.indexOf(p)}"><td class="num muted">${r[1] == null ? '–' : rankOf.get(r[1])}</td><td>${esc(p.n)}${p.x ? ' <span class="muted">· left</span>' : ''}</td>
       <td class="muted" style="font-variant-numeric:tabular-nums">${p.g || '–'}</td><td>${r[7] === p.n ? '<span class="muted">same</span>' : esc(r[7])}</td><td>${r[6] ? r[6][0].toUpperCase() + r[6].slice(1) : typeTxt(p)}</td>
       <td class="num">${r[1] == null ? '–' : short(r[1])}</td><td class="num">${r[2] ? short(r[2]) : '<span class="muted">No target</span>'}</td>
       <td class="num">${pctCell(r[3])}</td><td style="white-space:normal">${kvNote(r)}</td></tr>`).join('') ||
-    '<tr><td colspan="8" class="empty">No players match.</td></tr>';
+    '<tr><td colspan="9" class="empty">No players match.</td></tr>';
   const gone = rows.filter(x => x.p.x).length;
   $('kvkCount').textContent = `${rows.length} governor${rows.length === 1 ? '' : 's'} took part` + (gone ? ` · ${gone} of them left the kingdom` : ' · still in the kingdom');
   $('kvkSub').textContent = `KvK ${n} · ${kvkWhen(n)}${k.e ? ' (date estimated)' : ''} · measured by ${k.m}` +
-    (k.m === 'Acclaim' ? '' : ' (no acclaim yet in this KvK)') + '. Lists governors still in the kingdom; a search also finds those who left. Matched by Governor ID.';
+    (k.m === 'Acclaim' ? '' : ' (no acclaim yet in this KvK)') + '. # = rank by ' + k.m + ' among everyone in the KvK sheet. Lists governors still in the kingdom; a search also finds those who left. Matched by Governor ID.';
 }
 $('kvkSel').innerHTML = (DATA.kvks || []).slice().reverse().map(k => `<option value="${k.k}">KvK ${k.k} · ${kvkWhen(k.k)}</option>`).join('');
 ['kvkSel', 'kvkSearch', 'kvkType'].forEach(id => $(id).addEventListener('input', renderKvk));
