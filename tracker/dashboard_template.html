@@ -728,7 +728,7 @@ const leftChip = p => `<span class="chip"><span class="dot" style="background:va
 function renderRoster() {
   const q = $('rosterSearch').value.trim().toLowerCase(), t = $('rosterType').value, chf = $('rosterCh').value;
   // Governors not in the kingdom now (p.x = last seen) show up only in a search or under "Not in the kingdom now"
-  const rows = P.filter(p => (chf === 'all' || (chf === '25' ? p.ch >= 25 : !(p.ch >= 25))) && (t === 'left' ? p.x : !p.x || q) && (q || t === 'left' || !allyPick.size || allyPick.has(p.a || '')) && matches(p, q) &&
+  const rows = P.filter(p => (chf === 'all' || (chf === '25' ? p.ch >= 25 : !(p.ch >= 25))) && (t === 'left' ? p.x : !p.x || q) && (q || t === 'left' || allyAllOn() || allyPick.has(p.a || '')) && matches(p, q) &&
     (t === 'all' || t === 'left' || (t === 'review' ? !p.c : t === 'likely' ? !p.c && strong(p) : p.t === t)));
   rows.sort((a, b) => {
     const va = a[rSortK] ?? (['n', 'a', 't', 'g'].includes(rSortK) ? '' : -1), vb = b[rSortK] ?? (typeof va === 'string' ? '' : -1);
@@ -745,7 +745,7 @@ function renderRoster() {
   $('rosterActTh').hidden = $('rosterSelTh').hidden = !officer;
   renderBulk();
   const gone = rows.filter(p => p.x).length;
-  $('rosterCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'}` + (q && allyPick.size ? ' · searching all alliances' : '') +
+  $('rosterCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'}` + (q && !allyAllOn() ? ' · searching all alliances' : '') +
     (gone && t !== 'left' ? ` · ${gone} of them not in the kingdom now` : '');
   $('rosterSub').textContent = `Every governor in the kingdom scan and member export, plus anyone seen in the alliance rankings. CH = city hall level from the CH25 roster (– = not on it: below 25, or not listed yet). Search also finds governors not in the kingdom now (migrated, or still on the last KvK map), from older scans, name lists and KvK sheets. Click a name for details. Events are tracked for ${DATA.mainAlly} only.`;
 }
@@ -1476,20 +1476,22 @@ document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click
 addEventListener('hashchange', route);
 const allies = {};
 P.forEach(p => { if (p.a) allies[p.a] = (allies[p.a] || 0) + 1; });
-// Alliance filter: tick any number of alliances ("" = no alliance); none ticked = all alliances
+// Alliance filter: tick any number of alliances ("" = no alliance); every box (or none) ticked = all alliances
 const allyPick = new Set([DATA.mainAlly]);
 const noAlly = P.filter(p => !p.a && !p.x).length;
-$('allyList').innerHTML = Object.entries(allies).sort((a, b) => b[1] - a[1]).concat([['', noAlly]]).map(([a, n]) =>
+const allyOpts = Object.entries(allies).sort((a, b) => b[1] - a[1]).concat([['', noAlly]]);
+const allyAllOn = () => !allyPick.size || allyPick.size === allyOpts.length;
+$('allyList').innerHTML = allyOpts.map(([a, n]) =>
   `<label><input type="checkbox" value="${esc(a)}"${allyPick.has(a) ? ' checked' : ''}>${a ? esc(a) : '<i>No alliance</i>'}<span class="n">${n}</span></label>`).join('');
 function allyChanged() {
   document.querySelectorAll('#allyList input').forEach(i => { i.checked = allyPick.has(i.value); });
   const one = [...allyPick][0];
-  $('allySum').textContent = !allyPick.size ? 'All alliances' : allyPick.size > 1 ? `${allyPick.size} alliances` : one || 'No alliance';
+  $('allySum').textContent = allyAllOn() ? 'All alliances' : allyPick.size > 1 ? `${allyPick.size} alliances` : one || 'No alliance';
   renderRoster();
 }
 $('allyList').addEventListener('change', e => { e.target.checked ? allyPick.add(e.target.value) : allyPick.delete(e.target.value); allyChanged(); });
-$('allyAll').addEventListener('click', () => { allyPick.clear(); allyChanged(); });
-$('allyMain').addEventListener('click', () => { allyPick.clear(); allyPick.add(DATA.mainAlly); allyChanged(); });
+$('allyAll').addEventListener('click', () => { allyOpts.forEach(([a]) => allyPick.add(a)); allyChanged(); $('allyMs').open = false; });
+$('allyMain').addEventListener('click', () => { allyPick.clear(); allyPick.add(DATA.mainAlly); allyChanged(); $('allyMs').open = false; });
 document.addEventListener('click', e => { if (!e.target.closest('#allyMs')) $('allyMs').open = false; });  // close when clicking elsewhere
 allyChanged();
 ['rosterSearch', 'rosterType', 'rosterCh'].forEach(id => $(id).addEventListener('input', renderRoster));
