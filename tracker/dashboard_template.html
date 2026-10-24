@@ -52,6 +52,10 @@ h2 { font-size: 16px; margin: 0 0 4px; }
 select, input { font: inherit; color: var(--text-primary); background: var(--surface-1);
   border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; min-height: 34px; }
 input[type=search] { flex: 1 1 200px; min-width: 0; }
+.calc { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-top: 12px; }
+.calc label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
+.calc input { min-width: 0; font-variant-numeric: tabular-nums; }
+.calc-out { margin-top: 12px; line-height: 1.6; }
 button.theme { font: inherit; background: none; border: 1px solid var(--border); color: var(--text-secondary);
   border-radius: 6px; padding: 4px 10px; cursor: pointer; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 16px; }
@@ -255,6 +259,20 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
   </section>
 
   <section data-panel="fines" hidden>
+    <div class="card" id="calcCard">
+      <h2>Fine calculator</h2>
+      <div class="sub" id="calcSub"></div>
+      <div class="controls">
+        <input type="text" id="calcFine" inputmode="decimal" placeholder="Your fine, e.g. 1,575,569 or 787.79M" autocomplete="off" style="flex:1 1 220px;min-width:0">
+        <select id="calcUnit">
+          <option value="pts">points over the MGE limit</option>
+          <option value="gold">gold (fine amount)</option>
+        </select>
+      </div>
+      <div class="sub" style="margin-top:12px">What you pay with (leave empty if none). You can type 300M or 1.5B.</div>
+      <div class="calc" id="calcHave"></div>
+      <div class="calc-out" id="calcOut"></div>
+    </div>
     <div class="card" id="finesCard">
       <h2>Fines</h2>
       <div class="sub" id="finesSub">Fines and whether they have been paid.</div>
@@ -671,6 +689,41 @@ $('kvkHead').addEventListener('click', e => {
   const k = +th.dataset.kv; kvSortDir = kvSortK === k ? -kvSortDir : -1; kvSortK = k; renderKvk();
 });
 
+// ---------- fine calculator (public: no player data, just the exchange rates) ----------
+// Fines can be paid in food/wood/stone/gold (or a mix); MGE_RATE = gold value of one unit of each resource.
+const MGE_RATE = Object.fromEntries(Object.entries(DATA.mgeFine || {gold: 1}).map(([r, v]) => [r, (DATA.mgeFine || {gold: 1}).gold / v]));
+// Rounded UP to 2 decimals of M/B, so paying the shown amount always covers the rest (same as the mail).
+const payFmt = n => n >= 1e9 ? Math.ceil(n / 1e7) / 100 + 'B' : n >= 1e6 ? Math.ceil(n / 1e4) / 100 + 'M' : fmt(Math.ceil(n));
+const amount = v => {  // "300M", "1.5b", "1,575,569", "" -> number (0 for empty, NaN if unreadable)
+  const m = String(v).trim().toLowerCase().replace(/,/g, '').match(/^([\d.]*)\s*([kmb]?)$/);
+  return !m ? NaN : m[1] === '' ? (m[2] ? NaN : 0) : Number(m[1]) * ({k: 1e3, m: 1e6, b: 1e9}[m[2]] || 1);
+};
+const cap = r => r[0].toUpperCase() + r.slice(1);
+$('calcHave').innerHTML = Object.keys(MGE_RATE).map(r => `<label>${cap(r)}<input type="text" inputmode="decimal" data-rss="${r}" placeholder="0" autocomplete="off"></label>`).join('');
+$('calcSub').textContent = 'Pay in any one resource, or mix them: enter your fine and what you already have, and see what is left. ' +
+  `${Object.entries(DATA.mgeFine).map(([r, v]) => `${fmt(v)} ${r}`).join(' = ')} in value (the MGE fine per point over the limit; fort fines use the same rates).`;
+function renderCalc() {
+  const raw = amount($('calcFine').value), pts = $('calcUnit').value === 'pts';
+  const due = pts ? raw * DATA.mgeFine.gold : raw;
+  const have = [...document.querySelectorAll('#calcHave input')].map(i => [i.dataset.rss, amount(i.value)]);
+  const bad = have.filter(([, v]) => isNaN(v)).map(([r]) => cap(r));
+  if (!$('calcFine').value.trim()) { $('calcOut').innerHTML = '<span class="muted">Enter your fine to start.</span>'; return; }
+  if (isNaN(due) || bad.length) { $('calcOut').innerHTML = `<span class="below">Can't read ${isNaN(due) ? 'the fine' : bad.join(', ')}</span>: use numbers like 787.79M or 1,575,569.`; return; }
+  const paid = have.reduce((a, [r, v]) => a + v * MGE_RATE[r], 0), left = due - paid;
+  const used = have.filter(([, v]) => v > 0).map(([r, v]) => `${payFmt(v)} ${cap(r)}`).join(' + ');
+  $('calcOut').innerHTML = `<div class="stats">
+      <div class="stat"><div class="v">${payFmt(due)}</div><div class="l">Fine (gold value)${pts ? ` · ${fmt(raw)} points × ${fmt(DATA.mgeFine.gold)}` : ''}</div></div>
+      <div class="stat"><div class="v">${payFmt(paid)}</div><div class="l">Covered (gold value)${used ? ' · ' + esc(used) : ''}</div></div>
+      <div class="stat ${left > 0 ? 'bad' : 'good'}"><div class="v">${left > 0 ? payFmt(left) : '0'}</div><div class="l">Still to pay (gold value)</div></div>
+    </div>` + (left > 0
+      ? `<div style="margin-top:10px"><b>Pay the rest with ONE of:</b> ${Object.entries(MGE_RATE).map(([r, x]) => `<b>${payFmt(left / x)}</b> ${cap(r)}`).join(' · ')}</div>`
+      : `<div style="margin-top:10px" class="paid">✓ Fully covered${left < 0 ? ` (${payFmt(-left)} gold value more than the fine)` : ''}.</div>`) +
+    `<div class="sub" style="margin-top:6px">Send everything to the bank KD, then tell an R4 what you sent.</div>`;
+}
+['calcFine', 'calcUnit'].forEach(id => $(id).addEventListener('input', renderCalc));
+$('calcHave').addEventListener('input', renderCalc);
+renderCalc();
+
 // ---------- MGE tab ----------
 // an MGE row: [rank, player index or null, name then, points, slot, limit (null = no cap), over, fine, took slot]
 const MGE = Object.fromEntries((DATA.mges || []).map(m => [m.s, m]));
@@ -811,8 +864,6 @@ const shownFines = () => F.filter(f => !f.e || officer);
 // MGE fines carry e (event label) and m = points over the limit; fort fines have m = missing forts
 const fineWhen = f => f.e ? esc(f.e) : weekLabel(f.wk);
 const fineWhy = f => f.e ? `${fmt(f.m)} pts over` : `${f.m} forts short`;
-// Fines can be paid in food/wood/stone/gold (or a mix); MGE_RATE = gold value of one unit of each resource.
-const MGE_RATE = Object.fromEntries(Object.entries(DATA.mgeFine || {gold: 1}).map(([r, v]) => [r, (DATA.mgeFine || {gold: 1}).gold / v]));
 const inRss = a => Object.entries(MGE_RATE).map(([r, x]) => `${gold(a / x)} ${r}`).join(' / ');
 // "9M", "9,000,000", "300M food 200M wood 50M gold" -> gold value, or NaN
 function paidValue(v) {

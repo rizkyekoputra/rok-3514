@@ -44,6 +44,7 @@ MIN_TECH = 50_000
 FLUX_FORTS = 200
 MAIL_LIMIT = 2000  # in-game mail character limit
 BANK = 'KINGDOM 3514'  # bank KD account that receives fines
+DASHBOARD_URL = 'https://rizkyekoputra.github.io/rok-3514-dashboard/'  # public dashboard (tracker/dashboard/)
 CLEAR_AFTER = 2  # consecutive passing weeks that clear all recorded offenses
 
 # R4 fines ledger (Apps Script web app in fines_ledger/); the dashboard reads and writes it.
@@ -290,8 +291,9 @@ def write_mge(mges, paid):
         outro = ['', '<b>FINE PER POINT OVER THE LIMIT</b>',
                  ' / '.join(f'{v:,} {r.capitalize()}' for r, v in MGE_FINE.items()),
                  'You can pay your fine in <b>any type of resource</b>: Food, Wood, Stone or Gold.',
-                 f"Want to pay with a <b>mix</b> of resources? Contact <b>{' or '.join(MGE_CONTACTS)}</b> "
-                 'for the exact amounts.',
+                 'Want to pay with a <b>mix</b> of resources? Use the <b>Fine calculator</b> on the dashboard:',
+                 f'<color=#1E90FF>{DASHBOARD_URL}#t=fines</color>',
+                 f"Or contact <b>{' or '.join(MGE_CONTACTS)}</b> for the exact amounts.",
                  f'<b>Send your fine to the bank KD: <color=#DAA520>{BANK}</color></b>'] + foot
         d = os.path.join(HERE, 'mails', f"mge-{ev['mge']}")
         os.makedirs(d, exist_ok=True)

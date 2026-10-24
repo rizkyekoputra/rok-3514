@@ -27,7 +27,9 @@ These players went over their MGE point limit: <b>7M</b> outside the Top 10, or 
 <b>FINE PER POINT OVER THE LIMIT</b>
 1,000 Food / 1,000 Wood / 750 Stone / 500 Gold
 You can pay your fine in <b>any type of resource</b>: Food, Wood, Stone or Gold.
-Want to pay with a <b>mix</b> of resources? Contact <b>ＡＧＡＭ or Totos メtreme</b> for the exact amounts.
+Want to pay with a <b>mix</b> of resources? Use the <b>Fine calculator</b> on the dashboard:
+<color=#1E90FF>https://rizkyekoputra.github.io/rok-3514-dashboard/#t=fines</color>
+Or contact <b>ＡＧＡＭ or Totos メtreme</b> for the exact amounts.
 <b>Send your fine to the bank KD: <color=#DAA520>KINGDOM 3514</color></b>
 
 <b>Respect the allocation. Follow the limit. Do not disrupt Kingdom strategy.</b>
