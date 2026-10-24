@@ -271,7 +271,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
           <option value="gold">gold (fine amount)</option>
         </select>
       </div>
-      <div class="sub" style="margin-top:12px">What you pay with (leave empty if none). You can type 300M or 1.5B.</div>
+      <div class="sub" style="margin-top:12px">What you pay with (leave empty if none). Type the full number (commas are added for you) or a short form like 300M or 1.5B.</div>
       <div class="calc" id="calcHave"></div>
       <div class="calc-out" id="calcOut"></div>
     </div>
@@ -701,6 +701,21 @@ const amount = v => {  // "300M", "1.5b", "1,575,569", "" -> number (0 for empty
   return !m ? NaN : m[1] === '' ? (m[2] ? NaN : 0) : Number(m[1]) * ({k: 1e3, m: 1e6, b: 1e9}[m[2]] || 1);
 };
 const cap = r => r[0].toUpperCase() + r.slice(1);
+// Rounded up like payFmt, as a full number with commas (what tap-to-fill puts in a field)
+const payFull = n => fmt(n >= 1e9 ? Math.ceil(n / 1e7) * 1e7 : n >= 1e6 ? Math.ceil(n / 1e4) * 1e4 : Math.ceil(n));
+// Commas per thousand while typing plain numbers ("300000000" -> "300,000,000"), keeping the cursor after the same digit;
+// short forms like 300M or 1.5B are left as typed
+function groupDigits(i) {
+  const m = i.value.match(/^([\d,]*)(\.\d*)?$/);
+  if (!m || !m[1]) return;
+  const digitsBefore = i.value.slice(0, i.selectionStart).replace(/\D/g, '').length;
+  const int = m[1].replace(/,/g, '').replace(/^0+(?=\d)/, ''), v = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (m[2] || '');
+  if (v === i.value) return;
+  i.value = v;
+  let pos = 0;
+  for (let n = 0; pos < v.length && n < digitsBefore; pos++) if (/\d/.test(v[pos])) n++;
+  i.setSelectionRange(pos, pos);
+}
 $('calcHave').innerHTML = Object.keys(MGE_RATE).map(r => `<label>${cap(r)}<input type="text" inputmode="decimal" data-rss="${r}" placeholder="0" autocomplete="off">` +
   `<button class="hint" type="button" data-fill="${r}" hidden></button></label>`).join('');
 $('calcSub').textContent = 'Pay in any one resource, or mix them: enter your fine and what you already have, and see what is left. ' +
@@ -722,8 +737,8 @@ function renderCalc() {
   document.querySelectorAll('#calcHave [data-fill]').forEach(b => {
     const r = b.dataset.fill, input = document.querySelector(`#calcHave [data-rss="${r}"]`), empty = !input.value.trim();
     b.hidden = !(started && empty && left > 0);
-    if (!b.hidden) { b.dataset.v = payFmt(left / MGE_RATE[r]); b.textContent = `↑ tap to fill the rest: ${b.dataset.v}`; }
-    input.placeholder = b.hidden ? '0' : `rest: ${b.dataset.v}`;  // the suggestion sits in the empty field itself
+    if (!b.hidden) { b.dataset.v = payFull(left / MGE_RATE[r]); b.textContent = `↑ tap to fill the rest: ${b.dataset.v}`; }
+    input.placeholder = b.hidden ? '0' : `rest: ${payFmt(left / MGE_RATE[r])}`;  // the suggestion sits in the empty field itself
   });
   const used = have.filter(([, v]) => v > 0).map(([r, v]) => `${payFmt(v)} ${cap(r)}`).join(' + ');
   $('calcOut').innerHTML = `<div class="stats">
@@ -736,8 +751,9 @@ function renderCalc() {
       : `<div style="margin-top:10px" class="paid">✓ Fully covered${-left > due * 0.005 ? ` (${payFmt(-left)} gold value more than the fine)` : ''}.</div>`) +
     `<div class="sub" style="margin-top:6px">Send everything to the bank KD, then tell an R4 what you sent.</div>`;
 }
-['calcFine', 'calcUnit'].forEach(id => $(id).addEventListener('input', renderCalc));
-$('calcHave').addEventListener('input', renderCalc);
+$('calcFine').addEventListener('input', e => { groupDigits(e.target); renderCalc(); });
+$('calcUnit').addEventListener('input', renderCalc);
+$('calcHave').addEventListener('input', e => { if (e.target.matches('input')) groupDigits(e.target); renderCalc(); });
 $('calcHave').addEventListener('click', e => {
   const b = e.target.closest('button[data-fill]');
   if (!b) return;
