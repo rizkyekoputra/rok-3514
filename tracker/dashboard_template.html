@@ -259,7 +259,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
   </section>
 
   <section data-panel="fines" hidden>
-    <div class="card" id="calcCard">
+    <div class="card" id="calcCard" hidden>
       <h2>Fine calculator</h2>
       <div class="sub" id="calcSub"></div>
       <div class="controls">
@@ -689,7 +689,7 @@ $('kvkHead').addEventListener('click', e => {
   const k = +th.dataset.kv; kvSortDir = kvSortK === k ? -kvSortDir : -1; kvSortK = k; renderKvk();
 });
 
-// ---------- fine calculator (public: no player data, just the exchange rates) ----------
+// ---------- fine calculator (R4-only for now, see renderOfficer; holds no player data, only the exchange rates) ----------
 // Fines can be paid in food/wood/stone/gold (or a mix); MGE_RATE = gold value of one unit of each resource.
 const MGE_RATE = Object.fromEntries(Object.entries(DATA.mgeFine || {gold: 1}).map(([r, v]) => [r, (DATA.mgeFine || {gold: 1}).gold / v]));
 // Rounded UP to 2 decimals of M/B, so paying the shown amount always covers the rest (same as the mail).
@@ -920,7 +920,7 @@ function renderOfficer() {
     : `<span>This R4 link is not valid or has been revoked. Ask the admin for a new one.</span><button class="act ghost" id="logoutBtn" type="button">Dismiss</button>`;
   const b = $('logoutBtn'); if (b) b.addEventListener('click', forgetKey);
   $('finesActTh').hidden = !officer;
-  $('reviewTabBtn').hidden = $('mgeTabBtn').hidden = !officer;
+  $('reviewTabBtn').hidden = $('mgeTabBtn').hidden = $('calcCard').hidden = !officer;  // MGE + calculator: R4-only for now
 }
 
 function renderFines() {

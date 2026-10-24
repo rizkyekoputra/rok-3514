@@ -125,7 +125,7 @@ fine rates in `MGE_FINE` at the top of `track.py`.
 
 ## Dashboard tabs
 
-Players (master list + player view) · Weekly activity · Fines (fort + MGE, with a public **Fine calculator**: fine in
+Players (master list + player view) · Weekly activity · Fines (fort + MGE, with a **Fine calculator**, R4-only for now like the MGE tab (`calcCard` in `renderOfficer`): fine in
 MGE points over or gold, plus what the player has in food/wood/stone/gold -> what is left, in each resource; the MGE
 sanctions mail links to it at `DASHBOARD_URL#t=fines`) · MGE · KvK history · Review (R4 mode only: proposals waiting for the admin,
 and unconfirmed accounts in the alliance with farm hints from `farm_hints()` in `track.py`). Links: `#t=<tab>`, `#t=players&p=<name>`.
