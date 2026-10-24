@@ -165,7 +165,8 @@ Future events (KvK, AoO, 20 GH…) get their own tab and data folder, sharing th
   `mge:<start>` for an MGE fine; `gold_paid` in gold value: food/wood ÷ 2, stone ÷ 1.5) and rerun.
 - **Rule change**: edit the constants in `tracker/track.py`; the rules mail (`5_fort_rules.txt`) regenerates from them.
 - **Fine exchange rates** are per kind of fine (`FINE_KINDS` in `track.py`: units of each resource worth 1 gold), because
-  each event may set its own. Fort: 500K gold = 1M food/wood = 750K stone; MGE: derived from `MGE_FINE`. A new event
+  each event may set its own. Fort: 500K gold = 1M food/wood = 750K stone (gold per missing fort in `FORT_FINE`);
+  MGE: derived from `MGE_FINE`. Each kind's `steps` are the rows of the calculator's rate table. A new event
   with fines adds its own entry and tags its fines with `t=<kind>` (MGE does `t='mge'`; fort fines have none). The
   calculator's "Fine for" list and the "Mark paid" conversion follow these rates.
 - **Missing rank or wrong number** reported by the user: fix the week CSV row, rerun.

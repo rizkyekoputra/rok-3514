@@ -70,11 +70,16 @@ R4_REWARD = 'Advanced Trophy'
 MGE_FINE = {'food': 1000, 'wood': 1000, 'stone': 750, 'gold': 500}
 MGE_CONTACTS = ['ＡＧＡＭ', 'Totos メtreme']  # named in the sanctions mail for working out a mixed payment
 
+FORT_FINE = {2: 500_000, 3: 1_000_000}  # gold per missing fort at the 2nd and 3rd offense
+
 # What a fine can be paid with, per kind of fine: units of each resource worth 1 gold of the fine. Each event keeps its
 # own rates (they may differ); the dashboard's calculator and "Mark paid" use the rates of the fine's kind.
+# steps = [what one unit of the fine is, its gold], shown as the rate table in the calculator.
 FINE_KINDS = {
-    'mge': dict(label='MGE', rss={r: v / MGE_FINE['gold'] for r, v in MGE_FINE.items()}),
-    'fort': dict(label='Fort', rss={'food': 2, 'wood': 2, 'stone': 1.5, 'gold': 1}),  # 500K gold = 1M food/wood = 750K stone
+    'mge': dict(label='MGE', rss={r: v / MGE_FINE['gold'] for r, v in MGE_FINE.items()},
+                steps=[['Per point over the limit', MGE_FINE['gold']]]),
+    'fort': dict(label='Fort', rss={'food': 2, 'wood': 2, 'stone': 1.5, 'gold': 1},  # 500K gold = 1M food/wood = 750K stone
+                 steps=[['2nd offense, per missing fort', FORT_FINE[2]], ['3rd offense, per missing fort', FORT_FINE[3]]]),
 }
 
 NEXT = {1: 'Forgiven + Low Contribution label',
@@ -175,12 +180,12 @@ def penalty(offense, missing, unpaid):
     if offense == 1:
         return 0, 'Forgiven + Low Contribution label'
     if offense == 2:
-        fine = 500_000 * missing
-        return fine, f'Fine 500K x {missing} = {gold(fine)}'
+        fine = FORT_FINE[2] * missing
+        return fine, f"Fine {gold(FORT_FINE[2]).replace(' gold', '')} x {missing} = {gold(fine)}"
     if offense == 3:
-        fine = 1_000_000 * missing
+        fine = FORT_FINE[3] * missing
         extra = f' + unpaid {gold(unpaid)}' if unpaid else ''
-        return fine, f'Fine 1M x {missing} = {gold(fine)}{extra}'
+        return fine, f"Fine {gold(FORT_FINE[3]).replace(' gold', '')} x {missing} = {gold(fine)}{extra}"
     return 0, 'MUST MIGRATE (or account zeroed)'
 
 

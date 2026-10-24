@@ -56,6 +56,8 @@ input[type=search] { flex: 1 1 200px; min-width: 0; }
 .calc label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
 .calc input { min-width: 0; font-variant-numeric: tabular-nums; }
 .calc-out { margin-top: 12px; line-height: 1.6; }
+.rates { width: auto; margin-top: 4px; }
+.rates th, .rates td { cursor: default; padding: 6px 14px 6px 0; }
 .calc .hint { font: inherit; font-size: 12px; text-align: left; padding: 0; margin-top: -2px; border: 0; background: none; color: var(--series-1); cursor: pointer; min-height: 18px; }
 .calc .hint:hover { text-decoration: underline; }
 button.theme { font: inherit; background: none; border: 1px solid var(--border); color: var(--text-secondary);
@@ -263,7 +265,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
   <section data-panel="fines" hidden>
     <div class="card" id="calcCard" hidden>
       <h2>Fine calculator</h2>
-      <div class="sub" id="calcSub"></div>
+      <div class="sub">Pay in any one resource, or mix them. Enter your fine and what you already have to see what is left.</div>
       <div class="controls">
         <label class="sub" for="calcKind">Fine for</label>
         <select id="calcKind"></select>
@@ -274,6 +276,8 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
         </select>
         <button class="act ghost" id="calcReset" type="button">Reset</button>
       </div>
+      <div class="table-wrap" style="margin-top:12px"><table class="rates" id="calcRates"></table></div>
+      <div class="sub">Each row is worth the same in every column: pay one column, or mix them.</div>
       <div class="sub" style="margin-top:12px">What you pay with (leave empty if none). Type the full number (commas are added for you) or a short form like 300M or 1.5B.</div>
       <div class="calc" id="calcHave"></div>
       <div class="calc-out" id="calcOut"></div>
@@ -731,9 +735,12 @@ function calcFields() {
   const mge = $('calcKind').value === 'mge', rss = calcRss();
   $('calcUnit').hidden = !mge;  // only MGE fines are counted in points; other fines are entered in gold
   if (!mge) $('calcUnit').value = 'gold';
-  $('calcSub').textContent = 'Pay in any one resource, or mix them: enter your fine and what you already have, and see what is left. ' +
-    `${KINDS[$('calcKind').value].label} rates: 1M gold = ${Object.entries(rss).filter(([r]) => r !== 'gold').map(([r, x]) => `${payFmt(x * 1e6)} ${r}`).join(' = ')}` +
-    (mge ? ` (MGE: ${Object.entries(DATA.mgeFine).map(([r, v]) => `${fmt(v)} ${r}`).join(' / ')} per point over the limit).` : '.');
+  // Rate table: one row per step of the fine (e.g. 2nd / 3rd fort offense), its value in each resource
+  const res = ['gold', ...Object.keys(rss).filter(r => r !== 'gold')], k = KINDS[$('calcKind').value];
+  const n = v => v >= 1e6 ? payFmt(v) : v >= 1e5 ? v / 1e3 + 'K' : fmt(v);
+  $('calcRates').innerHTML = `<thead><tr><th>${esc(k.label)} fine</th>${res.map(r => `<th class="num">${cap(r)}</th>`).join('')}</tr></thead>` +
+    `<tbody>${(k.steps || []).map(([what, g]) => `<tr><td>${esc(what)}</td>${res.map(r => `<td class="num">${n(g * rss[r])}</td>`).join('')}</tr>`).join('')}</tbody>`;
+  $('calcFine').placeholder = mge ? 'Your fine, e.g. 1,575,569 points or 787.79M gold' : 'Your fine in gold, e.g. 35,000,000 or 35M';
 }
 function renderCalc() {
   const raw = amount($('calcFine').value), pts = $('calcKind').value === 'mge' && $('calcUnit').value === 'pts', rss = calcRss();
