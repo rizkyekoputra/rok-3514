@@ -132,7 +132,7 @@ fine rates in `MGE_FINE` at the top of `track.py`.
 
 Players (master list + player view; its search also finds **governors who left the kingdom**: anyone in an older scan,
 name list or KvK sheet but not in the latest scan/export/rankings, kept with `x` = last date seen, listed under the
-"Left the kingdom" filter and in KvK history searches) · Weekly activity · Fines (fort + MGE, with a **Fine calculator**, R4-only for now like the MGE tab (`calcCard` in `renderOfficer`): fine in
+"Left the kingdom" filter; KvK history lists everyone in each KvK sheet with a Kingdom column, In kingdom / Migrated out) · Weekly activity · Fines (fort + MGE, with a **Fine calculator**, R4-only for now like the MGE tab (`calcCard` in `renderOfficer`): fine in
 MGE points over or gold, plus what the player has in food/wood/stone/gold -> what is left, in each resource, with tap-to-fill "+ rest" suggestions under the empty fields; the MGE
 sanctions mail links to it at `DASHBOARD_URL#t=fines`) · MGE · KvK history · Review (R4 mode only: proposals waiting for the admin,
 and unconfirmed accounts in the alliance with farm hints from `farm_hints()` in `track.py`). Links: `#t=<tab>`, `#t=players&p=<name>`.
