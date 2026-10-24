@@ -31,6 +31,7 @@ Usage: python3 track.py          rebuild from local files
 import csv
 import hashlib
 import json
+import math
 import os
 import re
 import sys
@@ -207,9 +208,18 @@ def mge_label(ev):
         f"MGE {ev['troop']} {s.day} {s:%b}–{e.day} {e:%b %Y}"
 
 
+def pay(n):
+    """Amount to pay, rounded UP to 2 decimals of M or B, so paying the shown amount always covers the fine."""
+    if n >= 1e9:
+        return f'{math.ceil(n / 1e7) / 100:g}B'
+    if n >= 1e6:
+        return f'{math.ceil(n / 1e4) / 100:g}M'
+    return f'{math.ceil(n / 1e3):g}K'
+
+
 def rss(over):
     """Fine for points over the cap, in each resource it can be paid with."""
-    return ' / '.join(f'{gold(over * v).replace(" gold", "")} {r.capitalize()}' for r, v in MGE_FINE.items())
+    return ' / '.join(f'{pay(over * v)} {r.capitalize()}' for r, v in MGE_FINE.items())
 
 
 def write_mge(mges, paid):
@@ -251,26 +261,44 @@ def write_mge(mges, paid):
         with open(os.path.join(HERE, 'reports', f"mge-{ev['mge']}.md"), 'w', encoding='utf-8') as f:
             f.write('\n'.join(out))
 
-        head = lambda t: [f'<size=30><b>3514 | {t}</b></size>', f'<b>{title}</b>', '',
-                          '<size=24><color=navy>══════ ✦ ⚔ ✦ ══════</color></size>', '']
-        intro = [f'These players went over their MGE point limit '
-                 f'(<b>{dcap / 1e6:g}M</b> outside the Top 10, or a Top-10 player who took a higher slot).',
-                 '<i>Name – points – over – fine</i>', '']
-        items = [f"• {r['name']} – {short(r['points'])} – +{r['over']:,}" +
-                 (f" – <color=red>took slot {r['took']}</color>" if r['took'] else '') +
+        # a provisional ranking (final != yes) gets a banner so the draft is not sent by mistake
+        draft = [] if ev['final'] == 'yes' else ['<color=red><b>DRAFT – ranking not final, do not send</b></color>', '']
+        head = lambda t: draft + [f'<size=30><b>3514 | {t}</b></size>', f'<b>{title}</b>', '',
+                                  '<size=24><color=navy>══════ ✦ ⚔ ✦ ══════</color></size>', '']
+        foot = ['', '<b>Respect the allocation. Follow the limit. Do not disrupt Kingdom strategy.</b>',
+                '<b>— KINGDOM 3514 LEADERSHIP</b>']
+        took = [r for r in rows if r['took']]
+        results = head('MGE RESULTS') + ['<b><color=navy>TOP 10 SLOTS</color></b>']
+        for sl in read(f"mge/{ev['mge']}_slots.csv"):
+            r = held.get(key(sl))
+            res = ('not in the ranking' if not r else '<color=green>held</color>' if r['rank'] == r['slot']
+                   else f"finished #{r['rank']}" if r['rank'] > r['slot'] else f"<color=red>took #{r['rank']}</color>")
+            results.append(f"{sl['slot']}. {r['name'] if r else sl['name']} – {res}")
+        results += ['', '<b><color=red>TAKEOVERS</color></b>',
+                    f'<i>Players over their limit who finished in a Top 10 slot allocated to someone else</i>']
+        results += [f"• {r['name']} took #{r['took']} ({r['took_from']}) – {short(r['points'])}" for r in took] or ['(none)']
+        results += ['', '<b><color=red>OVER THE LIMIT</color></b>',
+                    f"<b>{len(fined)}</b> player{'s' if len(fined) != 1 else ''} went over their limit "
+                    f"(<b>{dcap / 1e6:g}M</b> outside the Top 10). Fines are in the next mail."] + foot
+        intro = [f'These players went over their MGE point limit: <b>{dcap / 1e6:g}M</b> outside the Top 10, '
+                 'or a Top 10 player who took a higher slot. Top 10 players who kept their slot are not fined.',
+                 '<i>Name – points – over the limit</i>', '<i>Fine: pay ONE of these, or a mix</i>', '']
+        items = [f"• <b>{r['name']}</b> – {short(r['points'])} – +{r['over']:,}" +
+                 (f" – <color=red>took #{r['took']}</color>" if r['took'] else '') +
                  f"\n   {rss(r['over'])}" for r in fined]
         outro = ['', '<b>FINE PER POINT OVER THE LIMIT</b>',
                  ' / '.join(f'{v:,} {r.capitalize()}' for r, v in MGE_FINE.items()),
                  'Pay in one resource or a mix of them.',
-                 f'<b>Send your fine to the bank KD: <color=#DAA520>{BANK}</color></b>', '',
-                 '<b>Respect the allocation. Follow the limit. Do not disrupt Kingdom strategy.</b>']
+                 f'<b>Send your fine to the bank KD: <color=#DAA520>{BANK}</color></b>'] + foot
         d = os.path.join(HERE, 'mails', f"mge-{ev['mge']}")
         os.makedirs(d, exist_ok=True)
         for old in os.listdir(d):
             os.remove(os.path.join(d, old))
+        with open(os.path.join(d, '1_results.txt'), 'w', encoding='utf-8') as f:
+            f.write('\n'.join(results) + '\n')
         parts = split_mail('MGE SANCTIONS', head, intro, items or ['(none)'], outro)
         for i, body in enumerate(parts):
-            with open(os.path.join(d, f"1_sanctions{f'_part{i + 1}' if len(parts) > 1 else ''}.txt"), 'w',
+            with open(os.path.join(d, f"2_sanctions{f'_part{i + 1}' if len(parts) > 1 else ''}.txt"), 'w',
                       encoding='utf-8') as f:
                 f.write(body)
         for name in os.listdir(d):

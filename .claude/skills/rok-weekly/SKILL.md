@@ -105,7 +105,7 @@ Processing: add the row to `mges.csv` and the slots file (names exactly as in th
 recording (`extract_frames.py`; short fast-scrolling clips need `--fps 4`, else ranks are skipped), transcribe
 `rank|name|points` into scratch, then `.venv/bin/python .claude/skills/rok-weekly/scripts/import_mge.py START ranking.txt`
 (check `~~`/`--` lines; `--overrides` like `build_week.py`), `--write`, and `python3 tracker/track.py`.
-Outputs: `reports/mge-<start>.md`, `mails/mge-<start>/1_sanctions*.txt`, `mge_log.csv`, the dashboard MGE tab.
+Outputs: `reports/mge-<start>.md`, `mails/mge-<start>/1_results.txt` + `2_sanctions*.txt` (DRAFT banner until `final = yes`), `mge_log.csv`, the dashboard MGE tab.
 Only the ranks captured are checked; capture until the points drop well below the default cap.
 Names render in game with `✕` for `メ` (Totos ✕treme = Totos メtreme); transcribe with `メ`, the matcher folds both.
 
