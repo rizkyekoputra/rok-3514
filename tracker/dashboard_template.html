@@ -64,6 +64,8 @@ input[type=search] { flex: 1 1 200px; min-width: 0; }
 .ms-list label:hover { background: var(--chip-bg); }
 .ms-list input { min-height: 0; width: 16px; height: 16px; margin: 0; }
 .ms-list .n { margin-left: auto; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+#allyFind { width: 100%; box-sizing: border-box; margin: 2px 0 4px; }
+.ms-list label[hidden] { display: none; }
 .ms-acts { display: flex; gap: 6px; padding: 2px 2px 6px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
 .calc { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-top: 12px; }
 .calc label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
@@ -214,7 +216,9 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
           <div class="ms-list">
             <div class="ms-acts"><button class="act ghost" id="allyAll" type="button">All alliances</button>
               <button class="act ghost" id="allyMain" type="button">Only main alliance</button></div>
+            <input type="search" id="allyFind" placeholder="Find alliance…" autocomplete="off">
             <div id="allyList"></div>
+            <div class="sub" id="allyNone" hidden style="padding:6px">No alliance matches.</div>
           </div>
         </details>
         <select id="rosterCh" title="City hall level">
@@ -1489,6 +1493,14 @@ function allyChanged() {
   $('allySum').textContent = allyAllOn() ? 'All alliances' : allyPick.size > 1 ? `${allyPick.size} alliances` : one || 'No alliance';
   renderRoster();
 }
+// Find box: hides alliances that don't match (ticks stay as they are)
+$('allyFind').addEventListener('input', () => {
+  const q = $('allyFind').value.trim().toLowerCase();
+  let shown = 0;
+  document.querySelectorAll('#allyList label').forEach(l => { l.hidden = !!q && !l.textContent.toLowerCase().includes(q); shown += !l.hidden; });
+  $('allyNone').hidden = !!shown;
+});
+$('allyMs').addEventListener('toggle', () => { if ($('allyMs').open) $('allyFind').focus(); });
 $('allyList').addEventListener('change', e => { e.target.checked ? allyPick.add(e.target.value) : allyPick.delete(e.target.value); allyChanged(); });
 $('allyAll').addEventListener('click', () => { allyOpts.forEach(([a]) => allyPick.add(a)); allyChanged(); $('allyMs').open = false; });
 $('allyMain').addEventListener('click', () => { allyPick.clear(); allyPick.add(DATA.mainAlly); allyChanged(); $('allyMs').open = false; });
