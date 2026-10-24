@@ -56,7 +56,7 @@ input[type=search] { flex: 1 1 200px; min-width: 0; }
 .calc label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
 .calc input { min-width: 0; font-variant-numeric: tabular-nums; }
 .calc-out { margin-top: 12px; line-height: 1.6; }
-.calc .hint { font: inherit; font-size: 12px; text-align: left; padding: 0; border: 0; background: none; color: var(--series-1); cursor: pointer; min-height: 18px; }
+.calc .hint { font: inherit; font-size: 12px; text-align: left; padding: 0; margin-top: -2px; border: 0; background: none; color: var(--series-1); cursor: pointer; min-height: 18px; }
 .calc .hint:hover { text-decoration: underline; }
 button.theme { font: inherit; background: none; border: 1px solid var(--border); color: var(--text-secondary);
   border-radius: 6px; padding: 4px 10px; cursor: pointer; }
@@ -712,6 +712,7 @@ function renderCalc() {
   const bad = have.filter(([, v]) => isNaN(v)).map(([r]) => cap(r));
   if (!$('calcFine').value.trim()) {
     document.querySelectorAll('#calcHave [data-fill]').forEach(b => { b.hidden = true; });
+    document.querySelectorAll('#calcHave input').forEach(i => { i.placeholder = '0'; });
     $('calcOut').innerHTML = '<span class="muted">Enter your fine to start.</span>'; return;
   }
   if (isNaN(due) || bad.length) { $('calcOut').innerHTML = `<span class="below">Can't read ${isNaN(due) ? 'the fine' : bad.join(', ')}</span>: use numbers like 787.79M or 1,575,569.`; return; }
@@ -719,9 +720,10 @@ function renderCalc() {
   // Suggest the rest under every empty resource once something is typed: tap to fill it in
   const started = have.some(([, v]) => v > 0);
   document.querySelectorAll('#calcHave [data-fill]').forEach(b => {
-    const r = b.dataset.fill, empty = !document.querySelector(`#calcHave [data-rss="${r}"]`).value.trim();
+    const r = b.dataset.fill, input = document.querySelector(`#calcHave [data-rss="${r}"]`), empty = !input.value.trim();
     b.hidden = !(started && empty && left > 0);
-    if (!b.hidden) { b.dataset.v = payFmt(left / MGE_RATE[r]); b.textContent = `+ rest: ${b.dataset.v} ${cap(r)}`; }
+    if (!b.hidden) { b.dataset.v = payFmt(left / MGE_RATE[r]); b.textContent = `↑ tap to fill the rest: ${b.dataset.v}`; }
+    input.placeholder = b.hidden ? '0' : `rest: ${b.dataset.v}`;  // the suggestion sits in the empty field itself
   });
   const used = have.filter(([, v]) => v > 0).map(([r, v]) => `${payFmt(v)} ${cap(r)}`).join(' + ');
   $('calcOut').innerHTML = `<div class="stats">
