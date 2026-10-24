@@ -56,6 +56,8 @@ input[type=search] { flex: 1 1 200px; min-width: 0; }
 .calc label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary); }
 .calc input { min-width: 0; font-variant-numeric: tabular-nums; }
 .calc-out { margin-top: 12px; line-height: 1.6; }
+.calc .hint { font: inherit; font-size: 12px; text-align: left; padding: 0; border: 0; background: none; color: var(--series-1); cursor: pointer; min-height: 18px; }
+.calc .hint:hover { text-decoration: underline; }
 button.theme { font: inherit; background: none; border: 1px solid var(--border); color: var(--text-secondary);
   border-radius: 6px; padding: 4px 10px; cursor: pointer; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 16px; }
@@ -699,7 +701,8 @@ const amount = v => {  // "300M", "1.5b", "1,575,569", "" -> number (0 for empty
   return !m ? NaN : m[1] === '' ? (m[2] ? NaN : 0) : Number(m[1]) * ({k: 1e3, m: 1e6, b: 1e9}[m[2]] || 1);
 };
 const cap = r => r[0].toUpperCase() + r.slice(1);
-$('calcHave').innerHTML = Object.keys(MGE_RATE).map(r => `<label>${cap(r)}<input type="text" inputmode="decimal" data-rss="${r}" placeholder="0" autocomplete="off"></label>`).join('');
+$('calcHave').innerHTML = Object.keys(MGE_RATE).map(r => `<label>${cap(r)}<input type="text" inputmode="decimal" data-rss="${r}" placeholder="0" autocomplete="off">` +
+  `<button class="hint" type="button" data-fill="${r}" hidden></button></label>`).join('');
 $('calcSub').textContent = 'Pay in any one resource, or mix them: enter your fine and what you already have, and see what is left. ' +
   `${Object.entries(DATA.mgeFine).map(([r, v]) => `${fmt(v)} ${r}`).join(' = ')} in value (the MGE fine per point over the limit; fort fines use the same rates).`;
 function renderCalc() {
@@ -707,9 +710,19 @@ function renderCalc() {
   const due = pts ? raw * DATA.mgeFine.gold : raw;
   const have = [...document.querySelectorAll('#calcHave input')].map(i => [i.dataset.rss, amount(i.value)]);
   const bad = have.filter(([, v]) => isNaN(v)).map(([r]) => cap(r));
-  if (!$('calcFine').value.trim()) { $('calcOut').innerHTML = '<span class="muted">Enter your fine to start.</span>'; return; }
+  if (!$('calcFine').value.trim()) {
+    document.querySelectorAll('#calcHave [data-fill]').forEach(b => { b.hidden = true; });
+    $('calcOut').innerHTML = '<span class="muted">Enter your fine to start.</span>'; return;
+  }
   if (isNaN(due) || bad.length) { $('calcOut').innerHTML = `<span class="below">Can't read ${isNaN(due) ? 'the fine' : bad.join(', ')}</span>: use numbers like 787.79M or 1,575,569.`; return; }
   const paid = have.reduce((a, [r, v]) => a + v * MGE_RATE[r], 0), left = due - paid;
+  // Suggest the rest under every empty resource once something is typed: tap to fill it in
+  const started = have.some(([, v]) => v > 0);
+  document.querySelectorAll('#calcHave [data-fill]').forEach(b => {
+    const r = b.dataset.fill, empty = !document.querySelector(`#calcHave [data-rss="${r}"]`).value.trim();
+    b.hidden = !(started && empty && left > 0);
+    if (!b.hidden) { b.dataset.v = payFmt(left / MGE_RATE[r]); b.textContent = `+ rest: ${b.dataset.v} ${cap(r)}`; }
+  });
   const used = have.filter(([, v]) => v > 0).map(([r, v]) => `${payFmt(v)} ${cap(r)}`).join(' + ');
   $('calcOut').innerHTML = `<div class="stats">
       <div class="stat"><div class="v">${payFmt(due)}</div><div class="l">Fine (gold value)${pts ? ` · ${fmt(raw)} points × ${fmt(DATA.mgeFine.gold)}` : ''}</div></div>
@@ -717,11 +730,20 @@ function renderCalc() {
       <div class="stat ${left > 0 ? 'bad' : 'good'}"><div class="v">${left > 0 ? payFmt(left) : '0'}</div><div class="l">Still to pay (gold value)</div></div>
     </div>` + (left > 0
       ? `<div style="margin-top:10px"><b>Pay the rest with ONE of:</b> ${Object.entries(MGE_RATE).map(([r, x]) => `<b>${payFmt(left / x)}</b> ${cap(r)}`).join(' · ')}</div>`
-      : `<div style="margin-top:10px" class="paid">✓ Fully covered${left < 0 ? ` (${payFmt(-left)} gold value more than the fine)` : ''}.</div>`) +
+      // a tiny extra only comes from rounding the suggestions up: don't flag it as overpaying
+      : `<div style="margin-top:10px" class="paid">✓ Fully covered${-left > due * 0.005 ? ` (${payFmt(-left)} gold value more than the fine)` : ''}.</div>`) +
     `<div class="sub" style="margin-top:6px">Send everything to the bank KD, then tell an R4 what you sent.</div>`;
 }
 ['calcFine', 'calcUnit'].forEach(id => $(id).addEventListener('input', renderCalc));
 $('calcHave').addEventListener('input', renderCalc);
+$('calcHave').addEventListener('click', e => {
+  const b = e.target.closest('button[data-fill]');
+  if (!b) return;
+  e.preventDefault();
+  const i = document.querySelector(`#calcHave [data-rss="${b.dataset.fill}"]`);
+  i.value = b.dataset.v;
+  renderCalc();
+});
 renderCalc();
 
 // ---------- MGE tab ----------
