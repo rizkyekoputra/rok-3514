@@ -401,6 +401,10 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
   <button class="dlg-close" data-close type="button" aria-label="Close">✕</button>
   <div id="claimView"></div>
 </dialog>
+<dialog id="payDlg" class="dlg" aria-label="Record payment">
+  <button class="dlg-close" data-close type="button" aria-label="Close">✕</button>
+  <div id="payView"></div>
+</dialog>
 <dialog id="fileDlg" class="dlg" aria-label="Proof file">
   <button class="dlg-close" data-close type="button" aria-label="Close">✕</button>
   <div id="fileView"></div>
@@ -1113,14 +1117,6 @@ const ORD = n => n + (['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 
 const fineLabel = f => f.e || `Weekly Fort ${weekLabel(f.wk)}` + (f.o ? ` ${ORD(f.o)} Offense` : '');
 const fineWhen = f => esc(fineLabel(f));
 const fineWhy = f => f.e ? `${fmt(f.m)} pts over` : `${f.m} forts short`;
-const inRss = (a, rss) => Object.entries(rss).map(([r, x]) => `${gold(a * x)} ${r}`).join(' / ');
-// "9M", "9,000,000", "300M food 200M wood 50M gold" -> gold value, or NaN
-function paidValue(v, rss) {
-  const txt = String(v).toLowerCase().replace(/,/g, ''), re = /([\d.]+)\s*([kmb]?)\s*(food|wood|stone|gold)?/g;
-  let total = 0, n = 0;
-  for (const m of txt.matchAll(re)) { total += Number(m[1]) * ({k: 1e3, m: 1e6, b: 1e9}[m[2]] || 1) / rss[m[3] || 'gold']; n++; }
-  return n && !txt.replace(re, '').replace(/[\s+&/]|and/g, '') ? total : NaN;
-}
 const unpaidOf = p => ledger ? shownFines().filter(f => P[f.p] === p).reduce((a, f) => a + Math.max(0, f.a - paidOf(f)), 0) : p.u;
 
 // R4 mode only while ?key= is in the address; nothing is stored, so the plain link is always read-only.
@@ -1264,26 +1260,64 @@ $('finesBody').addEventListener('click', async e => {
   const b = e.target.closest('button[data-pay], button[data-undo]');
   if (!b || !officer) return;
   const f = F.find(f => f.id === (b.dataset.pay || b.dataset.undo)), name = f.p != null ? P[f.p].n : f.n;
-  let action = 'undo', amount = 0;
-  if (b.dataset.pay) {
-    const due = f.a - (f.h || 0);
-    const v = prompt(`Paid by ${name} for ${fineLabel(f)}. Fine ${gold(f.a)} gold = ${inRss(f.a, rssOf(f))}.\n` +
-      `Type gold (9M or 9000000), or what they sent, mixed if needed: 300M food 200M wood 50M gold`, due);
-    if (v == null) return;
-    amount = Math.round(paidValue(v, rssOf(f)));
-    if (!(amount > 0)) return alert('Enter what was paid, e.g. 9M (gold) or 300M food 50M gold.');
-    if (/[a-z]/i.test(v) && !confirm(`Record ${gold(amount)} gold value for ${name}?`)) return;
-    action = 'paid';
-  } else if (!confirm(`Undo the payment recorded for ${name} (${fineLabel(f)})?`)) return;
+  if (b.dataset.pay) return openPay(f);
+  if (!confirm(`Undo the payment recorded for ${name} (${fineLabel(f)})?`)) return;
   saving(b);
   try {
-    await sendPayment(f, action, amount);
+    await sendPayment(f, 'undo', 0);
     ledger = {...ledger};
-    if (action === 'paid') ledger[f.id] = {amount, by: officer, time: new Date().toISOString()};
-    else delete ledger[f.id];
+    delete ledger[f.id];
     saved();
   } catch (err) { notSaved(b, err); }
 });
+
+// R4 "Mark paid": what the player sent, one field per resource (any mix), recorded as its gold value
+function openPay(f) {
+  const name = f.p != null ? P[f.p].n : f.n, rss = rssOf(f), due = f.a - (f.h || 0);
+  $('payView').innerHTML = `<h2>Record payment</h2>
+    <div class="sub">${esc(name)} · ${esc(fineLabel(f))} · fine <b>${gold(f.a)}</b> gold value${f.h ? ` · ${gold(f.h)} already paid by hand` : ''}</div>
+    <div class="sub" style="margin-top:12px">What arrived in the bank KD <b>${esc(DATA.bank || '')}</b>? Fill in each resource (one or a mix).</div>
+    <div class="calc" id="payHave">${Object.keys(rss).map(r => `<label>${cap(r)}<input type="text" inputmode="decimal" data-pr="${r}" placeholder="0" autocomplete="off">` +
+      `<button class="hint" type="button" data-pfill="${r}" hidden></button></label>`).join('')}</div>
+    <div class="calc-out" id="paySum"></div>
+    <div class="controls"><button class="act" id="paySave" type="button">Record payment</button><span class="sub" id="payMsg"></span></div>`;
+  const inputs = () => [...document.querySelectorAll('#payHave input')];
+  const check = () => {
+    const v = inputs().reduce((a, i) => a + amount(i.value) / rss[i.dataset.pr], 0), left = due - (v || 0);
+    $('paySum').innerHTML = isNaN(v) ? '<span class="below">Use numbers like 300M or 1,575,569.</span>'
+      : v ? `Worth <b>${payFmt(v)}</b> gold value · ${left <= 0 ? '<span class="paid">covers the fine</span>' : `<span class="below">${payFmt(left)} short</span> (recorded as a partial payment)`}` : '';
+    document.querySelectorAll('#payHave [data-pfill]').forEach(b => {  // the rest in each empty resource, tap to fill
+      const i = b.previousElementSibling;
+      b.hidden = !!i.value.trim() || isNaN(v) || left <= 0;
+      if (!b.hidden) { b.dataset.v = payFull(left * rss[b.dataset.pfill]); b.textContent = `↑ tap to fill ${v ? 'the rest' : 'the fine'}: ${b.dataset.v}`; }
+      i.placeholder = b.hidden ? '0' : `${v ? 'rest' : 'fine'}: ${payFmt(left * rss[b.dataset.pfill])}`;
+    });
+    return v;
+  };
+  $('payHave').addEventListener('input', e => { groupDigits(e.target); check(); });
+  $('payHave').addEventListener('click', e => {
+    const b = e.target.closest('button[data-pfill]');
+    if (!b) return;
+    e.preventDefault();
+    b.previousElementSibling.value = b.dataset.v;
+    check();
+  });
+  $('paySave').addEventListener('click', async () => {
+    const v = check(), b = $('paySave');
+    if (isNaN(v) || !(v > 0)) { $('payMsg').innerHTML = '<span class="below">Fill in what arrived.</span>'; return; }
+    const amount = Math.round(v);
+    saving(b);
+    try {
+      await sendPayment(f, 'paid', amount);
+      ledger = {...ledger, [f.id]: {amount, by: officer, time: new Date().toISOString()}};
+      $('payDlg').close();
+      saved();
+    } catch (err) { $('payMsg').innerHTML = `<span class="below">Not saved: ${esc(err.message)}. Try again.</span>`; b.disabled = false; b.textContent = b.dataset.label; }
+  });
+  check();
+  $('payDlg').showModal();
+  inputs()[0].focus();
+}
 ['finesSearch', 'finesSel'].forEach(id => $(id).addEventListener('input', renderFines));
 
 // ---------- tabs (#t=players|activity|fines|review, plus p=<name> on the players tab) ----------

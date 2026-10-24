@@ -168,8 +168,8 @@ Future events (KvK, AoO, 20 GH…) get their own tab and data folder, sharing th
   10 minutes. A daily trigger (made by `setup()`) deletes proof files 30 days after the decision, and unfinished uploads
   after a day. The script needs the `drive.file` and `script.scriptapp` scopes: after changing them the ledger account
   must run `setup` once in the script editor to grant them, before `clasp update-deployment`.
-- **Fine paid**: R4s mark payments on the dashboard with their personal `?key=` link (gold, or a resource mix like
-  `300M food 50M gold`, converted to gold value); `publish.sh` pulls them.
+- **Fine paid**: R4s mark payments on the dashboard with their personal `?key=` link ("Mark paid" opens a form with one
+  field per resource, with tap-to-fill suggestions; recorded as gold value at the fine kind's rates); `publish.sh` pulls them.
   Only if the user reports one directly, append to `tracker/fines_paid.csv` (week = Monday the fine was issued, or
   `mge:<start>` for an MGE fine; `gold_paid` in gold value: food/wood ÷ 2, stone ÷ 1.5) and rerun.
 - **Rule change**: edit the constants in `tracker/track.py`; the rules mail (`5_fort_rules.txt`) regenerates from them.
