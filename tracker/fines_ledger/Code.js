@@ -254,13 +254,18 @@ function locked(write, by) {
 
 // ---------- payment claims ----------
 
+// Proof files use the Drive API (advanced service, appsscript.json) with the drive.file scope: the script only reaches
+// files it created itself. (DriveApp would need access to the whole Drive.)
 function claimsFolder() {
   const props = PropertiesService.getScriptProperties(), id = props.getProperty('CLAIMS_FOLDER');
-  if (id) { try { return DriveApp.getFolderById(id); } catch (err) { /* deleted: make a new one */ } }
-  const f = DriveApp.createFolder('3514 payment claims (proof files)');
-  props.setProperty('CLAIMS_FOLDER', f.getId());
-  return f;
+  if (id) { try { if (!Drive.Files.get(id, {fields: 'trashed'}).trashed) return id; } catch (err) { /* deleted: make a new one */ } }
+  const made = Drive.Files.create({name: '3514 payment claims (proof files)', mimeType: 'application/vnd.google-apps.folder'}, null, {fields: 'id'}).id;
+  props.setProperty('CLAIMS_FOLDER', made);
+  return made;
 }
+const trashFile = id => Drive.Files.update({trashed: true}, id);
+const fileBytes = id => UrlFetchApp.fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media`,
+  {headers: {Authorization: 'Bearer ' + ScriptApp.getOAuthToken()}}).getBlob().getBytes();
 
 // [{r: sheet row (1-based), v: values}] of the Claims tab
 function claimRows() { return rows('Claims').map((v, i) => ({r: i + 2, v})); }
@@ -311,12 +316,13 @@ function claimFile(req) {
   const used = Number(c.v[C.bytes]) + bytes.length;
   if (!bytes.length || list.length >= expect.n || used > Math.min(expect.bytes, CLAIM.maxBytes)) return {ok: false, error: 'file over the limit'};
   const name = `${c.v[C.claim_id]}_${list.length + 1}_` + String(req.name || 'proof').replace(/[^\w.\-]+/g, '_').slice(-60);
-  const file = claimsFolder().createFile(Utilities.newBlob(bytes, req.type, name));
+  const fileId = Drive.Files.create({name, parents: [claimsFolder()], mimeType: req.type},
+                                    Utilities.newBlob(bytes, req.type, name), {fields: 'id'}).id;
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
     const now = findClaim(req.claim_id), nowList = fileList(now);
-    nowList.push({id: file.getId(), n: String(req.name || name).slice(0, 80), t: req.type, s: bytes.length});
+    nowList.push({id: fileId, n: String(req.name || name).slice(0, 80), t: req.type, s: bytes.length});
     setCells(now, {files: JSON.stringify(nowList), bytes: Number(now.v[C.bytes]) + bytes.length});
     return {ok: true, count: nowList.length};
   } finally { lock.releaseLock(); }
@@ -354,8 +360,7 @@ function officerClaims() {
 function claimView(req) {
   const c = findClaim(req.claim_id), f = c && fileList(c).find(x => x.id === req.file_id);
   if (!f || c.v[C.cleaned]) return {ok: false, error: 'file not found (deleted after 30 days?)'};
-  const blob = DriveApp.getFileById(f.id).getBlob();
-  return {ok: true, type: f.t, name: f.n, data: Utilities.base64Encode(blob.getBytes())};
+  return {ok: true, type: f.t, name: f.n, data: Utilities.base64Encode(fileBytes(f.id))};
 }
 
 function decideClaim(req, by) {
@@ -387,7 +392,7 @@ function cleanupClaims() {
     const done = (st === 'approved' || st === 'rejected') && !v[C.cleaned] && now - new Date(v[C.decided]).getTime() > CLAIM.keepDays * 864e5;
     const stale = st === 'uploading' && now - new Date(v[C.time]).getTime() > 864e5;
     if (!done && !stale) return;
-    fileList(c).forEach(f => { try { DriveApp.getFileById(f.id).setTrashed(true); } catch (err) { /* already gone */ } });
+    fileList(c).forEach(f => { try { trashFile(f.id); } catch (err) { /* already gone */ } });
     setCells(c, stale ? {status: 'abandoned', token: '', cleaned: new Date()} : {cleaned: new Date()});
   });
 }
