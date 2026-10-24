@@ -1,6 +1,6 @@
 ---
 name: rok-weekly
-description: Process a week of Rise of Kingdoms 3514 alliance activity (fort destroyer + tech donation rankings from screenshots or screen recordings), update the offense tracker, and produce the weekly report, in-game mails and public dashboard. Use when the user drops a new "Activity <dates>" folder, says "process this week", marks accounts as farm/R4, records a paid fine, or changes the weekly rules.
+description: Process a week of Rise of Kingdoms 3514 alliance activity (fort destroyer + tech donation rankings from screenshots or screen recordings), update the offense tracker, and produce the weekly report, in-game mails and public dashboard. Also MGE (Mightiest Governor) point limits, takeovers and fines. Use when the user drops a new "Activity <dates>" folder or an MGE ranking/allocation mail, says "process this week", marks accounts as farm/R4, records a paid fine, or changes the weekly or MGE rules.
 ---
 
 # RoK 3514 weekly activity
@@ -16,7 +16,7 @@ to read the rankings accurately, match names to Governor IDs, and keep `accounts
 | `tracker/accounts.csv` | One row per account: `governor_id, name, type (main/farm), role (R4/R5/blank), confirmed, previous_names`. Accounts with no ID are keyed by name |
 | `tracker/scans/<date>.csv` | Kingdom scans (from `TOP500-<date>-….xlsx` via `scripts/import_scan.py`). The newest one is the **master player list** on the dashboard's Players tab: every governor with alliance, power, kill points. Events are tracked for `MAIN_ALLIANCE` ([14-X]THE MORTICIANS) only |
 | `tracker/weeks/<monday>.csv` | One file per week: `governor_id, name, fort_rank, forts, tech_rank, tech` (blank = not captured) |
-| `tracker/fines_paid.csv` | `governor_id, name, week, gold_paid, note`. `week` = the Monday of the week the fine was issued. Hand-entered payments only |
+| `tracker/fines_paid.csv` | `governor_id, name, week, gold_paid, note`. `week` = the Monday of the week the fine was issued, or `mge:<start>` for an MGE fine. Hand-entered payments only |
 | `tracker/fines_online.csv` | Same columns, payments R4s marked on the dashboard; written by `track.py --pull` (generated) |
 | `tracker/accounts_online.csv` | `governor_id, name, type, approved_by, decided`: farm/main changes R4s proposed on the dashboard and the admin approved in the sheet; written by `track.py --pull`, overrides `accounts.csv` (generated) |
 | `.github/workflows/recalc.yml` + `tracker/publish_ci.sh` | GitHub Action: `track.py --pull` and republish the dashboard. Started by the sheet on approval, hourly, or `gh workflow run recalc.yml`. Uses the `DASHBOARD_DEPLOY_KEY` secret; refuses to publish if the live dashboard has a week the repo lacks |
@@ -25,6 +25,9 @@ to read the rankings accurately, match names to Governor IDs, and keep `accounts
 | `tracker/reports/<monday>.md` | Weekly report (generated) |
 | `tracker/mails/<monday>/` | In-game alliance mails, RoK rich text, each ≤ 2000 chars (generated) |
 | `tracker/status.csv`, `tracker/offense_log.csv` | Current status and full offense history (generated) |
+| `tracker/mge/` | MGE inputs: `mges.csv`, `<start>_slots.csv` (Top-10 allocation), `<start>.csv` (ranking). See **MGE** below |
+| `tracker/mge_log.csv`, `tracker/reports/mge-<start>.md`, `tracker/mails/mge-<start>/` | MGE over-limit fines and takeovers, report, sanctions mail (generated) |
+| `event/mge/<name (dates)>/` | Raw MGE ranking recordings / screenshots the user provides |
 | `tracker/dashboard_template.html` → `tracker/dashboard/index.html` | Public dashboard (generated; `dashboard/` is its own git repo) |
 | `tracker/publish.sh` | Rebuilds and pushes the dashboard to GitHub Pages |
 | `Activity <d-d mon yyyy>/` | Raw screenshots / videos / member export the user provides each week |
@@ -83,11 +86,47 @@ history, labelled "KvK N"). Shown in the player pop-up and the KvK history tab, 
 Imported: KvK 3-10. Dates of KvK 3, 5, 7, 8, 9 are estimated (≈ Jan 2025, Jul 2025, Nov 2025, Feb 2026, May 2026) until
 the user gives them; rerun with the real `--date` to fix.
 
+## MGE (Mightiest Governor)
+
+Inputs in `tracker/mge/`: `mges.csv` (`mge` = start date, `start, end, troop, default_cap, final`), `<start>_slots.csv`
+(`slot, name, governor_id, cap`: the Top-10 allocation from the leadership mail; blank cap = no cap) and `<start>.csv`
+(`rank, governor_id, name, points`: final ranking). Raw recordings go in `event/mge/<name (dates)>/`.
+
+Rules (`mge_results()` in `track.py`, fine rates `MGE_FINE`):
+- A **slot holder** may go past their listed points as long as they finish at their slot (or lower). Finishing *above*
+  their slot = took someone's rank: fined for the points over their listed cap.
+- **Everyone else** (any alliance, farms and R4s included): max `default_cap` (7M). Fined for every point over.
+  Finishing in a Top-10 rank allocated to someone else while over the limit is flagged as a **takeover**.
+- Fine per point over: 1,000 food / 1,000 wood / 750 stone / 500 gold, one resource or a mix. Stored in gold value
+  (500 gold per point) and paid through the same ledger as fort fines; R4s can type a mix like `300M food 50M gold`.
+  Hand-entered payments go in `fines_paid.csv` with `week = mge:<start>`.
+
+Processing: add the row to `mges.csv` and the slots file (names exactly as in the mail), extract frames from the
+recording (`extract_frames.py`; short fast-scrolling clips need `--fps 4`, else ranks are skipped), transcribe
+`rank|name|points` into scratch, then `.venv/bin/python .claude/skills/rok-weekly/scripts/import_mge.py START ranking.txt`
+(check `~~`/`--` lines; `--overrides` like `build_week.py`), `--write`, and `python3 tracker/track.py`.
+Outputs: `reports/mge-<start>.md`, `mails/mge-<start>/1_sanctions*.txt`, `mge_log.csv`, the dashboard MGE tab.
+Only the ranks captured are checked; capture until the points drop well below the default cap.
+Names render in game with `✕` for `メ` (Totos ✕treme = Totos メtreme); transcribe with `メ`, the matcher folds both.
+
+A ranking taken before the event ends is provisional: when the final one arrives, rerun `import_mge.py ... --write`
+(it overwrites `<start>.csv`), set `final = yes` in `mges.csv` and run `track.py`. Until then the dashboard labels the
+MGE provisional and R4s can't mark its fines paid. Don't hand over the sanctions mail from a provisional ranking.
+The MGE tab, MGE fines and the pop-up's MGE section are **R4-only** for now (hidden for the public, though the numbers
+are in the page source); to open them to everyone, drop the `officer` checks around `mgeTabBtn`, `shownFines()` and `p.mg`.
+
+Report to the user: slot holders who held / fell below / took a higher slot, everyone over the limit with points over,
+fine in gold and takeovers, players not matched to an ID, and whether every slot holder was captured. Point to the mail
+folder, then ask before publishing.
+
+Rule changes: the default cap is per event (`mges.csv`), Top-10 limits per event (slots file, from the leadership mail),
+fine rates in `MGE_FINE` at the top of `track.py`.
+
 ## Dashboard tabs
 
-Players (master list + player view) · Weekly activity · Fines · KvK history · Review (R4 mode only: proposals waiting for the admin,
+Players (master list + player view) · Weekly activity · Fines (fort + MGE) · MGE · KvK history · Review (R4 mode only: proposals waiting for the admin,
 and unconfirmed accounts in the alliance with farm hints from `farm_hints()` in `track.py`). Links: `#t=<tab>`, `#t=players&p=<name>`.
-Future events (KvK, MGE, AoO, 20 GH…) get their own tab and data folder, sharing the master list, R4 keys and fines ledger.
+Future events (KvK, AoO, 20 GH…) get their own tab and data folder, sharing the master list, R4 keys and fines ledger.
 
 ## Processing a week
 
@@ -117,13 +156,16 @@ Future events (KvK, MGE, AoO, 20 GH…) get their own tab and data folder, shari
 
 ## Other requests
 
-- **Fine paid**: R4s mark payments on the dashboard with their personal `?key=` link; `publish.sh` pulls them.
-  Only if the user reports one directly, append to `tracker/fines_paid.csv` (week = Monday the fine was issued) and rerun.
+- **Fine paid**: R4s mark payments on the dashboard with their personal `?key=` link (gold, or a resource mix like
+  `300M food 50M gold`, converted to gold value); `publish.sh` pulls them.
+  Only if the user reports one directly, append to `tracker/fines_paid.csv` (week = Monday the fine was issued, or
+  `mge:<start>` for an MGE fine; `gold_paid` in gold value: food/wood ÷ 2, stone ÷ 1.5) and rerun.
 - **Rule change**: edit the constants in `tracker/track.py`; the rules mail (`5_fort_rules.txt`) regenerates from them.
 - **Missing rank or wrong number** reported by the user: fix the week CSV row, rerun.
 
 ## Gotchas
 
+- Helpers need `ffmpeg` (`brew install ffmpeg` if `extract_frames.py` says it is missing).
 - WhatsApp recordings are 848×392; the default crop in `extract_frames.py` fits that layout. Other devices may need `--crop`.
 - Ask for the original video or "send as document" — WhatsApp video compression can blur superscript tags.
 - A week where only part of the ranking was captured is marked partial on the dashboard automatically

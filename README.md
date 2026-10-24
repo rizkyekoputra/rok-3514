@@ -29,6 +29,20 @@ mails and a public dashboard.
 
 The numbers live as constants at the top of [`tracker/track.py`](tracker/track.py).
 
+## MGE (Mightiest Governor)
+
+Kingdom Leadership allocates the Top 10 slots, each with a listed point limit; everyone else may score at most **7M**.
+
+- Top-10 slot holders may go past their listed points **as long as they finish at their slot**. Finishing above it
+  (taking someone else's rank) is fined for the points over their limit.
+- Everyone else is fined for every point over 7M. Finishing in someone else's Top-10 rank is marked as a **takeover**.
+- Fine per point over: **1,000 food / 1,000 wood / 750 stone / 500 gold**, in one resource or a mix, paid to
+  **KINGDOM 3514**. R4s mark payments on the dashboard (gold, or a mix like `300M food 50M gold`).
+
+Drop the ranking recording in `event/mge/<name (dates)>/` with the allocation mail and ask Claude to process the MGE.
+Inputs live in `tracker/mge/`; results are in `tracker/reports/mge-<start>.md`, `tracker/mails/mge-<start>/` and the
+dashboard's MGE tab.
+
 ## Every week
 
 1. **Before the weekly reset**, screen-record (or screenshot) the **Fort Destroyer** and
@@ -52,6 +66,7 @@ payment log and recalculates everything.
 | `tracker/accounts.csv` | Every account: Governor ID, name, main/farm, R4/R5, previous names |
 | `tracker/weeks/<monday>.csv` | One file per week: fort and tech rank and value per player |
 | `tracker/fines_paid.csv` | Fines that have been paid |
+| `tracker/mge/` | MGE events, Top-10 allocations and final rankings |
 | `tracker/reports/<monday>.md` | Weekly report: summary, rewards, penalties, low tech, farms |
 | `tracker/mails/<monday>/` | In-game mails (RoK rich text, max 2,000 characters each) |
 | `tracker/status.csv` | Each player's current offenses, passing streak and unpaid fines |

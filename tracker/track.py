@@ -4,13 +4,17 @@
 Reads:
   accounts.csv      governor_id, name, type (main/farm), confirmed
   weeks/<monday>.csv governor_id, name, fort_rank, forts, tech_rank, tech  (blank = not captured)
-  fines_paid.csv    governor_id, name, week, gold_paid, note  (entered by hand)
+  fines_paid.csv    governor_id, name, week, gold_paid, note  (entered by hand; week = "mge:<start>" for an MGE fine)
   fines_online.csv  same columns, pulled from the R4 fines ledger (Google Sheet) by --pull
   scans/<date>.csv  latest kingdom scan = master player list (made by import_scan.py from the TOP500 xlsx)
   names/<date>.csv  governor_id, name, power from the latest member export (import_export.py): current name
                     per ID, plus governors below the TOP500 scan. names/<date>_kvk<N>.csv = names in that KvK
                     (history only)
   kvk/kvks.csv, kvk/kvk<N>.csv  past KvK results per governor (import_kvk.py), shown in the player pop-up
+  mge/mges.csv      mge (= start date), start, end, troop, default_cap, final: one row per MGE (final = yes once the
+                    ranking is the end-of-event one; until then its fines are provisional and can't be marked paid)
+  mge/<start>_slots.csv  slot, name, governor_id, cap: the Top-10 allocation (blank cap = no cap)
+  mge/<start>.csv   rank, governor_id, name, points: final ranking (import_mge.py)
   ledger.json       last pulled ledger state (payments, account changes, SHA-256 of active R4 keys), published so the
                     dashboard works before the slow web app answers
   accounts_online.csv  governor_id, name, type, approved_by, decided: farm/main changes R4s proposed and the
@@ -19,6 +23,7 @@ Reads:
 Writes:
   status.csv                 current offense status per account
   reports/<monday>.md        weekly report for each week file
+  mge_log.csv, reports/mge-<start>.md, mails/mge-<start>/   MGE results, over-cap fines and takeovers
 
 Usage: python3 track.py          rebuild from local files
        python3 track.py --pull   first refresh fines_online.csv and accounts_online.csv from the ledger
@@ -57,6 +62,10 @@ MAIN_ALLIANCE = '[14-X]THE MORTICIANS'
 REWARDS = ['Legendary Trophy + 10K VIP', 'Epic Trophy + 5K VIP', 'Epic Trophy'] + \
           ['Elite Trophy'] * 5 + ['Advanced Trophy'] * 2
 R4_REWARD = 'Advanced Trophy'
+
+# MGE: fine per point over the player's cap, payable in one resource or a mix (in gold-equivalent, food = wood = 2 gold
+# and stone = 1.5 gold per unit of value, the same rates as the fort fines). Caps live in mge/mges.csv and mge/<start>_slots.csv.
+MGE_FINE = {'food': 1000, 'wood': 1000, 'stone': 750, 'gold': 500}
 
 NEXT = {1: 'Forgiven + Low Contribution label',
         2: '500K gold per missing fort',
@@ -116,6 +125,8 @@ def pull_ledger():
                   f, ensure_ascii=False, indent=1, sort_keys=True)
     paid = ledger['paid']
     fines = {fine_id(r['governor_id'], r['week']): r for r in read('offense_log.csv') if num(r['fine_gold'])}
+    fines.update({fine_id(r['governor_id'], 'mge|' + r['mge']): dict(r, week='mge:' + r['mge'])
+                  for r in read('mge_log.csv') if num(r['fine_gold'])})
     with open(os.path.join(HERE, 'fines_online.csv'), 'w', newline='', encoding='utf-8-sig') as f:
         w = csv.writer(f)
         w.writerow(['governor_id', 'name', 'week', 'gold_paid', 'note'])
@@ -125,7 +136,7 @@ def pull_ledger():
                 w.writerow([r['governor_id'], r['name'], r['week'], int(p['amount']),
                             f"marked by {p['by']} {p['time'][:10]}"])
             else:
-                print(f'Ledger payment {fid} matches no fine in offense_log.csv, skipped')
+                print(f'Ledger payment {fid} matches no fine in offense_log.csv or mge_log.csv, skipped')
     print(f'Pulled {len(paid)} payment(s) from the fines ledger')
 
 
@@ -161,6 +172,113 @@ def penalty(offense, missing, unpaid):
         extra = f' + unpaid {gold(unpaid)}' if unpaid else ''
         return fine, f'Fine 1M x {missing} = {gold(fine)}{extra}'
     return 0, 'MUST MIGRATE (or account zeroed)'
+
+
+def mge_results(accounts):
+    """[(event, rows)] per MGE, oldest first. Slot holders may pass their listed points as long as they finish at
+    their slot or below; finishing above it (taking another slot) fines the points over their cap. Everyone else is
+    fined for every point over the default cap, and finishing in a slot allocated to someone else is a takeover."""
+    out = []
+    for ev in read('mge/mges.csv'):
+        slots = read(f"mge/{ev['mge']}_slots.csv")
+        slot_of = {key(s): s for s in slots}
+        owner = {int(s['slot']): s['name'] for s in slots}
+        rows = []
+        for r in read(f"mge/{ev['mge']}.csv"):
+            k, rank, pts = key(r), int(r['rank']), num(r['points'])
+            s = slot_of.get(k)
+            cap = (num(s['cap']) if s else num(ev['default_cap']))  # None = no cap
+            slot = int(s['slot']) if s else None
+            over = max(0, pts - cap) if cap is not None else 0
+            if s and rank >= slot:
+                over = 0  # kept (or fell below) their allocated rank: listed points are only a guide
+            took = rank if rank in owner and slot != rank and (slot is None or rank < slot) and over else None
+            acc = accounts.get(k, {})
+            rows.append(dict(key=k, name=r['name'], rank=rank, points=pts, slot=slot, cap=cap, over=over,
+                             fine=over * MGE_FINE['gold'], took=took, took_from=owner.get(took, ''),
+                             type=acc.get('type') or 'main', role=acc.get('role', '')))
+        out.append((ev, rows))
+    return out
+
+
+def mge_label(ev):
+    s, e = date.fromisoformat(ev['start']), date.fromisoformat(ev['end'])
+    return f"MGE {ev['troop']} {s.day}–{e.day} {e:%b %Y}" if s.month == e.month else \
+        f"MGE {ev['troop']} {s.day} {s:%b}–{e.day} {e:%b %Y}"
+
+
+def rss(over):
+    """Fine for points over the cap, in each resource it can be paid with."""
+    return ' / '.join(f'{gold(over * v).replace(" gold", "")} {r.capitalize()}' for r, v in MGE_FINE.items())
+
+
+def write_mge(mges, paid):
+    """mge_log.csv, reports/mge-<start>.md and mails/mge-<start>/ for every MGE."""
+    with open(os.path.join(HERE, 'mge_log.csv'), 'w', newline='', encoding='utf-8-sig') as f:
+        w = csv.writer(f)
+        w.writerow(['mge', 'governor_id', 'name', 'rank', 'points', 'slot', 'cap', 'over', 'took_slot',
+                    'fine_gold', 'paid_gold'])
+        for ev, rows in mges:
+            for r in rows:
+                if r['over'] or r['took']:
+                    w.writerow([ev['mge'], r['key'], r['name'], r['rank'], r['points'], r['slot'] or '',
+                                r['cap'] or '', r['over'], r['took'] or '', r['fine'],
+                                paid.get((r['key'], 'mge:' + ev['mge']), 0)])
+    for ev, rows in mges:
+        title, dcap = mge_label(ev), num(ev['default_cap'])
+        fined = sorted([r for r in rows if r['over']], key=lambda r: -r['over'])
+        slots = [r for r in rows if r['slot']]
+        out = [f'# {title}', '',
+               f'Top-10 slots may pass their listed points if they keep their rank. Everyone else: max '
+               f'**{dcap / 1e6:g}M points**. Fine per point over: ' +
+               ', '.join(f'{v:,} {r}' for r, v in MGE_FINE.items()) + ' (one resource or a mix).', '',
+               '## Top-10 slots', '', '| Slot | Player | Limit | Finished | Points | Result |', '|---|---|---|---|---|---|']
+        held = {r['key']: r for r in slots}
+        for s in read(f"mge/{ev['mge']}_slots.csv"):
+            r = held.get(key(s))
+            if not r:
+                out.append(f"| {s['slot']} | {s['name']} | {short(num(s['cap']))} | - | - | Not in the captured ranks |")
+                continue
+            res = 'Held slot' if r['rank'] == r['slot'] else 'Took a higher slot' if r['rank'] < r['slot'] else 'Below slot'
+            out.append(f"| {r['slot']} | {r['name']} | {short(r['cap'])} | {r['rank']} | {r['points']:,} | {res} |")
+        out += ['', '## Over the limit', '', '| Rank | Player | Points | Limit | Over | Takeover | Fine (gold) | Or |',
+                '|---|---|---|---|---|---|---|---|']
+        for r in fined:
+            tk = f"slot {r['took']} ({r['took_from']})" if r['took'] else '-'
+            out.append(f"| {r['rank']} | {r['name']} | {r['points']:,} | {short(r['cap'])} | {r['over']:,} | {tk} | "
+                       f"{gold(r['fine'])} | {rss(r['over'])} |")
+        out += ['', f"Ranking captured: ranks 1–{max(r['rank'] for r in rows)}.", '']
+        with open(os.path.join(HERE, 'reports', f"mge-{ev['mge']}.md"), 'w', encoding='utf-8') as f:
+            f.write('\n'.join(out))
+
+        head = lambda t: [f'<size=30><b>3514 | {t}</b></size>', f'<b>{title}</b>', '',
+                          '<size=24><color=navy>══════ ✦ ⚔ ✦ ══════</color></size>', '']
+        intro = [f'These players went over their MGE point limit '
+                 f'(<b>{dcap / 1e6:g}M</b> outside the Top 10, or a Top-10 player who took a higher slot).',
+                 '<i>Name – points – over – fine</i>', '']
+        items = [f"• {r['name']} – {short(r['points'])} – +{r['over']:,}" +
+                 (f" – <color=red>took slot {r['took']}</color>" if r['took'] else '') +
+                 f"\n   {rss(r['over'])}" for r in fined]
+        outro = ['', '<b>FINE PER POINT OVER THE LIMIT</b>',
+                 ' / '.join(f'{v:,} {r.capitalize()}' for r, v in MGE_FINE.items()),
+                 'Pay in one resource or a mix of them.',
+                 f'<b>Send your fine to the bank KD: <color=#DAA520>{BANK}</color></b>', '',
+                 '<b>Respect the allocation. Follow the limit. Do not disrupt Kingdom strategy.</b>']
+        d = os.path.join(HERE, 'mails', f"mge-{ev['mge']}")
+        os.makedirs(d, exist_ok=True)
+        for old in os.listdir(d):
+            os.remove(os.path.join(d, old))
+        parts = split_mail('MGE SANCTIONS', head, intro, items or ['(none)'], outro)
+        for i, body in enumerate(parts):
+            with open(os.path.join(d, f"1_sanctions{f'_part{i + 1}' if len(parts) > 1 else ''}.txt"), 'w',
+                      encoding='utf-8') as f:
+                f.write(body)
+        for name in os.listdir(d):
+            assert len(open(os.path.join(d, name), encoding='utf-8').read()) <= MAIL_LIMIT, name
+
+
+def short(n):
+    return 'No cap' if n is None else f'{round(n / 1e6, 2):g}M' if n >= 1e6 else f'{n:,}'
 
 
 def main():
@@ -244,7 +362,15 @@ def main():
                     'fine_gold', 'total_owed_gold'])
         w.writerows(log)
 
-    write_dashboard(history, state, accounts, fines)
+    mges = mge_results(accounts)
+    for ev, rows in mges:  # MGE fines share the ledger; their payments are keyed by week = "mge:<start>"
+        for r in rows:
+            if r['fine']:
+                fines.append(dict(id=fine_id(r['key'], 'mge|' + ev['mge']), k=r['key'], n=r['name'], wk=ev['mge'],
+                                  a=r['fine'], m=r['over'], h=by_hand.get((r['key'], 'mge:' + ev['mge']), 0),
+                                  e=mge_label(ev), pv=ev['final'] != 'yes'))
+    write_mge(mges, paid)
+    write_dashboard(history, state, accounts, fines, mges)
 
 
 def write_report(wk, lines):
@@ -493,7 +619,7 @@ def farm_hints(p, mains):
     return hints
 
 
-def write_dashboard(history, state, accounts, fines):
+def write_dashboard(history, state, accounts, fines, mges):
     """Fill dashboard_template.html with this season's data -> dashboard/index.html (public page).
     Players = everyone in the weekly rankings plus everyone in the latest scan (with Governor ID)."""
     ids, players = {}, []
@@ -547,6 +673,14 @@ def write_dashboard(history, state, accounts, fines):
     for k, i in ids.items():  # kv = past KvKs this governor took part in (matched by Governor ID)
         if k in kv:
             players[i]['kv'] = sorted(kv[k], key=lambda r: r[0])
+    mge = []  # per MGE: rows [rank, player index or None, name then, points, slot, cap, over, fine, took slot]
+    for ev, rows in mges:
+        for r in rows:
+            if r['key'] in ids:
+                players[ids[r['key']]].setdefault('mg', []).append([ev['mge'], r['rank'], r['points'], r['over'], r['fine']])
+        mge.append(dict(s=ev['start'], e=ev['end'], t=ev['troop'], c=num(ev['default_cap']), l=mge_label(ev), f=ev['final'] == 'yes',
+                        r=[[r['rank'], ids.get(r['key']), r['name'], r['points'], r['slot'], r['cap'], r['over'],
+                            r['fine'], r['took']] for r in rows]))
     mains = [p['n'] for p in players if p['t'] == 'main' and p['c']] + [p['n'] for p in players if p['t'] == 'main' and not p['c']]
     for p in players:
         if not p['c']:
@@ -557,6 +691,7 @@ def write_dashboard(history, state, accounts, fines):
     ledger = json.load(open(lp, encoding='utf-8')) if os.path.exists(lp) else {}
     data = dict(weeks=[wk for wk, _ in history], minF=MIN_FORTS, minT=MIN_TECH, players=players,
                 fines=fines, finesUrl=FINES_URL, scanDay=scan_day, namesDay=names_day, mainAlly=MAIN_ALLIANCE, kvks=kvks,
+                mges=mge, mgeFine=MGE_FINE,
                 ledger=dict(paid=ledger.get('paid', {}), accounts=ledger.get('accounts', {})), officers=ledger.get('officers', []),
                 updated=date.today().isoformat())
     with open(os.path.join(HERE, 'dashboard_template.html'), encoding='utf-8') as f:

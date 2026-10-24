@@ -3,9 +3,10 @@
 
 Writes into OUT_DIR:
   start_XX.png   first 1.5 s at 10 fps (rank 1 is only on screen for a moment)
-  stack_XX.png   1 fps frames, cropped to the ranking list, 4 frames per image
+  stack_XX.png   1 fps frames (or --fps), cropped to the ranking list, 4 frames per image
 
-Usage: .venv/bin/python extract_frames.py VIDEO OUT_DIR [--crop L,T,R,B]
+Usage: .venv/bin/python extract_frames.py VIDEO OUT_DIR [--crop L,T,R,B] [--fps N]
+Short, fast-scrolling clips (a few seconds) skip ranks at 1 fps: use --fps 4.
 Default crop fits WhatsApp-compressed 848x392 recordings.
 """
 import argparse
@@ -20,6 +21,7 @@ p.add_argument('video')
 p.add_argument('out')
 p.add_argument('--crop', default='145,95,705,385')
 p.add_argument('--per-image', type=int, default=4)
+p.add_argument('--fps', type=float, default=1)
 a = p.parse_args()
 crop = tuple(int(v) for v in a.crop.split(','))
 raw = os.path.join(a.out, 'raw')
@@ -27,7 +29,7 @@ os.makedirs(raw, exist_ok=True)
 
 subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', a.video, '-t', '1.5', '-vf', 'fps=10',
                 os.path.join(a.out, 'start_%02d.png')], check=True)
-subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', a.video, '-vf', 'fps=1',
+subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', a.video, '-vf', f'fps={a.fps:g}',
                 os.path.join(raw, '%03d.png')], check=True)
 
 frames = sorted(glob.glob(os.path.join(raw, '*.png')))

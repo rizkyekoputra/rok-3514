@@ -168,6 +168,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
     <button data-tab="players" type="button">Players</button>
     <button data-tab="activity" type="button">Weekly activity</button>
     <button data-tab="fines" type="button">Fines</button>
+    <button data-tab="mge" id="mgeTabBtn" type="button" hidden>MGE</button>
     <button data-tab="kvk" type="button">KvK history</button>
     <button data-tab="review" id="reviewTabBtn" type="button" hidden>Review <span class="badge" id="reviewCount"></span></button>
   </nav>
@@ -256,7 +257,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
   <section data-panel="fines" hidden>
     <div class="card" id="finesCard">
       <h2>Fines</h2>
-      <div class="sub" id="finesSub">Fines from the 2nd offense on, and whether they have been paid.</div>
+      <div class="sub" id="finesSub">Fines and whether they have been paid.</div>
       <div class="controls">
         <input type="search" id="finesSearch" placeholder="Filter by name…" autocomplete="off">
         <select id="finesSel">
@@ -267,13 +268,41 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       </div>
       <div class="table-wrap"><table>
         <thead><tr>
-          <th>Player</th><th id="finesActTh" hidden></th><th>Week</th><th class="num">Missing forts</th><th class="num">Fine</th><th>Status</th>
+          <th>Player</th><th id="finesActTh" hidden></th><th>Week / event</th><th class="num">Reason</th><th class="num">Fine</th><th>Status</th>
         </tr></thead>
         <tbody id="finesBody"></tbody>
       </table></div>
       <div class="sub" id="finesCount"></div>
     </div>
 
+  </section>
+
+  <section data-panel="mge" hidden>
+    <div class="controls">
+      <label class="sub" for="mgeSel">Event</label>
+      <select id="mgeSel"></select>
+    </div>
+    <div class="tiles" id="mgeTiles"></div>
+    <div class="card">
+      <h2>Ranking</h2>
+      <div class="sub" id="mgeSub"></div>
+      <div class="controls">
+        <input type="search" id="mgeSearch" placeholder="Filter by name…" autocomplete="off">
+        <select id="mgeShow">
+          <option value="all">Everyone captured</option>
+          <option value="over">Over the limit</option>
+          <option value="slots">Top-10 slots</option>
+        </select>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th class="num">Rank</th><th>Player</th><th>Slot</th><th class="num">Limit</th><th class="num">Points</th>
+          <th class="num">Over</th><th class="num">Fine (gold)</th><th>Status</th>
+        </tr></thead>
+        <tbody id="mgeBody"></tbody>
+      </table></div>
+      <div class="sub" id="mgeCount"></div>
+    </div>
   </section>
 
   <section data-panel="kvk" hidden>
@@ -559,6 +588,11 @@ function renderPlayer() {
         <td>${r[7] === p.n ? '<span class="muted">same</span>' : esc(r[7])}</td><td>${r[6] ? r[6][0].toUpperCase() + r[6].slice(1) : '–'}</td>
         <td class="num">${kvResult(r)} <span class="muted">${KVK[r[0]] ? KVK[r[0]].m : ''}</span></td><td class="num">${kvPct(r)}</td>
         <td style="white-space:normal">${kvNote(r)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+    ${p.mg && officer ? `<div class="p-sec">MGE</div><div class="table-wrap"><table class="kv">
+      <thead><tr><th>Event</th><th class="num">Rank</th><th class="num">Points</th><th class="num">Over limit</th><th>Fine</th></tr></thead>
+      <tbody>${p.mg.slice().reverse().map(([s, rank, pts, over, fine]) => { const f = mgeFine(s, P.indexOf(p));
+        return `<tr style="cursor:default"><td>${esc(MGE[s] ? MGE[s].l : s)}</td><td class="num">${rank}</td><td class="num">${fmt(pts)}</td>
+        <td class="num">${over ? fmt(over) : '–'}</td><td>${f ? fineStatus(f) : '<span class="muted">–</span>'}</td></tr>`; }).join('')}</tbody></table></div>` : ''}
     ${!p.c && p.h && p.h.length ? `<div class="p-sec">Farm hints</div><div class="hints">${p.h.map(h => `<span class="chip">${esc(h)}</span>`).join('')}</div>` : ''}
     ${kingdom}${activity}
     ${ranked ? `<div class="grid2" style="margin-top:16px">
@@ -637,6 +671,44 @@ $('kvkHead').addEventListener('click', e => {
   const k = +th.dataset.kv; kvSortDir = kvSortK === k ? -kvSortDir : -1; kvSortK = k; renderKvk();
 });
 
+// ---------- MGE tab ----------
+// an MGE row: [rank, player index or null, name then, points, slot, limit (null = no cap), over, fine, took slot]
+const MGE = Object.fromEntries((DATA.mges || []).map(m => [m.s, m]));
+const mgeFine = (s, i, name) => F.find(f => f.e && f.wk === s && (i != null ? f.p === i : f.n === name));
+const fineStatus = f => { const paid = paidOf(f); return paid >= f.a ? '<span class="paid">✓ Paid</span>' : paid ? `${gold(paid)} of ${gold(f.a)} paid` : '<span class="below">Unpaid</span>'; };
+function renderMge() {
+  const m = MGE[$('mgeSel').value];
+  if (!m) { $('mgeBody').innerHTML = '<tr><td colspan="8" class="empty">No MGE data yet.</td></tr>'; return; }
+  const q = $('mgeSearch').value.trim().toLowerCase(), show = $('mgeShow').value;
+  const name = r => r[1] != null ? P[r[1]].n : r[2];
+  const rows = m.r.filter(r => (!q || name(r).toLowerCase().includes(q) || r[2].toLowerCase().includes(q)) &&
+    (show === 'all' || (show === 'over' ? r[6] > 0 : r[4] != null)));
+  const fines = m.r.filter(r => r[7]).map(r => mgeFine(m.s, r[1], r[2])).filter(Boolean);
+  const owed = fines.reduce((a, f) => a + Math.max(0, f.a - paidOf(f)), 0), slots = m.r.filter(r => r[4] != null);
+  $('mgeTiles').innerHTML = [
+    [`${slots.filter(r => r[0] === r[4]).length}/10`, 'Top-10 slots held by their player'],
+    [m.r.filter(r => r[8]).length, 'Takeovers (slot taken by someone else)'],
+    [fines.length, 'Players over the limit'],
+    [gold(fines.reduce((a, f) => a + f.a, 0)), 'Fines (gold value)'],
+    [gold(owed), 'Still unpaid (gold value)'],
+  ].map(([v, l]) => `<div class="tile"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+  $('mgeBody').innerHTML = rows.map(r => {
+    const f = r[7] ? mgeFine(m.s, r[1], r[2]) : null;
+    const slot = r[4] == null ? '<span class="muted">–</span>' : r[0] === r[4] ? `${r[4]} <span class="paid">held</span>`
+      : r[0] < r[4] ? `${r[4]} <span class="below">took a higher slot</span>` : `${r[4]} <span class="muted">finished lower</span>`;
+    const took = r[8] ? ` <span class="chip"><span class="dot" style="background:var(--critical)"></span>took slot ${r[8]}</span>` : '';
+    return `<tr${r[1] != null ? ` data-i="${r[1]}"` : ''}><td class="num">${r[0]}</td><td>${esc(name(r))}${took}</td><td>${slot}</td>
+      <td class="num">${r[5] == null ? 'No cap' : short(r[5])}</td><td class="num">${fmt(r[3])}</td>
+      <td class="num">${r[6] ? `<span class="below">${fmt(r[6])}</span>` : '<span class="muted">–</span>'}</td>
+      <td class="num">${r[7] ? gold(r[7]) : '–'}</td><td>${f ? fineStatus(f) : r[4] != null && r[0] >= r[4] ? '<span class="muted">Within allocation</span>' : '<span class="paid">OK</span>'}</td></tr>`;
+  }).join('') || '<tr><td colspan="8" class="empty">No players match.</td></tr>';
+  $('mgeCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'} · ranks 1–${m.r.length} captured`;
+  $('mgeSub').textContent = `${m.l}${m.f ? '' : ' · PROVISIONAL ranking: fines are not final and cannot be marked paid yet'} · Top-10 slots may go past their listed points as long as they finish at their slot. ` +
+    `Everyone else: max ${short(m.c)} points. Fine per point over: ${Object.entries(DATA.mgeFine).map(([r, v]) => fmt(v) + ' ' + r).join(' / ')} (one or a mix), paid to the bank KD.`;
+}
+$('mgeSel').innerHTML = (DATA.mges || []).slice().reverse().map(m => `<option value="${m.s}">${esc(m.l)}${m.f ? '' : ' (provisional)'}</option>`).join('');
+['mgeSel', 'mgeSearch', 'mgeShow'].forEach(id => $(id).addEventListener('input', renderMge));
+
 // ---------- multi-select (R4 mode): change many accounts at once ----------
 const picked = new Set();  // player indexes ticked in the master list
 let rosterShown = [];      // selectable rows currently shown (for "select all")
@@ -663,7 +735,7 @@ $('rosterAll').addEventListener('change', e => {
 // the change at once and refreshes everything from the sheet in the background.
 function saving(b) { b.disabled = true; b.dataset.label = b.textContent; b.textContent = 'Saving…'; }
 function notSaved(b, err) { alert('Not saved: ' + err.message + '. Try again.'); b.disabled = false; b.textContent = b.dataset.label; }
-function saved() { renderOfficer(); renderFines(); renderPlayer(); renderTable(); renderRoster(); renderReview(); loadLedger(); }
+function saved() { renderMge(); renderOfficer(); renderFines(); renderPlayer(); renderTable(); renderRoster(); renderReview(); loadLedger(); }
 function typeSaved(ids, type, approved) {
   const now = new Date().toISOString();
   ids.forEach(id => { changes[id] = approved ? {type, by: officer, decided: now} : {...changes[id], pending: {type, by: officer, time: now}}; });
@@ -734,7 +806,22 @@ const F = DATA.fines || [];
 let ledger = null, officer = null, approver = false, r4key = null;  // ledger: {fine_id: {amount, by, time}} once loaded
 let changes = {};  // account_id -> {type, by, decided, pending: {type, by, time}} from the ledger
 const paidOf = f => (f.h || 0) + (ledger && ledger[f.id] ? ledger[f.id].amount : 0);
-const unpaidOf = p => ledger ? F.filter(f => P[f.p] === p).reduce((a, f) => a + Math.max(0, f.a - paidOf(f)), 0) : p.u;
+// MGE is R4-only for now: its tab, fines and pop-up section show in R4 mode only
+const shownFines = () => F.filter(f => !f.e || officer);
+// MGE fines carry e (event label) and m = points over the limit; fort fines have m = missing forts
+const fineWhen = f => f.e ? esc(f.e) : weekLabel(f.wk);
+const fineWhy = f => f.e ? `${fmt(f.m)} pts over` : `${f.m} forts short`;
+// Fines can be paid in food/wood/stone/gold (or a mix); MGE_RATE = gold value of one unit of each resource.
+const MGE_RATE = Object.fromEntries(Object.entries(DATA.mgeFine || {gold: 1}).map(([r, v]) => [r, (DATA.mgeFine || {gold: 1}).gold / v]));
+const inRss = a => Object.entries(MGE_RATE).map(([r, x]) => `${gold(a / x)} ${r}`).join(' / ');
+// "9M", "9,000,000", "300M food 200M wood 50M gold" -> gold value, or NaN
+function paidValue(v) {
+  const txt = String(v).toLowerCase().replace(/,/g, ''), re = /([\d.]+)\s*([kmb]?)\s*(food|wood|stone|gold)?/g;
+  let total = 0, n = 0;
+  for (const m of txt.matchAll(re)) { total += Number(m[1]) * ({k: 1e3, m: 1e6, b: 1e9}[m[2]] || 1) * MGE_RATE[m[3] || 'gold']; n++; }
+  return n && !txt.replace(re, '').replace(/[\s+&/]|and/g, '') ? total : NaN;
+}
+const unpaidOf = p => ledger ? shownFines().filter(f => P[f.p] === p).reduce((a, f) => a + Math.max(0, f.a - paidOf(f)), 0) : p.u;
 
 // R4 mode only while ?key= is in the address; nothing is stored, so the plain link is always read-only.
 function readKey() {
@@ -770,7 +857,7 @@ async function loadLedger() {
       if (attempt === 2) $('finesSub').textContent = `Could not reach the sheet just now; showing data from the last update (${DATA.updated}).`;
     }
   }
-  renderOfficer(); renderFines(); renderPlayer(); renderTable(); renderRoster(); renderReview();
+  renderOfficer(); renderFines(); renderPlayer(); renderTable(); renderRoster(); renderReview(); renderMge();
 }
 
 function renderOfficer() {
@@ -782,12 +869,12 @@ function renderOfficer() {
     : `<span>This R4 link is not valid or has been revoked. Ask the admin for a new one.</span><button class="act ghost" id="logoutBtn" type="button">Dismiss</button>`;
   const b = $('logoutBtn'); if (b) b.addEventListener('click', forgetKey);
   $('finesActTh').hidden = !officer;
-  $('reviewTabBtn').hidden = !officer;
+  $('reviewTabBtn').hidden = $('mgeTabBtn').hidden = !officer;
 }
 
 function renderFines() {
   const q = $('finesSearch').value.trim().toLowerCase(), sel = $('finesSel').value;
-  const rows = F.map(f => ({f, paid: paidOf(f), name: f.p != null ? P[f.p].n : f.n}))
+  const rows = shownFines().map(f => ({f, paid: paidOf(f), name: f.p != null ? P[f.p].n : f.n}))
     .filter(r => (!q || r.name.toLowerCase().includes(q) || r.f.n.toLowerCase().includes(q)) &&
       (sel === 'all' || (sel === 'paid') === (r.paid >= r.f.a)))
     .sort((a, b) => b.f.wk.localeCompare(a.f.wk) || b.f.a - a.f.a);
@@ -795,11 +882,11 @@ function renderFines() {
     const l = ledger && ledger[f.id], full = paid >= f.a;
     const status = full ? `<span class="paid">✓ Paid</span>${l ? ` <span class="muted">${esc(l.by)}, ${l.time.slice(0, 10)}</span>` : ''}`
       : paid ? `${gold(paid)} of ${gold(f.a)} paid${l ? ` <span class="muted">${esc(l.by)}</span>` : ''}` : '<span class="below">Unpaid</span>';
-    const act = !officer ? '' : `<td>${l ? `<button class="act ghost" data-undo="${f.id}" type="button">Undo</button>`
+    const act = !officer ? '' : f.pv ? '<td><span class="muted">Provisional</span></td>' : `<td>${l ? `<button class="act ghost" data-undo="${f.id}" type="button">Undo</button>`
       : `<button class="act" data-pay="${f.id}" type="button">Mark paid</button>`}</td>`;
-    return `<tr${f.p != null ? ` data-i="${f.p}"` : ''}><td>${esc(name)}</td>${act}<td>${weekLabel(f.wk)}</td><td class="num">${f.m}</td><td class="num">${gold(f.a)}</td><td>${status}</td></tr>`;
+    return `<tr${f.p != null ? ` data-i="${f.p}"` : ''}><td>${esc(name)}</td>${act}<td>${fineWhen(f)}</td><td class="num">${fineWhy(f)}</td><td class="num">${gold(f.a)}</td><td>${status}</td></tr>`;
   }).join('') || `<tr><td colspan="${officer ? 6 : 5}" class="empty">No fines match.</td></tr>`;
-  const owed = F.reduce((a, f) => a + Math.max(0, f.a - paidOf(f)), 0);
+  const owed = shownFines().reduce((a, f) => a + Math.max(0, f.a - paidOf(f)), 0);
   $('finesCount').textContent = `${rows.length} fine${rows.length === 1 ? '' : 's'} · ${gold(owed)} gold still unpaid in total` +
     (ledger ? '' : ' (last published totals)');
 }
@@ -878,11 +965,12 @@ $('finesBody').addEventListener('click', async e => {
   let action = 'undo', amount = 0;
   if (b.dataset.pay) {
     const due = f.a - (f.h || 0);
-    const v = prompt(`Gold paid by ${name} for ${weekLabel(f.wk)} (fine ${gold(f.a)}). You can type 9M or 9000000:`, due);
+    const v = prompt(`Paid by ${name} for ${f.e || weekLabel(f.wk)}. Fine ${gold(f.a)} gold = ${inRss(f.a)}.\n` +
+      `Type gold (9M or 9000000), or what they sent, mixed if needed: 300M food 200M wood 50M gold`, due);
     if (v == null) return;
-    const m = String(v).trim().toUpperCase().match(/^([\d.,]+)\s*([KMB]?)$/);  // "9M", "1.5B", "9,000,000"
-    amount = m ? Number(m[1].replace(/,/g, '')) * ({K: 1e3, M: 1e6, B: 1e9}[m[2]] || 1) : NaN;
-    if (!(amount > 0)) return alert('Enter the amount of gold paid.');
+    amount = Math.round(paidValue(v));
+    if (!(amount > 0)) return alert('Enter what was paid, e.g. 9M (gold) or 300M food 50M gold.');
+    if (/[a-z]/i.test(v) && !confirm(`Record ${gold(amount)} gold value for ${name}?`)) return;
     action = 'paid';
   } else if (!confirm(`Undo the payment recorded for ${name} (${weekLabel(f.wk)})?`)) return;
   saving(b);
@@ -897,7 +985,7 @@ $('finesBody').addEventListener('click', async e => {
 ['finesSearch', 'finesSel'].forEach(id => $(id).addEventListener('input', renderFines));
 
 // ---------- tabs (#t=players|activity|fines|review, plus p=<name> on the players tab) ----------
-const TABS = ['players', 'activity', 'fines', 'kvk', 'review'];
+const TABS = ['players', 'activity', 'fines', 'mge', 'kvk', 'review'];
 let tab = 'activity';
 function setHash() {
   const q = new URLSearchParams({t: tab});
@@ -908,12 +996,13 @@ function renderSubtitle() {
   $('subtitle').textContent =
     tab === 'activity' ? `${weekLabel(week)} ${week.slice(0, 4)}${partial(week) ? ` · partial data (${seen(week)} of ${maxSeen} players captured)` : ''} · minimum ${DATA.minF} forts and ${fmt(DATA.minT)} tech per week`
     : tab === 'players' ? `${fmt(P.length)} governors · alliances from the scan of ${dayLabel(DATA.scanDay)}` + (DATA.namesDay ? ` · names and power from the member export of ${dayLabel(DATA.namesDay)}` : '')
-    : tab === 'fines' ? 'Fort fines from the 2nd offense on, and whether they have been paid'
+    : tab === 'fines' ? 'Fines and whether they have been paid'
+    : tab === 'mge' ? 'Mightiest Governor: point limits, takeovers and fines'
     : tab === 'kvk' ? 'Past KvK results of governors still in the kingdom'
     : 'Farm and main account changes waiting for approval';
 }
 function showTab(t) {
-  tab = TABS.includes(t) && (t !== 'review' || officer) ? t : 'activity';
+  tab = TABS.includes(t) && (!['review', 'mge'].includes(t) || officer) ? t : 'activity';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   document.querySelectorAll('section[data-panel]').forEach(sec => { sec.hidden = sec.dataset.panel !== tab; });
   renderSubtitle();
@@ -939,7 +1028,7 @@ function selectPlayer(p) {
 function closePlayer() { $('playerDlg').close(); }
 
 function renderAll() {
-  renderSubtitle(); renderTiles(); renderTable(); renderRoster(); renderReview(); renderKvk();
+  renderSubtitle(); renderTiles(); renderTable(); renderRoster(); renderReview(); renderKvk(); renderMge();
   if (tab === 'activity') renderOverview();
   renderPlayer();
 }
@@ -955,7 +1044,7 @@ document.querySelectorAll('th[data-k]').forEach(th => th.addEventListener('click
   const k = th.dataset.k;
   sortDir = sortK === k ? -sortDir : (k === 'n' || k === 't' ? 1 : -1); sortK = k; renderTable();
 }));
-['tbody', 'rosterBody', 'pendBody', 'queueBody', 'finesBody', 'kvkBody'].forEach(id => $(id).addEventListener('click', e => {
+['tbody', 'rosterBody', 'pendBody', 'queueBody', 'finesBody', 'kvkBody', 'mgeBody'].forEach(id => $(id).addEventListener('click', e => {
   const tr = e.target.closest('tr[data-i]');
   if (tr && !e.target.closest('button, input, td.sel')) selectPlayer(P[+tr.dataset.i]);
 }));
