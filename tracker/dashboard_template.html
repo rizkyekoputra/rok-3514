@@ -237,6 +237,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
           <option value="left">Not in the kingdom now</option>
         </select>
       </div>
+      <div class="tiles" id="rosterTiles"></div>
       <div class="bulk" id="bulkBar" hidden></div>
       <div class="table-wrap"><table>
         <thead><tr>
@@ -808,6 +809,13 @@ function renderRoster() {
   $('rosterActTh').hidden = $('rosterSelTh').hidden = !officer;
   renderBulk();
   const gone = rows.filter(p => p.x).length;
+  // totals of the governors shown; a missing power / kill points (not in the scan) counts as 0 and is noted
+  const sum = k => rows.reduce((a, p) => a + (p[k] || 0), 0), unknown = k => rows.filter(p => p[k] == null).length;
+  $('rosterTiles').innerHTML = [
+    [fmt(rows.length), 'Governors shown', ''],
+    [short(sum('pw')), 'Total power' + (unknown('pw') ? ` · ${unknown('pw')} without data` : ''), fmt(sum('pw'))],
+    [short(sum('kp')), 'Total kill points' + (unknown('kp') ? ` · ${unknown('kp')} without data` : ''), fmt(sum('kp'))],
+  ].map(([v, l, t]) => `<div class="tile"${t ? ` title="${t}"` : ''}><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
   $('rosterCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'}` + (q && !allyAllOn() ? ' · searching all alliances' : '') +
     (gone && t !== 'left' ? ` · ${gone} of them not in the kingdom now` : '');
   $('rosterSub').textContent = `Every governor in the kingdom scan and member export, plus anyone seen in the alliance rankings. CH = city hall level from the CH25 roster (– = not on it: below 25, or not listed yet). Search also finds governors not in the kingdom now (migrated, or still on the last KvK map), from older scans, name lists and KvK sheets. Click a name for details. Events are tracked for ${DATA.mainAlly} only.`;
