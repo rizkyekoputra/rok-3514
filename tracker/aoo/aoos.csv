@@ -1,2 +1,3 @@
-﻿aoo,date,team,opponent,result,score,opponent_score
-2026-10-03,2026-10-03,Team I,[3811]Guards of Glory,defeat,20030,39338
+﻿aoo,date,team,opponent,result,score,opponent_score,final,note
+2026-10-03,2026-10-03,Team I,[3811]Guards of Glory,defeat,20030,39338,yes,Battle report
+2026-10-17,2026-10-17,Team I,[W62F]What The Farm!,,40065,17048,no,"Live Battle Info ranking with 3:38 left (no battle report): final points may be higher, and governors who registered but never entered are not shown"

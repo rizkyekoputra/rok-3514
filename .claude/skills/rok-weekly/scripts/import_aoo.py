@@ -2,7 +2,8 @@
 """Build tracker/aoo/<date>.csv (one Ark of Osiris battle's individual ranking) from a transcribed list.
 
 Input (CSV, header row, one line per registered governor in screen order):
-  list.csv      rank,name,points,kills   (blank points = "Did Not Participate"; kills = the sword column)
+  list.csv      rank,name,points,kills   (blank points = "Did Not Participate"; kills = the sword column, blank when
+                not shown, e.g. a live Battle Info ranking taken during the battle)
 Optional overrides.csv: name,governor_id  (screen name -> ID; empty governor_id keeps a name-only row)
 
 Names are matched to Governor IDs the same way as import_mge.py (accounts, scans, member exports).
@@ -24,7 +25,7 @@ p.add_argument('--overrides')
 p.add_argument('--write', action='store_true')
 a = p.parse_args()
 
-rows = [(int(r['rank']), r['name'].strip(), int(r['points'] or 0), int(r['kills'] or 0)) for r in read(a.list)]
+rows = [(int(r['rank']), r['name'].strip(), int(r['points'] or 0), int(r['kills']) if r['kills'] else '') for r in read(a.list)]
 problems = 0
 ranks = [r[0] for r in rows]
 missing = sorted(set(range(1, max(ranks) + 1)) - set(ranks))

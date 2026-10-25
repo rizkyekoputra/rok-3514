@@ -166,6 +166,9 @@ recording), transcribe `rank,name,points,kills` (blank points for Did Not Partic
 `.venv/bin/python .claude/skills/rok-weekly/scripts/import_aoo.py DATE list.csv` (check `~~`/`--` lines), `--write`, add the
 row to `tracker/aoo/aoos.csv` (team, opponent, result, both scores from the mail header) and `python3 tracker/track.py`.
 Name matching for these importers lives in `scripts/match_names.py`.
+No battle report? A **live Battle Info** ranking (recorded during the battle, 1280×592: `--crop 315,320,965,525 --fps 4`)
+works too: blank kills, `final = no`, blank `result`, the scores shown at that moment and a `note` (time left). The tab
+marks it provisional and shows "Did not participate" as unknown: only governors who entered are listed.
 
 ## Dashboard tabs
 

@@ -19,8 +19,11 @@ Reads:
   mge/<start>.csv   rank, governor_id, name, points: final ranking (import_mge.py)
   canyon/canyons.csv  canyon (= start date), start, end: one row per Canyon Clash
   canyon/<start>.csv  rank, governor_id, name, defenses, attacks: combat statistics (import_canyon.py), attacks out of 3
-  aoo/aoos.csv      aoo (= date), date, team, opponent, result, score, opponent_score: one row per Ark of Osiris battle
-  aoo/<date>.csv    rank, governor_id, name, points, kills: individual ranking (import_aoo.py); points 0 = did not participate
+  aoo/aoos.csv      aoo (= date), date, team, opponent, result, score, opponent_score, final, note: one row per Ark of
+                    Osiris battle; final = no for a live Battle Info ranking taken during the battle (no report: blank
+                    result, scores at that moment, and governors who never entered are not listed)
+  aoo/<date>.csv    rank, governor_id, name, points, kills: individual ranking (import_aoo.py); points 0 = did not
+                    participate; blank kills = not shown (live ranking)
   ledger.json       last pulled ledger state (payments, account changes, SHA-256 of active R4 keys), published so the
                     dashboard works before the slow web app answers
   accounts_online.csv  governor_id, name, type, approved_by, proposed_by, decided: farm/main changes proposed on the
@@ -803,9 +806,9 @@ def write_dashboard(history, state, accounts, fines, mges, canyons, aoos):
             if key(r) in ids:
                 players[ids[key(r)]].setdefault('ao', []).append([ev['aoo'], int(r['rank']), int(r['points'])])
         d = date.fromisoformat(ev['date'])
-        aoo.append(dict(s=ev['date'], l=f"Ark of Osiris {d.day} {d:%b %Y}", tm=ev['team'], op=ev['opponent'], w=ev['result'] == 'victory',
-                        sc=[num(ev['score']), num(ev['opponent_score'])],
-                        r=[[int(r['rank']), ids.get(key(r)), r['name'], int(r['points']), int(r['kills'])] for r in rows]))
+        aoo.append(dict(s=ev['date'], l=f"Ark of Osiris {d.day} {d:%b %Y}", tm=ev['team'], op=ev['opponent'], w=ev['result'],
+                        sc=[num(ev['score']), num(ev['opponent_score'])], f=ev['final'] == 'yes', nt=ev['note'],
+                        r=[[int(r['rank']), ids.get(key(r)), r['name'], int(r['points']), num(r['kills'])] for r in rows]))
     here = [p for p in players if not p.get('x')]  # farm hints only compare governors still in the kingdom
     mains = [p['n'] for p in here if p['t'] == 'main' and p['c']] + [p['n'] for p in here if p['t'] == 'main' and not p['c']]
     for p in here:

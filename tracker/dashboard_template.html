@@ -1182,7 +1182,8 @@ $('ccSel').innerHTML = (DATA.canyons || []).slice().reverse().map(c => `<option 
 ['ccSel', 'ccSearch', 'ccShow'].forEach(id => $(id).addEventListener('input', renderCanyon));
 
 // ---------- Ark of Osiris tab ----------
-// an AoO row: [rank, player index or null, name then, points (0 = did not participate), kills]; sc = [our score, theirs]
+// an AoO row: [rank, player index or null, name then, points (0 = did not participate), kills or null]; sc = [our score, theirs]
+// f = false: a live ranking taken during the battle (w = '' as there is no result; players who never entered are not listed)
 const AOO = Object.fromEntries((DATA.aoos || []).map(a => [a.s, a]));
 const aooStatus = pts => !pts ? '<span class="below">Did not participate</span>'
   : pts < DATA.aooMin ? `<span class="chip"><span class="dot" style="background:var(--warning)"></span>Warning: below ${fmt(DATA.aooMin)}</span>`
@@ -1195,19 +1196,20 @@ function renderAoo() {
   const kind = r => !r[3] ? 'none' : r[3] < DATA.aooMin ? 'low' : 'ok';
   const rows = a.r.filter(r => (!q || name(r).toLowerCase().includes(q) || r[2].toLowerCase().includes(q)) && (show === 'all' || kind(r) === show));
   $('aooTiles').innerHTML = [
-    [a.w ? 'Victory' : 'Defeat', `${fmt(a.sc[0])} – ${fmt(a.sc[1])} vs ${esc(a.op)}`],
-    [a.r.length, 'Registered'],
+    [a.w ? a.w[0].toUpperCase() + a.w.slice(1) : a.sc[0] > a.sc[1] ? 'Leading' : 'Trailing',
+      `${fmt(a.sc[0])} – ${fmt(a.sc[1])} vs ${esc(a.op)}${a.f ? '' : ' (during the battle)'}`],
+    [a.r.length, a.f ? 'Registered' : 'In the battle'],
     [a.r.filter(r => r[3]).length, 'Participated'],
-    [a.r.filter(r => kind(r) === 'none').length, 'Did not participate'],
+    [a.f ? a.r.filter(r => kind(r) === 'none').length : '?', a.f ? 'Did not participate' : 'Did not participate (not shown during the battle)'],
     [a.r.filter(r => kind(r) === 'low').length, `Below ${fmt(DATA.aooMin)} points`],
   ].map(([v, l]) => `<div class="tile"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
   $('aooBody').innerHTML = rows.map(r => `<tr${r[1] != null ? ` data-i="${r[1]}"` : ''}><td class="num">${r[0]}</td><td>${esc(name(r))}</td>
-    <td class="num">${r[3] ? fmt(r[3]) : '–'}</td><td class="num">${r[3] ? fmt(r[4]) : '–'}</td><td>${aooStatus(r[3])}</td></tr>`).join('')
+    <td class="num">${r[3] ? fmt(r[3]) : '–'}</td><td class="num">${r[3] && r[4] != null ? fmt(r[4]) : '–'}</td><td>${aooStatus(r[3])}</td></tr>`).join('')
     || '<tr><td colspan="5" class="empty">No players match.</td></tr>';
-  $('aooCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'} of ${a.r.length} registered`;
-  $('aooSub').textContent = `${a.l} · ${a.tm} · Everyone registered is expected to play: 0 points = did not participate, below ${fmt(DATA.aooMin)} points = warning`;
+  $('aooCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'} of ${a.r.length} ${a.f ? 'registered' : 'in the battle'}`;
+  $('aooSub').textContent = `${a.l} · ${a.tm} · ${a.f ? '' : `PROVISIONAL: ${a.nt}. `}Everyone registered is expected to play: 0 points = did not participate, below ${fmt(DATA.aooMin)} points = warning`;
 }
-$('aooSel').innerHTML = (DATA.aoos || []).slice().reverse().map(a => `<option value="${a.s}">${esc(a.l)} · ${esc(a.tm)}</option>`).join('');
+$('aooSel').innerHTML = (DATA.aoos || []).slice().reverse().map(a => `<option value="${a.s}">${esc(a.l)} · ${esc(a.tm)}${a.f ? '' : ' (live ranking)'}</option>`).join('');
 ['aooSel', 'aooSearch', 'aooShow'].forEach(id => $(id).addEventListener('input', renderAoo));
 
 // ---------- multi-select (R4 mode): change many accounts at once ----------
