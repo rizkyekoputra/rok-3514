@@ -201,6 +201,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
     <button data-tab="activity" type="button">Weekly activity</button>
     <button data-tab="fines" type="button">Fines</button>
     <button data-tab="mge" id="mgeTabBtn" type="button">MGE</button>
+    <button data-tab="canyon" type="button">Canyon Clash</button>
     <button data-tab="kvk" type="button">KvK history</button>
     <button data-tab="review" id="reviewTabBtn" type="button" hidden>Review <span class="badge" id="reviewCount"></span></button>
   </nav>
@@ -339,6 +340,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
           <option value="paid">Paid</option>
           <option value="all">All fines</option>
         </select>
+        <select id="finesEv"></select>
       </div>
       <div class="table-wrap"><table>
         <thead><tr>
@@ -376,6 +378,31 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
         <tbody id="mgeBody"></tbody>
       </table></div>
       <div class="sub" id="mgeCount"></div>
+    </div>
+  </section>
+
+  <section data-panel="canyon" hidden>
+    <div class="controls">
+      <label class="sub" for="ccSel">Event</label>
+      <select id="ccSel"></select>
+    </div>
+    <div class="tiles" id="ccTiles"></div>
+    <div class="card">
+      <h2>Combat statistics</h2>
+      <div class="sub" id="ccSub"></div>
+      <div class="controls">
+        <input type="search" id="ccSearch" placeholder="Filter by name…" autocomplete="off">
+        <select id="ccShow">
+          <option value="all">Everyone</option>
+          <option value="full">Used all attacks</option>
+          <option value="missed">Did not use all attacks</option>
+        </select>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th class="num">#</th><th>Player</th><th class="num">Defenses</th><th class="num">Attacks</th><th>Status</th></tr></thead>
+        <tbody id="ccBody"></tbody>
+      </table></div>
+      <div class="sub" id="ccCount"></div>
     </div>
   </section>
 
@@ -688,6 +715,10 @@ function renderPlayer() {
       <tbody>${p.mg.slice().reverse().map(([s, rank, pts, over, fine]) => { const f = mgeFine(s, P.indexOf(p));
         return `<tr style="cursor:default"><td>${esc(MGE[s] ? MGE[s].l : s)}</td><td class="num">${rank}</td><td class="num">${fmt(pts)}</td>
         <td class="num">${over ? fmt(over) : '–'}</td><td>${f ? fineStatus(f) : '<span class="muted">–</span>'}</td></tr>`; }).join('')}</tbody></table></div>` : ''}
+    ${p.cc ? `<div class="p-sec">Canyon Clash</div><div class="table-wrap"><table class="kv">
+      <thead><tr><th>Event</th><th class="num">Defenses</th><th class="num">Attacks</th></tr></thead>
+      <tbody>${p.cc.slice().reverse().map(([s, dfn, att]) => `<tr style="cursor:default"><td>${esc(CANYON[s] ? CANYON[s].l : s)}</td>
+        <td class="num">${dfn}</td><td class="num">${ccAttacks(att, CANYON[s] ? CANYON[s].n : 3)}</td></tr>`).join('')}</tbody></table></div>` : ''}
     ${!p.c && p.h && p.h.length ? `<div class="p-sec">Farm hints</div><div class="hints">${p.h.map(h => `<span class="chip">${esc(h)}</span>`).join('')}</div>` : ''}
     ${kingdom}${activity}
     ${ranked ? `<div class="grid2" style="margin-top:16px">
@@ -1091,6 +1122,34 @@ function renderMge() {
 $('mgeSel').innerHTML = (DATA.mges || []).slice().reverse().map(m => `<option value="${m.s}">${esc(m.l)}${m.f ? '' : ' (provisional)'}</option>`).join('');
 ['mgeSel', 'mgeSearch', 'mgeShow'].forEach(id => $(id).addEventListener('input', renderMge));
 
+// ---------- Canyon Clash tab ----------
+// a Canyon Clash row: [rank, player index or null, name then, defenses, attacks used]; n = attacks each governor gets
+const CANYON = Object.fromEntries((DATA.canyons || []).map(c => [c.s, c]));
+const ccAttacks = (att, n) => att >= n ? `<span class="paid">${att}/${n}</span>` : `<span class="below">${att}/${n}</span>`;
+function renderCanyon() {
+  const c = CANYON[$('ccSel').value];
+  if (!c) { $('ccBody').innerHTML = '<tr><td colspan="5" class="empty">No Canyon Clash data yet.</td></tr>'; return; }
+  const q = $('ccSearch').value.trim().toLowerCase(), show = $('ccShow').value;
+  const name = r => r[1] != null ? P[r[1]].n : r[2];
+  const rows = c.r.filter(r => (!q || name(r).toLowerCase().includes(q) || r[2].toLowerCase().includes(q)) &&
+    (show === 'all' || (show === 'full') === (r[4] >= c.n)));
+  const full = c.r.filter(r => r[4] >= c.n).length, none = c.r.filter(r => !r[4]).length;
+  $('ccTiles').innerHTML = [
+    [c.r.length, 'Governors in the event'],
+    [full, `Used all ${c.n} attacks`],
+    [c.r.length - full - none, 'Used some attacks'],
+    [none, 'Used no attacks'],
+  ].map(([v, l]) => `<div class="tile"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+  $('ccBody').innerHTML = rows.map(r => `<tr${r[1] != null ? ` data-i="${r[1]}"` : ''}><td class="num">${r[0]}</td><td>${esc(name(r))}</td>
+    <td class="num">${r[3]}</td><td class="num">${ccAttacks(r[4], c.n)}</td>
+    <td>${r[4] >= c.n ? '<span class="paid">All attacks used</span>' : `<span class="below">${c.n - r[4]} unused</span>`}</td></tr>`).join('')
+    || '<tr><td colspan="5" class="empty">No players match.</td></tr>';
+  $('ccCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'} of ${c.r.length}`;
+  $('ccSub').textContent = `${c.l} · ${c.n} attacks per governor · in-game order (defenses, highest first)`;
+}
+$('ccSel').innerHTML = (DATA.canyons || []).slice().reverse().map(c => `<option value="${c.s}">${esc(c.l)}</option>`).join('');
+['ccSel', 'ccSearch', 'ccShow'].forEach(id => $(id).addEventListener('input', renderCanyon));
+
 // ---------- multi-select (R4 mode): change many accounts at once ----------
 const picked = new Set();  // player indexes ticked in the master list
 let rosterShown = [];      // selectable rows currently shown (for "select all")
@@ -1195,6 +1254,9 @@ const ORD = n => n + (['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 
 // Fine label: the MGE event, or "Weekly Fort 12–18 Oct 2nd Offense" (o = offense number of a fort fine)
 const fineLabel = f => f.e || `Weekly Fort ${weekLabel(f.wk)}` + (f.o ? ` ${ORD(f.o)} Offense` : '');
 const fineWhen = f => esc(fineLabel(f));
+// Event of a fine for the Fines filter: "mge:<start>" or "fort:<monday>"; label without the offense number
+const fineEv = f => (f.e ? 'mge:' : 'fort:') + f.wk;
+const fineEvLabel = f => f.e || `Weekly Fort ${weekLabel(f.wk)} ${f.wk.slice(0, 4)}`;
 const fineWhy = f => f.e ? `${fmt(f.m)} pts over` : `${f.m} forts short`;
 const unpaidOf = p => ledger ? shownFines().filter(f => P[f.p] === p).reduce((a, f) => a + Math.max(0, f.a - paidOf(f)), 0) : p.u;
 
@@ -1249,10 +1311,11 @@ function renderOfficer() {
 
 function renderFines() {
   renderClaims();
-  const q = $('finesSearch').value.trim().toLowerCase(), sel = $('finesSel').value;
+  const q = $('finesSearch').value.trim().toLowerCase(), sel = $('finesSel').value, ev = $('finesEv').value;
   const rows = shownFines().map(f => ({f, paid: paidOf(f), name: f.p != null ? P[f.p].n : f.n}))
     .filter(r => (!q || r.name.toLowerCase().includes(q) || r.f.n.toLowerCase().includes(q)) &&
-      (sel === 'all' || (sel === 'paid') === (r.paid >= r.f.a)))
+      (sel === 'all' || (sel === 'paid') === (r.paid >= r.f.a)) &&
+      (ev === 'all' || (ev === 'fort' ? !r.f.e : fineEv(r.f) === ev)))
     .sort((a, b) => b.f.wk.localeCompare(a.f.wk) || b.f.a - a.f.a);
   $('finesBody').innerHTML = rows.map(({f, paid, name}) => {
     const l = ledger && ledger[f.id], full = paid >= f.a;
@@ -1401,10 +1464,13 @@ function openPay(f) {
   $('payDlg').showModal();
   inputs()[0].focus();
 }
-['finesSearch', 'finesSel'].forEach(id => $(id).addEventListener('input', renderFines));
+$('finesEv').innerHTML = '<option value="all">All events</option><option value="fort">Weekly Fort (all weeks)</option>' +
+  [...new Map(shownFines().slice().sort((a, b) => b.wk.localeCompare(a.wk)).map(f => [fineEv(f), fineEvLabel(f)]))]
+    .map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('');
+['finesSearch', 'finesSel', 'finesEv'].forEach(id => $(id).addEventListener('input', renderFines));
 
 // ---------- tabs (#t=players|activity|fines|review, plus p=<name> on the players tab) ----------
-const TABS = ['players', 'activity', 'fines', 'mge', 'kvk', 'review'];
+const TABS = ['players', 'activity', 'fines', 'mge', 'canyon', 'kvk', 'review'];
 let tab = 'activity';
 function setHash() {
   const q = new URLSearchParams({t: tab});
@@ -1417,6 +1483,7 @@ function renderSubtitle() {
     : tab === 'players' ? `${fmt(P.filter(p => !p.x).length)} governors · alliances from the scan of ${dayLabel(DATA.scanDay)}` + (DATA.namesDay ? ` · names and power from the member export of ${dayLabel(DATA.namesDay)}` : '')
     : tab === 'fines' ? 'Fines and whether they have been paid'
     : tab === 'mge' ? 'Mightiest Governor: point limits, takeovers and fines'
+    : tab === 'canyon' ? 'Canyon Clash: who used all their attacks'
     : tab === 'kvk' ? 'Past KvK results, including governors not in the kingdom now'
     : 'Farm and main account changes waiting for approval';
 }
@@ -1447,7 +1514,7 @@ function selectPlayer(p) {
 function closePlayer() { $('playerDlg').close(); }
 
 function renderAll() {
-  renderSubtitle(); renderTiles(); renderTable(); renderRoster(); renderReview(); renderKvk(); renderMge();
+  renderSubtitle(); renderTiles(); renderTable(); renderRoster(); renderReview(); renderKvk(); renderMge(); renderCanyon();
   if (tab === 'activity') renderOverview();
   renderPlayer();
 }

@@ -17,6 +17,8 @@ Reads:
   mge/<start>_slots.csv  slot, name, governor_id, cap, tier: the Top-10 allocation (blank cap = no cap; slots with the
                     same tier, e.g. 7-10 with the same reward, may swap places freely)
   mge/<start>.csv   rank, governor_id, name, points: final ranking (import_mge.py)
+  canyon/canyons.csv  canyon (= start date), start, end: one row per Canyon Clash
+  canyon/<start>.csv  rank, governor_id, name, defenses, attacks: combat statistics (import_canyon.py), attacks out of 3
   ledger.json       last pulled ledger state (payments, account changes, SHA-256 of active R4 keys), published so the
                     dashboard works before the slow web app answers
   accounts_online.csv  governor_id, name, type, approved_by, proposed_by, decided: farm/main changes proposed on the
@@ -73,6 +75,7 @@ R4_REWARD = 'Advanced Trophy'
 # MGE: fine per point over the player's cap, payable in one resource or a mix (in gold-equivalent, food = wood = 2 gold
 # and stone = 1.5 gold per unit of value, the same rates as the fort fines). Caps live in mge/mges.csv and mge/<start>_slots.csv.
 MGE_FINE = {'food': 1000, 'wood': 1000, 'stone': 750, 'gold': 500}
+CANYON_ATTACKS = 3  # attacks each governor gets in a Canyon Clash
 MGE_CONTACTS = ['ＡＧＡＭ', 'Totos メtreme']  # named in the sanctions mail for working out a mixed payment
 
 FORT_FINE = {2: 500_000, 3: 1_000_000}  # gold per missing fort at the 2nd and 3rd offense
@@ -226,10 +229,18 @@ def mge_results(accounts):
     return out
 
 
-def mge_label(ev):
+def canyon_results():
+    """[(event, rows)] per Canyon Clash, oldest first; rows in the in-game order (defenses, highest first)."""
+    return [(ev, read(f"canyon/{ev['canyon']}.csv")) for ev in read('canyon/canyons.csv')]
+
+
+def event_label(name, ev):
     s, e = date.fromisoformat(ev['start']), date.fromisoformat(ev['end'])
-    return f"MGE {ev['troop']} {s.day}–{e.day} {e:%b %Y}" if s.month == e.month else \
-        f"MGE {ev['troop']} {s.day} {s:%b}–{e.day} {e:%b %Y}"
+    return f"{name} {s.day}–{e.day} {e:%b %Y}" if s.month == e.month else f"{name} {s.day} {s:%b}–{e.day} {e:%b %Y}"
+
+
+def mge_label(ev):
+    return event_label(f"MGE {ev['troop']}", ev)
 
 
 def pay(n):
@@ -427,7 +438,7 @@ def main():
                                   a=r['fine'], m=r['over'], h=by_hand.get((r['key'], 'mge:' + ev['mge']), 0),
                                   e=mge_label(ev), pv=ev['final'] != 'yes', t='mge'))
     write_mge(mges, paid)
-    write_dashboard(history, state, accounts, fines, mges)
+    write_dashboard(history, state, accounts, fines, mges, canyon_results())
 
 
 def write_report(wk, lines):
@@ -686,7 +697,7 @@ def farm_hints(p, mains):
     return hints
 
 
-def write_dashboard(history, state, accounts, fines, mges):
+def write_dashboard(history, state, accounts, fines, mges, canyons):
     """Fill dashboard_template.html with this season's data -> dashboard/index.html (public page).
     Players = everyone in the weekly rankings plus everyone in the latest scan (with Governor ID), plus governors who
     left the kingdom but are in an older scan, name list or KvK sheet (x = last date seen; found by search only)."""
@@ -771,6 +782,13 @@ def write_dashboard(history, state, accounts, fines, mges):
         mge.append(dict(s=ev['start'], e=ev['end'], t=ev['troop'], c=num(ev['default_cap']), l=mge_label(ev), f=ev['final'] == 'yes',
                         r=[[r['rank'], ids.get(r['key']), r['name'], r['points'], r['slot'], r['cap'], r['over'],
                             r['fine'], r['took']] for r in rows]))
+    canyon = []  # per Canyon Clash: rows [rank, player index or None, name then, defenses, attacks used]
+    for ev, rows in canyons:
+        for r in rows:
+            if key(r) in ids:
+                players[ids[key(r)]].setdefault('cc', []).append([ev['canyon'], int(r['defenses']), int(r['attacks'])])
+        canyon.append(dict(s=ev['start'], e=ev['end'], l=event_label('Canyon Clash', ev), n=CANYON_ATTACKS,
+                           r=[[int(r['rank']), ids.get(key(r)), r['name'], int(r['defenses']), int(r['attacks'])] for r in rows]))
     here = [p for p in players if not p.get('x')]  # farm hints only compare governors still in the kingdom
     mains = [p['n'] for p in here if p['t'] == 'main' and p['c']] + [p['n'] for p in here if p['t'] == 'main' and not p['c']]
     for p in here:
@@ -782,7 +800,7 @@ def write_dashboard(history, state, accounts, fines, mges):
     ledger = json.load(open(lp, encoding='utf-8')) if os.path.exists(lp) else {}
     data = dict(weeks=[wk for wk, _ in history], minF=MIN_FORTS, minT=MIN_TECH, players=players,
                 fines=fines, finesUrl=FINES_URL, scanDay=scan_day, namesDay=names_day, mainAlly=MAIN_ALLIANCE, kvks=kvks,
-                mges=mge, mgeFine=MGE_FINE, fineKinds=FINE_KINDS, bank=BANK, claimsOn=CLAIMS_ON,
+                mges=mge, canyons=canyon, mgeFine=MGE_FINE, fineKinds=FINE_KINDS, bank=BANK, claimsOn=CLAIMS_ON,
                 ledger=dict(paid=ledger.get('paid', {}), accounts=ledger.get('accounts', {})), officers=ledger.get('officers', []),
                 updated=date.today().isoformat())
     with open(os.path.join(HERE, 'dashboard_template.html'), encoding='utf-8') as f:

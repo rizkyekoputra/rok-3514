@@ -29,6 +29,8 @@ to read the rankings accurately, match names to Governor IDs, and keep `accounts
 | `tracker/mge/` | MGE inputs: `mges.csv`, `<start>_slots.csv` (Top-10 allocation), `<start>.csv` (ranking). See **MGE** below |
 | `tracker/mge_log.csv`, `tracker/reports/mge-<start>.md`, `tracker/mails/mge-<start>/` | MGE over-limit fines and takeovers, report, sanctions mail (generated) |
 | `event/mge/<name (dates)>/` | Raw MGE ranking recordings / screenshots the user provides |
+| `tracker/canyon/` | Canyon Clash: `canyons.csv` (`canyon, start, end`), `<start>.csv` (combat statistics). See **Canyon Clash** below |
+| `event/canyon-clash/` | Raw Canyon Clash combat-statistics recordings the user provides |
 | `tracker/dashboard_template.html` → `tracker/dashboard/index.html` | Public dashboard (generated; `dashboard/` is its own git repo) |
 | `tracker/publish.sh` | Rebuilds and pushes the dashboard to GitHub Pages |
 | `weekly-activity/Activity <d-d mon yyyy>/` | Raw ranking screenshots / videos the user provides each week |
@@ -140,6 +142,17 @@ folder, then ask before publishing.
 Rule changes: the default cap is per event (`mges.csv`), Top-10 limits per event (slots file, from the leadership mail),
 fine rates in `MGE_FINE` at the top of `track.py`.
 
+## Canyon Clash
+
+The in-game **Combat statistics** list (every member: defenses, attacks used out of 3) is recorded once per event into
+`event/canyon-clash/`. Tracked only (no fines yet): the dashboard **Canyon Clash** tab shows who used all their attacks,
+and the player pop-up lists each event.
+
+Processing: extract frames (`extract_frames.py VIDEO <scratch> --crop 340,60,960,540 --fps 2` fits the 1280×592 recording),
+transcribe `rank,name,defenses,attacks` (rank = screen order; the pinned top row is the recorder, also in the list), then
+`.venv/bin/python .claude/skills/rok-weekly/scripts/import_canyon.py START list.csv` (check `~~`/`--` lines; `--overrides`),
+`--write`, add the row to `tracker/canyon/canyons.csv`, and `python3 tracker/track.py`.
+
 ## Dashboard tabs
 
 Players (master list + player view; its search also finds **governors who left the kingdom**: anyone in an older scan,
@@ -148,7 +161,7 @@ name list or KvK sheet but not in the latest scan/export/rankings, kept with `x`
 sheet saw them: last seen in the latest KvK shows "Not seen since KvK <n> · still on the KvK map, or migrated" (they may be
 stuck on the map, not gone), earlier ones "Migrated out". The next scan/export after they return clears it) · Weekly activity · Fines (fort + MGE, with a public **Fine calculator**: fine in
 gold (as in the mail and Fines list), plus what the player has in food/wood/stone/gold -> what is left, in each resource, with tap-to-fill "+ rest" suggestions under the empty fields; the MGE
-sanctions mail links to it at `DASHBOARD_URL#t=fines`) · MGE · KvK history · Review (R4 mode only: proposals waiting for the admin,
+sanctions mail links to it at `DASHBOARD_URL#t=fines`) · MGE · Canyon Clash · KvK history · Review (R4 mode only: proposals waiting for the admin,
 and unconfirmed accounts in the alliance with farm hints from `farm_hints()` in `track.py`). Links: `#t=<tab>`, `#t=players&p=<name>`.
 Future events (KvK, AoO, 20 GH…) get their own tab and data folder, sharing the master list, R4 keys and fines ledger.
 
