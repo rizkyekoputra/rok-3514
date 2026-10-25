@@ -845,13 +845,13 @@ function renderCalc() {
   }
   if (isNaN(due) || bad.length) { $('calcOut').innerHTML = `<span class="below">Can't read ${isNaN(due) ? 'the fine' : bad.join(', ')}</span>: use numbers like 787.79M or 1,575,569.`; return; }
   const paid = have.reduce((a, [r, v]) => a + v / rss[r], 0), left = due - paid;
-  // Suggest the rest under every empty resource once something is typed: tap to fill it in
-  const started = have.some(([, v]) => v > 0);
+  // Suggest under every empty resource as soon as the fine is entered (the whole fine, then the rest): tap to fill it in
+  const started = have.some(([, v]) => v > 0), word = started ? 'rest' : 'fine';
   document.querySelectorAll('#calcHave [data-fill]').forEach(b => {
     const r = b.dataset.fill, input = document.querySelector(`#calcHave [data-rss="${r}"]`), empty = !input.value.trim();
-    b.hidden = !(started && empty && left > 0);
-    if (!b.hidden) { b.dataset.v = payFull(left * rss[r]); b.textContent = `↑ tap to fill the rest: ${b.dataset.v}`; }
-    input.placeholder = b.hidden ? '0' : `rest: ${payFmt(left * rss[r])}`;  // the suggestion sits in the empty field itself
+    b.hidden = !(empty && left > 0);
+    if (!b.hidden) { b.dataset.v = payFull(left * rss[r]); b.textContent = `↑ tap to fill the ${word}: ${b.dataset.v}`; }
+    input.placeholder = b.hidden ? '0' : `${word}: ${payFmt(left * rss[r])}`;  // the suggestion sits in the empty field itself
   });
   const used = have.filter(([, v]) => v > 0).map(([r, v]) => `${payFmt(v)} ${cap(r)}`).join(' + ');
   $('calcOut').innerHTML = `<div class="stats">
