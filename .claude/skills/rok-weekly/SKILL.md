@@ -128,8 +128,8 @@ Names render in game with `✕` for `メ` (Totos ✕treme = Totos メtreme); tra
 A ranking taken before the event ends is provisional: when the final one arrives, rerun `import_mge.py ... --write`
 (it overwrites `<start>.csv`), set `final = yes` in `mges.csv` and run `track.py`. Until then the dashboard labels the
 MGE provisional and R4s can't mark its fines paid. Don't hand over the sanctions mail from a provisional ranking.
-The MGE tab, MGE fines and the pop-up's MGE section are **R4-only** for now (hidden for the public, though the numbers
-are in the page source); to open them to everyone, drop the `officer` checks around `mgeTabBtn`, `shownFines()` and `p.mg`.
+The MGE tab, MGE fines, the pop-up's MGE section and the fine calculator are public (opened 25 Oct 2026 with the final
+ranking of the first MGE).
 
 Report to the user: slot holders who held / fell below / took a higher slot, everyone over the limit with points over,
 fine in gold and takeovers, players not matched to an ID, and whether every slot holder was captured. Point to the mail
@@ -144,7 +144,7 @@ Players (master list + player view; its search also finds **governors who left t
 name list or KvK sheet but not in the latest scan/export/rankings, kept with `x` = last date seen, listed under the
 "Left the kingdom" filter; KvK history lists everyone in each KvK sheet with a Kingdom column. `xs` = where they were last seen when only a KvK
 sheet saw them: last seen in the latest KvK shows "Not seen since KvK <n> · still on the KvK map, or migrated" (they may be
-stuck on the map, not gone), earlier ones "Migrated out". The next scan/export after they return clears it) · Weekly activity · Fines (fort + MGE, with a **Fine calculator**, R4-only for now like the MGE tab (`calcCard` in `renderOfficer`): fine in
+stuck on the map, not gone), earlier ones "Migrated out". The next scan/export after they return clears it) · Weekly activity · Fines (fort + MGE, with a public **Fine calculator**: fine in
 MGE points over or gold, plus what the player has in food/wood/stone/gold -> what is left, in each resource, with tap-to-fill "+ rest" suggestions under the empty fields; the MGE
 sanctions mail links to it at `DASHBOARD_URL#t=fines`) · MGE · KvK history · Review (R4 mode only: proposals waiting for the admin,
 and unconfirmed accounts in the alliance with farm hints from `farm_hints()` in `track.py`). Links: `#t=<tab>`, `#t=players&p=<name>`.

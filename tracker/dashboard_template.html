@@ -200,7 +200,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
     <button data-tab="players" type="button">Players</button>
     <button data-tab="activity" type="button">Weekly activity</button>
     <button data-tab="fines" type="button">Fines</button>
-    <button data-tab="mge" id="mgeTabBtn" type="button" hidden>MGE</button>
+    <button data-tab="mge" id="mgeTabBtn" type="button">MGE</button>
     <button data-tab="kvk" type="button">KvK history</button>
     <button data-tab="review" id="reviewTabBtn" type="button" hidden>Review <span class="badge" id="reviewCount"></span></button>
   </nav>
@@ -303,7 +303,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
   </section>
 
   <section data-panel="fines" hidden>
-    <div class="card" id="calcCard" hidden>
+    <div class="card" id="calcCard">
       <h2>Fine calculator</h2>
       <div class="sub">Pay in any one resource, or mix them. Enter your fine and what you already have to see what is left.</div>
       <div class="controls">
@@ -686,7 +686,7 @@ function renderPlayer() {
         <td>${r[7] === p.n ? '<span class="muted">same</span>' : esc(r[7])}</td><td>${r[6] ? r[6][0].toUpperCase() + r[6].slice(1) : '–'}</td>
         <td class="num">${kvResult(r)} <span class="muted">${KVK[r[0]] ? KVK[r[0]].m : ''}</span></td><td class="num">${kvPct(r)}</td>
         <td style="white-space:normal">${kvNote(r)}</td></tr>`).join('')}</tbody></table></div>` : ''}
-    ${p.mg && officer ? `<div class="p-sec">MGE</div><div class="table-wrap"><table class="kv">
+    ${p.mg ? `<div class="p-sec">MGE</div><div class="table-wrap"><table class="kv">
       <thead><tr><th>Event</th><th class="num">Rank</th><th class="num">Points</th><th class="num">Over limit</th><th>Fine</th></tr></thead>
       <tbody>${p.mg.slice().reverse().map(([s, rank, pts, over, fine]) => { const f = mgeFine(s, P.indexOf(p));
         return `<tr style="cursor:default"><td>${esc(MGE[s] ? MGE[s].l : s)}</td><td class="num">${rank}</td><td class="num">${fmt(pts)}</td>
@@ -789,7 +789,7 @@ $('kvkHead').addEventListener('click', e => {
   const k = +th.dataset.kv; kvSortDir = kvSortK === k ? -kvSortDir : -1; kvSortK = k; renderKvk();
 });
 
-// ---------- fine calculator (R4-only for now, see renderOfficer; holds no player data, only the exchange rates) ----------
+// ---------- fine calculator (public; holds no player data, only the exchange rates) ----------
 // Fines can be paid in food/wood/stone/gold (or a mix), at the rates of their kind (FINE_KINDS in track.py):
 // KINDS[kind].rss[r] = units of resource r worth 1 gold of the fine. Fort fines have no t; MGE fines have t = 'mge'.
 const KINDS = DATA.fineKinds || {fort: {label: 'Fort', rss: {gold: 1}}};
@@ -1196,8 +1196,7 @@ const F = DATA.fines || [];
 let ledger = null, officer = null, approver = false, r4key = null;  // ledger: {fine_id: {amount, by, time}} once loaded
 let changes = {};  // account_id -> {type, by, decided, pending: {type, by, time}} from the ledger
 const paidOf = f => (f.h || 0) + (ledger && ledger[f.id] ? ledger[f.id].amount : 0);
-// MGE is R4-only for now: its tab, fines and pop-up section show in R4 mode only
-const shownFines = () => F.filter(f => !f.e || officer);
+const shownFines = () => F;  // every fine, fort and MGE (MGE opened to everyone on 25 Oct 2026)
 // MGE fines carry e (event label) and m = points over the limit; fort fines have m = missing forts
 const ORD = n => n + (['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || 'th');
 // Fine label: the MGE event, or "Weekly Fort 12–18 Oct 2nd Offense" (o = offense number of a fort fine)
@@ -1252,7 +1251,7 @@ function renderOfficer() {
     : `<span>This R4 link is not valid or has been revoked. Ask the admin for a new one.</span><button class="act ghost" id="logoutBtn" type="button">Dismiss</button>`;
   const b = $('logoutBtn'); if (b) b.addEventListener('click', forgetKey);
   $('finesActTh').hidden = !officer;
-  $('reviewTabBtn').hidden = $('mgeTabBtn').hidden = $('calcCard').hidden = !officer;  // MGE + calculator: R4-only for now
+  $('reviewTabBtn').hidden = !officer;
 }
 
 function renderFines() {
@@ -1429,7 +1428,7 @@ function renderSubtitle() {
     : 'Farm and main account changes waiting for approval';
 }
 function showTab(t) {
-  tab = TABS.includes(t) && (!['review', 'mge'].includes(t) || officer) ? t : 'activity';
+  tab = TABS.includes(t) && (t !== 'review' || officer) ? t : 'activity';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   document.querySelectorAll('section[data-panel]').forEach(sec => { sec.hidden = sec.dataset.panel !== tab; });
   renderSubtitle();

@@ -1,5 +1,3 @@
-<color=red><b>DRAFT – ranking not final, do not send</b></color>
-
 <size=30><b>3514 | MGE RESULTS</b></size>
 <b>MGE Infantry 19–24 Oct 2026</b>
 
@@ -12,19 +10,18 @@
 4. RockyメGirang – <color=green>held</color>
 5. KaLfiN – <color=green>held</color>
 6. xxYxx – <color=green>held</color>
-7. メ S L A Y E R メ – finished #12
-8. ツ 3D – <color=green>held</color>
-9. 么 QUEEN – finished #13
-10. susuKNTLmaniez – not in the ranking
+7. メ S L A Y E R メ – finished #8
+8. ツ 3D – <color=red>took #7</color>
+9. 么 QUEEN – finished #10
+10. susuKNTLmaniez – <color=red>took #9</color>
 
 <b><color=red>TAKEOVERS</color></b>
 <i>Players over their limit who finished in a Top 10 slot allocated to someone else</i>
-• Jeyjœ took #7 (メ S L A Y E R メ) – 8.58M
-• Fluticasone took #9 (么 QUEEN) – 8.15M
-• Cefixime took #10 (susuKNTLmaniez) – 7.92M
+• ツ 3D took #7 (メ S L A Y E R メ) – 9.13M
+• susuKNTLmaniez took #9 (么 QUEEN) – 8.77M
 
 <b><color=red>OVER THE LIMIT</color></b>
-<b>7</b> players went over their limit (<b>7M</b> outside the Top 10). Fines are in the next mail.
+<b>13</b> players went over their limit (<b>7M</b> outside the Top 10). Fines are in the next mail.
 
 <b>Respect the allocation. Follow the limit. Do not disrupt Kingdom strategy.</b>
 <b>— KINGDOM 3514 LEADERSHIP</b>
