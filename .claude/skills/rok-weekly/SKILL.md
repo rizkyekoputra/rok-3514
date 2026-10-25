@@ -31,6 +31,8 @@ to read the rankings accurately, match names to Governor IDs, and keep `accounts
 | `event/mge/<name (dates)>/` | Raw MGE ranking recordings / screenshots the user provides |
 | `tracker/canyon/` | Canyon Clash: `canyons.csv` (`canyon, start, end`), `<start>.csv` (combat statistics). See **Canyon Clash** below |
 | `event/canyon-clash/` | Raw Canyon Clash combat-statistics recordings the user provides |
+| `tracker/aoo/` | Ark of Osiris: `aoos.csv` (`aoo, date, team, opponent, result, score, opponent_score`), `<date>.csv` (individual ranking). See **Ark of Osiris** below |
+| `event/aoo/` | Raw AoO battle-report recordings the user provides |
 | `tracker/dashboard_template.html` → `tracker/dashboard/index.html` | Public dashboard (generated; `dashboard/` is its own git repo) |
 | `tracker/publish.sh` | Rebuilds and pushes the dashboard to GitHub Pages |
 | `weekly-activity/Activity <d-d mon yyyy>/` | Raw ranking screenshots / videos the user provides each week |
@@ -153,6 +155,18 @@ transcribe `rank,name,defenses,attacks` (rank = screen order; the pinned top row
 `.venv/bin/python .claude/skills/rok-weekly/scripts/import_canyon.py START list.csv` (check `~~`/`--` lines; `--overrides`),
 `--write`, add the row to `tracker/canyon/canyons.csv`, and `python3 tracker/track.py`.
 
+## Ark of Osiris
+
+The **Ark of Osiris Battle Report** mail lists every registered governor with Individual Points; "Did Not Participate"
+rows score 0. Tracked only (no fines yet): the dashboard **Ark of Osiris** tab flags 0 points as *did not participate*
+and anything below `AOO_MIN` (10,000, in `track.py`) as a *warning*; the player pop-up lists each battle.
+
+Processing: extract frames (`extract_frames.py VIDEO <scratch> --crop 365,55,785,345 --fps 3` fits the 848×392 mail
+recording), transcribe `rank,name,points,kills` (blank points for Did Not Participate; kills = the sword column), then
+`.venv/bin/python .claude/skills/rok-weekly/scripts/import_aoo.py DATE list.csv` (check `~~`/`--` lines), `--write`, add the
+row to `tracker/aoo/aoos.csv` (team, opponent, result, both scores from the mail header) and `python3 tracker/track.py`.
+Name matching for these importers lives in `scripts/match_names.py`.
+
 ## Dashboard tabs
 
 Players (master list + player view; its search also finds **governors who left the kingdom**: anyone in an older scan,
@@ -161,7 +175,7 @@ name list or KvK sheet but not in the latest scan/export/rankings, kept with `x`
 sheet saw them: last seen in the latest KvK shows "Not seen since KvK <n> · still on the KvK map, or migrated" (they may be
 stuck on the map, not gone), earlier ones "Migrated out". The next scan/export after they return clears it) · Weekly activity · Fines (fort + MGE, with a public **Fine calculator**: fine in
 gold (as in the mail and Fines list), plus what the player has in food/wood/stone/gold -> what is left, in each resource, with tap-to-fill "+ rest" suggestions under the empty fields; the MGE
-sanctions mail links to it at `DASHBOARD_URL#t=fines`) · MGE · Canyon Clash · KvK history · Review (R4 mode only: proposals waiting for the admin,
+sanctions mail links to it at `DASHBOARD_URL#t=fines`) · MGE · Canyon Clash · Ark of Osiris · KvK history · Review (R4 mode only: proposals waiting for the admin,
 and unconfirmed accounts in the alliance with farm hints from `farm_hints()` in `track.py`). Links: `#t=<tab>`, `#t=players&p=<name>`.
 Future events (KvK, AoO, 20 GH…) get their own tab and data folder, sharing the master list, R4 keys and fines ledger.
 

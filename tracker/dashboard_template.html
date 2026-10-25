@@ -202,6 +202,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
     <button data-tab="fines" type="button">Fines</button>
     <button data-tab="mge" id="mgeTabBtn" type="button">MGE</button>
     <button data-tab="canyon" type="button">Canyon Clash</button>
+    <button data-tab="aoo" type="button">Ark of Osiris</button>
     <button data-tab="kvk" type="button">KvK history</button>
     <button data-tab="review" id="reviewTabBtn" type="button" hidden>Review <span class="badge" id="reviewCount"></span></button>
   </nav>
@@ -403,6 +404,32 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
         <tbody id="ccBody"></tbody>
       </table></div>
       <div class="sub" id="ccCount"></div>
+    </div>
+  </section>
+
+  <section data-panel="aoo" hidden>
+    <div class="controls">
+      <label class="sub" for="aooSel">Battle</label>
+      <select id="aooSel"></select>
+    </div>
+    <div class="tiles" id="aooTiles"></div>
+    <div class="card">
+      <h2>Participation</h2>
+      <div class="sub" id="aooSub"></div>
+      <div class="controls">
+        <input type="search" id="aooSearch" placeholder="Filter by name…" autocomplete="off">
+        <select id="aooShow">
+          <option value="all">Everyone registered</option>
+          <option value="none">Did not participate</option>
+          <option value="low">Warning: low points</option>
+          <option value="ok">OK</option>
+        </select>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th class="num">Rank</th><th>Player</th><th class="num">Points</th><th class="num">Kills</th><th>Status</th></tr></thead>
+        <tbody id="aooBody"></tbody>
+      </table></div>
+      <div class="sub" id="aooCount"></div>
     </div>
   </section>
 
@@ -719,6 +746,10 @@ function renderPlayer() {
       <thead><tr><th>Event</th><th class="num">Defenses</th><th class="num">Attacks</th></tr></thead>
       <tbody>${p.cc.slice().reverse().map(([s, dfn, att]) => `<tr style="cursor:default"><td>${esc(CANYON[s] ? CANYON[s].l : s)}</td>
         <td class="num">${dfn}</td><td class="num">${ccAttacks(att, CANYON[s] ? CANYON[s].n : 3)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+    ${p.ao ? `<div class="p-sec">Ark of Osiris</div><div class="table-wrap"><table class="kv">
+      <thead><tr><th>Battle</th><th class="num">Rank</th><th class="num">Points</th><th>Status</th></tr></thead>
+      <tbody>${p.ao.slice().reverse().map(([s, rank, pts]) => `<tr style="cursor:default"><td>${esc(AOO[s] ? AOO[s].l : s)}</td>
+        <td class="num">${rank}</td><td class="num">${pts ? fmt(pts) : '–'}</td><td>${aooStatus(pts)}</td></tr>`).join('')}</tbody></table></div>` : ''}
     ${!p.c && p.h && p.h.length ? `<div class="p-sec">Farm hints</div><div class="hints">${p.h.map(h => `<span class="chip">${esc(h)}</span>`).join('')}</div>` : ''}
     ${kingdom}${activity}
     ${ranked ? `<div class="grid2" style="margin-top:16px">
@@ -1150,6 +1181,35 @@ function renderCanyon() {
 $('ccSel').innerHTML = (DATA.canyons || []).slice().reverse().map(c => `<option value="${c.s}">${esc(c.l)}</option>`).join('');
 ['ccSel', 'ccSearch', 'ccShow'].forEach(id => $(id).addEventListener('input', renderCanyon));
 
+// ---------- Ark of Osiris tab ----------
+// an AoO row: [rank, player index or null, name then, points (0 = did not participate), kills]; sc = [our score, theirs]
+const AOO = Object.fromEntries((DATA.aoos || []).map(a => [a.s, a]));
+const aooStatus = pts => !pts ? '<span class="below">Did not participate</span>'
+  : pts < DATA.aooMin ? `<span class="chip"><span class="dot" style="background:var(--warning)"></span>Warning: below ${fmt(DATA.aooMin)}</span>`
+  : '<span class="paid">OK</span>';
+function renderAoo() {
+  const a = AOO[$('aooSel').value];
+  if (!a) { $('aooBody').innerHTML = '<tr><td colspan="5" class="empty">No Ark of Osiris data yet.</td></tr>'; return; }
+  const q = $('aooSearch').value.trim().toLowerCase(), show = $('aooShow').value;
+  const name = r => r[1] != null ? P[r[1]].n : r[2];
+  const kind = r => !r[3] ? 'none' : r[3] < DATA.aooMin ? 'low' : 'ok';
+  const rows = a.r.filter(r => (!q || name(r).toLowerCase().includes(q) || r[2].toLowerCase().includes(q)) && (show === 'all' || kind(r) === show));
+  $('aooTiles').innerHTML = [
+    [a.w ? 'Victory' : 'Defeat', `${fmt(a.sc[0])} – ${fmt(a.sc[1])} vs ${esc(a.op)}`],
+    [a.r.length, 'Registered'],
+    [a.r.filter(r => r[3]).length, 'Participated'],
+    [a.r.filter(r => kind(r) === 'none').length, 'Did not participate'],
+    [a.r.filter(r => kind(r) === 'low').length, `Below ${fmt(DATA.aooMin)} points`],
+  ].map(([v, l]) => `<div class="tile"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+  $('aooBody').innerHTML = rows.map(r => `<tr${r[1] != null ? ` data-i="${r[1]}"` : ''}><td class="num">${r[0]}</td><td>${esc(name(r))}</td>
+    <td class="num">${r[3] ? fmt(r[3]) : '–'}</td><td class="num">${r[3] ? fmt(r[4]) : '–'}</td><td>${aooStatus(r[3])}</td></tr>`).join('')
+    || '<tr><td colspan="5" class="empty">No players match.</td></tr>';
+  $('aooCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'} of ${a.r.length} registered`;
+  $('aooSub').textContent = `${a.l} · ${a.tm} · Everyone registered is expected to play: 0 points = did not participate, below ${fmt(DATA.aooMin)} points = warning`;
+}
+$('aooSel').innerHTML = (DATA.aoos || []).slice().reverse().map(a => `<option value="${a.s}">${esc(a.l)} · ${esc(a.tm)}</option>`).join('');
+['aooSel', 'aooSearch', 'aooShow'].forEach(id => $(id).addEventListener('input', renderAoo));
+
 // ---------- multi-select (R4 mode): change many accounts at once ----------
 const picked = new Set();  // player indexes ticked in the master list
 let rosterShown = [];      // selectable rows currently shown (for "select all")
@@ -1470,7 +1530,7 @@ $('finesEv').innerHTML = '<option value="all">All events</option><option value="
 ['finesSearch', 'finesSel', 'finesEv'].forEach(id => $(id).addEventListener('input', renderFines));
 
 // ---------- tabs (#t=players|activity|fines|review, plus p=<name> on the players tab) ----------
-const TABS = ['players', 'activity', 'fines', 'mge', 'canyon', 'kvk', 'review'];
+const TABS = ['players', 'activity', 'fines', 'mge', 'canyon', 'aoo', 'kvk', 'review'];
 let tab = 'activity';
 function setHash() {
   const q = new URLSearchParams({t: tab});
@@ -1484,6 +1544,7 @@ function renderSubtitle() {
     : tab === 'fines' ? 'Fines and whether they have been paid'
     : tab === 'mge' ? 'Mightiest Governor: point limits, takeovers and fines'
     : tab === 'canyon' ? 'Canyon Clash: who used all their attacks'
+    : tab === 'aoo' ? 'Ark of Osiris: who played, who did not, and low scores'
     : tab === 'kvk' ? 'Past KvK results, including governors not in the kingdom now'
     : 'Farm and main account changes waiting for approval';
 }
@@ -1514,7 +1575,7 @@ function selectPlayer(p) {
 function closePlayer() { $('playerDlg').close(); }
 
 function renderAll() {
-  renderSubtitle(); renderTiles(); renderTable(); renderRoster(); renderReview(); renderKvk(); renderMge(); renderCanyon();
+  renderSubtitle(); renderTiles(); renderTable(); renderRoster(); renderReview(); renderKvk(); renderMge(); renderCanyon(); renderAoo();
   if (tab === 'activity') renderOverview();
   renderPlayer();
 }
