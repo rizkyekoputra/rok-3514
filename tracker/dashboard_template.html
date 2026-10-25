@@ -309,11 +309,8 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       <div class="controls">
         <label class="sub" for="calcKind">Fine for</label>
         <select id="calcKind"></select>
-        <input type="text" id="calcFine" inputmode="decimal" placeholder="Your fine, e.g. 1,575,569 or 787.79M" autocomplete="off" style="flex:1 1 220px;min-width:0">
-        <select id="calcUnit">
-          <option value="pts">points over the MGE limit</option>
-          <option value="gold">gold (fine amount)</option>
-        </select>
+        <input type="text" id="calcFine" inputmode="decimal" placeholder="Your fine in gold, e.g. 787.79M or 787,790,000" autocomplete="off" style="flex:1 1 220px;min-width:0">
+        <span class="sub">gold</span>
         <button class="act ghost" id="calcReset" type="button">Reset</button>
       </div>
       <div class="table-wrap" style="margin-top:12px"><table class="rates" id="calcRates"></table></div>
@@ -824,18 +821,15 @@ function calcFields() {
   $('calcHave').innerHTML = Object.keys(calcRss()).map(r => `<label>${cap(r)}<input type="text" inputmode="decimal" data-rss="${r}" placeholder="0" autocomplete="off" value="${esc(was[r] || '')}">` +
     `<button class="hint" type="button" data-fill="${r}" hidden></button></label>`).join('');
   const mge = $('calcKind').value === 'mge', rss = calcRss();
-  $('calcUnit').hidden = !mge;  // only MGE fines are counted in points; other fines are entered in gold
-  if (!mge) $('calcUnit').value = 'gold';
   // Rate table: one row per step of the fine (e.g. 2nd / 3rd fort offense), its value in each resource
   const res = ['gold', ...Object.keys(rss).filter(r => r !== 'gold')], k = KINDS[$('calcKind').value];
   const n = v => v >= 1e6 ? payFmt(v) : v >= 1e5 ? v / 1e3 + 'K' : fmt(v);
   $('calcRates').innerHTML = `<thead><tr><th>${esc(k.label)} fine</th>${res.map(r => `<th class="num">${cap(r)}</th>`).join('')}</tr></thead>` +
     `<tbody>${(k.steps || []).map(([what, g]) => `<tr><td>${esc(what)}</td>${res.map(r => `<td class="num">${n(g * rss[r])}</td>`).join('')}</tr>`).join('')}</tbody>`;
-  $('calcFine').placeholder = mge ? 'Your fine, e.g. 1,575,569 points or 787.79M gold' : 'Your fine in gold, e.g. 35,000,000 or 35M';
+  $('calcFine').placeholder = mge ? 'Your fine in gold, e.g. 787.79M or 787,790,000' : 'Your fine in gold, e.g. 35M or 35,000,000';
 }
 function renderCalc() {
-  const raw = amount($('calcFine').value), pts = $('calcKind').value === 'mge' && $('calcUnit').value === 'pts', rss = calcRss();
-  const due = pts ? raw * DATA.mgeFine.gold : raw;
+  const due = amount($('calcFine').value), rss = calcRss();  // the fine in gold, as in the mail and the Fines list
   const have = [...document.querySelectorAll('#calcHave input')].map(i => [i.dataset.rss, amount(i.value)]);
   const bad = have.filter(([, v]) => isNaN(v)).map(([r]) => cap(r));
   if (!$('calcFine').value.trim()) {
@@ -855,7 +849,7 @@ function renderCalc() {
   });
   const used = have.filter(([, v]) => v > 0).map(([r, v]) => `${payFmt(v)} ${cap(r)}`).join(' + ');
   $('calcOut').innerHTML = `<div class="stats">
-      <div class="stat"><div class="v">${payFmt(due)}</div><div class="l">Fine (gold value)${pts ? ` · ${fmt(raw)} points × ${fmt(DATA.mgeFine.gold)}` : ''}</div></div>
+      <div class="stat"><div class="v">${payFmt(due)}</div><div class="l">Fine (gold)</div></div>
       <div class="stat"><div class="v">${payFmt(paid)}</div><div class="l">Covered (gold value)${used ? ' · ' + esc(used) : ''}</div></div>
       <div class="stat ${left > 0 ? 'bad' : 'good'}"><div class="v">${left > 0 ? payFmt(left) : '0'}</div><div class="l">Still to pay (gold value)</div></div>
     </div>` + (left > 0
@@ -865,11 +859,9 @@ function renderCalc() {
     `<div class="sub" style="margin-top:6px">Send everything to the bank KD, then tell an R4 what you sent.</div>`;
 }
 $('calcFine').addEventListener('input', e => { groupDigits(e.target); renderCalc(); });
-$('calcUnit').addEventListener('input', renderCalc);
 $('calcKind').addEventListener('input', () => { calcFields(); renderCalc(); });
 $('calcReset').addEventListener('click', () => {
   document.querySelectorAll('#calcFine, #calcHave input').forEach(i => { i.value = ''; });
-  $('calcUnit').value = 'pts';
   calcFields();
   renderCalc();
   $('calcFine').focus();

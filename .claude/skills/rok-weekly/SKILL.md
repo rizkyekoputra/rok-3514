@@ -147,7 +147,7 @@ name list or KvK sheet but not in the latest scan/export/rankings, kept with `x`
 "Left the kingdom" filter; KvK history lists everyone in each KvK sheet with a Kingdom column. `xs` = where they were last seen when only a KvK
 sheet saw them: last seen in the latest KvK shows "Not seen since KvK <n> · still on the KvK map, or migrated" (they may be
 stuck on the map, not gone), earlier ones "Migrated out". The next scan/export after they return clears it) · Weekly activity · Fines (fort + MGE, with a public **Fine calculator**: fine in
-MGE points over or gold, plus what the player has in food/wood/stone/gold -> what is left, in each resource, with tap-to-fill "+ rest" suggestions under the empty fields; the MGE
+gold (as in the mail and Fines list), plus what the player has in food/wood/stone/gold -> what is left, in each resource, with tap-to-fill "+ rest" suggestions under the empty fields; the MGE
 sanctions mail links to it at `DASHBOARD_URL#t=fines`) · MGE · KvK history · Review (R4 mode only: proposals waiting for the admin,
 and unconfirmed accounts in the alliance with farm hints from `farm_hints()` in `track.py`). Links: `#t=<tab>`, `#t=players&p=<name>`.
 Future events (KvK, AoO, 20 GH…) get their own tab and data folder, sharing the master list, R4 keys and fines ledger.
