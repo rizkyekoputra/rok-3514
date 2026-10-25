@@ -14,7 +14,8 @@ Reads:
   ch/<date>.csv     governor_id, name, ch: city hall levels (import_ch.py, e.g. the CH25 roster); highest level seen wins
   mge/mges.csv      mge (= start date), start, end, troop, default_cap, final: one row per MGE (final = yes once the
                     ranking is the end-of-event one; until then its fines are provisional and can't be marked paid)
-  mge/<start>_slots.csv  slot, name, governor_id, cap: the Top-10 allocation (blank cap = no cap)
+  mge/<start>_slots.csv  slot, name, governor_id, cap, tier: the Top-10 allocation (blank cap = no cap; slots with the
+                    same tier, e.g. 7-10 with the same reward, may swap places freely)
   mge/<start>.csv   rank, governor_id, name, points: final ranking (import_mge.py)
   ledger.json       last pulled ledger state (payments, account changes, SHA-256 of active R4 keys), published so the
                     dashboard works before the slow web app answers
@@ -195,13 +196,18 @@ def penalty(offense, missing, unpaid):
 
 def mge_results(accounts):
     """[(event, rows)] per MGE, oldest first. Slot holders may pass their listed points as long as they finish at
-    their slot or below; finishing above it (taking another slot) fines the points over their cap. Everyone else is
-    fined for every point over the default cap, and finishing in a slot allocated to someone else is a takeover."""
+    their slot or below (or anywhere within their tier: slots with the same reward may swap); finishing above that
+    (taking another slot) fines the points over their cap. Everyone else is fined for every point over the default cap,
+    and finishing in a slot allocated to someone else is a takeover."""
     out = []
     for ev in read('mge/mges.csv'):
         slots = read(f"mge/{ev['mge']}_slots.csv")
         slot_of = {key(s): s for s in slots}
         owner = {int(s['slot']): s['name'] for s in slots}
+        top_of = {}  # highest slot a holder may reach without a takeover: the first slot of their tier
+        for s in slots:
+            t = s.get('tier', '')
+            top_of[int(s['slot'])] = min(int(x['slot']) for x in slots if t and x.get('tier', '') == t) if t else int(s['slot'])
         rows = []
         for r in read(f"mge/{ev['mge']}.csv"):
             k, rank, pts = key(r), int(r['rank']), num(r['points'])
@@ -209,9 +215,9 @@ def mge_results(accounts):
             cap = (num(s['cap']) if s else num(ev['default_cap']))  # None = no cap
             slot = int(s['slot']) if s else None
             over = max(0, pts - cap) if cap is not None else 0
-            if s and rank >= slot:
-                over = 0  # kept (or fell below) their allocated rank: listed points are only a guide
-            took = rank if rank in owner and slot != rank and (slot is None or rank < slot) and over else None
+            if s and rank >= top_of[slot]:
+                over = 0  # kept their rank, fell below it, or moved within their tier: listed points are only a guide
+            took = rank if rank in owner and slot != rank and (slot is None or rank < top_of[slot]) and over else None
             acc = accounts.get(k, {})
             rows.append(dict(key=k, name=r['name'], rank=rank, points=pts, slot=slot, cap=cap, over=over,
                              fine=over * MGE_FINE['gold'], took=took, took_from=owner.get(took, ''),
@@ -267,7 +273,8 @@ def write_mge(mges, paid):
             if not r:
                 out.append(f"| {s['slot']} | {s['name']} | {short(num(s['cap']))} | - | - | Not in the captured ranks |")
                 continue
-            res = 'Held slot' if r['rank'] == r['slot'] else 'Took a higher slot' if r['rank'] < r['slot'] else 'Below slot'
+            res = ('Held slot' if r['rank'] == r['slot'] else 'Below slot' if r['rank'] > r['slot']
+                   else 'Took a higher slot' if r['over'] else 'Moved up within its reward tier')
             out.append(f"| {r['slot']} | {r['name']} | {short(r['cap'])} | {r['rank']} | {r['points']:,} | {res} |")
         out += ['', '## Over the limit', '', '| Rank | Player | Points | Limit | Over | Takeover | Fine (gold) | Or |',
                 '|---|---|---|---|---|---|---|---|']
@@ -290,7 +297,8 @@ def write_mge(mges, paid):
         for sl in read(f"mge/{ev['mge']}_slots.csv"):
             r = held.get(key(sl))
             res = ('not in the ranking' if not r else '<color=green>held</color>' if r['rank'] == r['slot']
-                   else f"finished #{r['rank']}" if r['rank'] > r['slot'] else f"<color=red>took #{r['rank']}</color>")
+                   else f"finished #{r['rank']}" if r['rank'] > r['slot'] else f"<color=red>took #{r['rank']}</color>" if r['over']
+                   else f"<color=green>#{r['rank']} (same reward tier)</color>")
             results.append(f"{sl['slot']}. {r['name'] if r else sl['name']} – {res}")
         results += ['', '<b><color=red>TAKEOVERS</color></b>',
                     f'<i>Players over their limit who finished in a Top 10 slot allocated to someone else</i>']

@@ -1075,7 +1075,7 @@ function renderMge() {
   const fines = m.r.filter(r => r[7]).map(r => mgeFine(m.s, r[1], r[2])).filter(Boolean);
   const owed = fines.reduce((a, f) => a + Math.max(0, f.a - paidOf(f)), 0), slots = m.r.filter(r => r[4] != null);
   $('mgeTiles').innerHTML = [
-    [`${slots.filter(r => r[0] === r[4]).length}/10`, 'Top-10 slots held by their player'],
+    [`${slots.filter(r => !r[6]).length}/${slots.length}`, 'Top-10 slot holders within their allocation'],
     [m.r.filter(r => r[8]).length, 'Takeovers (slot taken by someone else)'],
     [fines.length, 'Players over the limit'],
     [gold(fines.reduce((a, f) => a + f.a, 0)), 'Fines (gold value)'],
@@ -1084,15 +1084,16 @@ function renderMge() {
   $('mgeBody').innerHTML = rows.map(r => {
     const f = r[7] ? mgeFine(m.s, r[1], r[2]) : null;
     const slot = r[4] == null ? '<span class="muted">–</span>' : r[0] === r[4] ? `${r[4]} <span class="paid">held</span>`
-      : r[0] < r[4] ? `${r[4]} <span class="below">took a higher slot</span>` : `${r[4]} <span class="muted">finished lower</span>`;
+      : r[0] < r[4] ? (r[6] ? `${r[4]} <span class="below">took a higher slot</span>` : `${r[4]} <span class="paid">same reward tier</span>`)
+      : `${r[4]} <span class="muted">finished lower</span>`;
     const took = r[8] ? ` <span class="chip"><span class="dot" style="background:var(--critical)"></span>took slot ${r[8]}</span>` : '';
     return `<tr${r[1] != null ? ` data-i="${r[1]}"` : ''}><td class="num">${r[0]}</td><td>${esc(name(r))}${took}</td><td>${slot}</td>
       <td class="num">${r[5] == null ? 'No cap' : short(r[5])}</td><td class="num">${fmt(r[3])}</td>
       <td class="num">${r[6] ? `<span class="below">${fmt(r[6])}</span>` : '<span class="muted">–</span>'}</td>
-      <td class="num">${r[7] ? gold(r[7]) : '–'}</td><td>${f ? fineStatus(f) : r[4] != null && r[0] >= r[4] ? '<span class="muted">Within allocation</span>' : '<span class="paid">OK</span>'}</td></tr>`;
+      <td class="num">${r[7] ? gold(r[7]) : '–'}</td><td>${f ? fineStatus(f) : r[4] != null ? '<span class="muted">Within allocation</span>' : '<span class="paid">OK</span>'}</td></tr>`;
   }).join('') || '<tr><td colspan="8" class="empty">No players match.</td></tr>';
   $('mgeCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'} · ranks 1–${m.r.length} captured`;
-  $('mgeSub').textContent = `${m.l}${m.f ? '' : ' · PROVISIONAL ranking: fines are not final and cannot be marked paid yet'} · Top-10 slots may go past their listed points as long as they finish at their slot. ` +
+  $('mgeSub').textContent = `${m.l}${m.f ? '' : ' · PROVISIONAL ranking: fines are not final and cannot be marked paid yet'} · Top-10 slots may go past their listed points as long as they finish at their slot (slots with the same reward, e.g. 7–10, may swap). ` +
     `Everyone else: max ${short(m.c)} points. Fine per point over: ${Object.entries(DATA.mgeFine).map(([r, v]) => fmt(v) + ' ' + r).join(' / ')} (one or a mix), paid to the bank KD.`;
 }
 $('mgeSel').innerHTML = (DATA.mges || []).slice().reverse().map(m => `<option value="${m.s}">${esc(m.l)}${m.f ? '' : ' (provisional)'}</option>`).join('');

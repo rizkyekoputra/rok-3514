@@ -104,12 +104,14 @@ the user gives them; rerun with the real `--date` to fix.
 ## MGE (Mightiest Governor)
 
 Inputs in `tracker/mge/`: `mges.csv` (`mge` = start date, `start, end, troop, default_cap, final`), `<start>_slots.csv`
-(`slot, name, governor_id, cap`: the Top-10 allocation from the leadership mail; blank cap = no cap) and `<start>.csv`
+(`slot, name, governor_id, cap, tier`: the Top-10 allocation from the leadership mail; blank cap = no cap; slots with the
+same `tier` have the same reward and may swap places freely, e.g. tier `7-10` for slots 7–10) and `<start>.csv`
 (`rank, governor_id, name, points`: final ranking). Raw recordings go in `event/mge/<name (dates)>/`.
 
 Rules (`mge_results()` in `track.py`, fine rates `MGE_FINE`):
-- A **slot holder** may go past their listed points as long as they finish at their slot (or lower). Finishing *above*
-  their slot = took someone's rank: fined for the points over their listed cap.
+- A **slot holder** may go past their listed points as long as they finish at their slot (or lower), or anywhere within
+  their tier (same reward, e.g. slots 7–10). Finishing *above* that = took someone's rank: fined for the points over
+  their listed cap.
 - **Everyone else** (any alliance, farms and R4s included): max `default_cap` (7M). Fined for every point over.
   Finishing in a Top-10 rank allocated to someone else while over the limit is flagged as a **takeover**.
 - Fine per point over: 1,000 food / 1,000 wood / 750 stone / 500 gold, one resource or a mix. Stored in gold value

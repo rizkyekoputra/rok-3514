@@ -3,12 +3,6 @@
 
 <size=24><color=navy>══════ ✦ ⚔ ✦ ══════</color></size>
 
-• <b>Totos メtreme F2</b> – 7.31M – +306,815
-   306.82M Food / 306.82M Wood / 230.12M Stone / 153.41M Gold
-• <b>KINGDOM 3514</b> – 7.15M – +148,009
-   148.01M Food / 148.01M Wood / 111.01M Stone / 74.01M Gold
-• <b>Cynocobalamin</b> – 7.15M – +145,537
-   145.54M Food / 145.54M Wood / 109.16M Stone / 72.77M Gold
 • <b>Totos メtreme F3</b> – 7.03M – +26,680
    26.68M Food / 26.68M Wood / 20.01M Stone / 13.34M Gold
 
