@@ -150,7 +150,7 @@ fine rates in `MGE_FINE` at the top of `track.py`.
 then `.venv/bin/python .claude/skills/rok-weekly/scripts/import_mge_history.py history.txt` (check), `--write` ->
 `tracker/mge/history.csv` (seasons in the file are replaced, others kept), `python3 tracker/track.py`. Names are matched
 against every name a governor ever had (old names, KvK lists, MGE rankings), e.g. ᴅʀメ / Agam メtreme = ＡＧＡＭ,
-Byakko メtreme = JDメ, Wowo BijiSatu / Pria ˢᵒˡᵒ = RockyメGirang. Shown on the MGE tab (season table + most top-10
+Byakko メtreme = JDメ, Wowo BijiSatu / Pria ˢᵒˡᵒ = RockyメGering. Shown on the MGE tab (season table + most top-10
 finishes) and in the player pop-up; no limits or fines. Imported: seasons 46–65 (26 Jan – 19 Oct 2026; season 65 = MGE
 19–24 Oct). Not matched (name only): 火 Noir, Jack PriaSolo, Skinnier, ᴿᴵAmbaleon.
 

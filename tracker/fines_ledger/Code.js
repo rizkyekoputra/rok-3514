@@ -12,7 +12,7 @@
 const DASHBOARD = 'https://rizkyekoputra.github.io/rok-3514-dashboard/';
 const RECALC = 'https://api.github.com/repos/rizkyekoputra/rok-3514/actions/workflows/recalc.yml/dispatches';
 // Keep in sync with role=R4 in ../accounts.csv; rerun setup() after adding names (existing keys are kept).
-const R4 = ['Totos メtreme', 'Dobelメtreme', 'RockyメGirang', 'Depati Amir', 'ＡＧＡＭ', 'MʀメSENOPATI', 'JDメ', 'ツ 3D',
+const R4 = ['Totos メtreme', 'Dobelメtreme', 'RockyメGering', 'Depati Amir', 'ＡＧＡＭ', 'MʀメSENOPATI', 'JDメ', 'ツ 3D',
             'Saxaa メtreme', 'Nyyaaa', '么 QUEEN', 'xxYxx', 'メ S L A Y E R メ'];
 // Officers who may also approve/reject farm/main changes on the dashboard (besides the admin in the sheet menu).
 // Also settable per row: approver = yes in the Officers tab.
