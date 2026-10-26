@@ -362,7 +362,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       <select id="mgeSel"></select>
     </div>
     <div class="tiles" id="mgeTiles"></div>
-    <div class="card">
+    <div class="card" id="mgeRankCard">
       <h2>Ranking</h2>
       <div class="sub" id="mgeSub"></div>
       <div class="controls">
@@ -382,7 +382,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       </table></div>
       <div class="sub" id="mgeCount"></div>
     </div>
-    <div class="card">
+    <div class="card mgh" hidden>
       <h2>History's Mightiest Governors</h2>
       <div class="sub">Top 10 of each past MGE season, from the in-game history. Alliance tags and names as they were then; for reference only, no limits or fines.</div>
       <div class="controls">
@@ -395,7 +395,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       </table></div>
       <div class="sub" id="mghCount"></div>
     </div>
-    <div class="card">
+    <div class="card mgh" hidden>
       <h2>Most top-10 finishes</h2>
       <div class="sub" id="mghTopSub"></div>
       <div class="table-wrap"><table>
@@ -1154,6 +1154,11 @@ const MGE = Object.fromEntries((DATA.mges || []).map(m => [m.s, m]));
 const mgeFine = (s, i, name) => F.find(f => f.e && f.wk === s && (i != null ? f.p === i : f.n === name));
 const fineStatus = f => { const paid = paidOf(f); return paid >= f.a ? '<span class="paid">✓ Paid</span>' : paid ? `${gold(paid)} of ${gold(f.a)} paid` : '<span class="below">Unpaid</span>'; };
 function renderMge() {
+  const hist = $('mgeSel').value === 'history';  // past seasons (top 10 each) instead of one MGE's ranking
+  $('mgeTiles').style.display = hist ? 'none' : '';  // .tiles sets display, so hidden alone would not hide it
+  $('mgeRankCard').hidden = hist;
+  document.querySelectorAll('.mgh').forEach(c => c.hidden = !hist);
+  if (hist) return;
   const m = MGE[$('mgeSel').value];
   if (!m) { $('mgeBody').innerHTML = '<tr><td colspan="8" class="empty">No MGE data yet.</td></tr>'; return; }
   const q = $('mgeSearch').value.trim().toLowerCase(), show = $('mgeShow').value;
@@ -1213,7 +1218,8 @@ function renderMgh() {
 }
 $('mghSel').innerHTML = '<option value="all">All seasons</option>' + MGH.map(m => `<option value="${m.n}">Season ${m.n} · ${dayLabel(m.d)}</option>`).join('');
 ['mghSel', 'mghSearch'].forEach(id => $(id).addEventListener('input', renderMgh));
-$('mgeSel').innerHTML = (DATA.mges || []).slice().reverse().map(m => `<option value="${m.s}">${esc(m.l)}${m.f ? '' : ' (provisional)'}</option>`).join('');
+$('mgeSel').innerHTML = (DATA.mges || []).slice().reverse().map(m => `<option value="${m.s}">${esc(m.l)}${m.f ? '' : ' (provisional)'}</option>`).join('') +
+  (MGH.length ? `<option value="history">Past seasons: top 10 (seasons ${MGH[MGH.length - 1].n}–${MGH[0].n})</option>` : '');
 ['mgeSel', 'mgeSearch', 'mgeShow'].forEach(id => $(id).addEventListener('input', renderMge));
 
 // ---------- Canyon Clash tab ----------
@@ -1631,6 +1637,8 @@ function route() {
   const q = new URLSearchParams(location.hash.slice(1)), name = q.get('p');
   const p = name && (P.find(p => p.n === name) || P.find(p => (p.pn || []).includes(name)));
   showTab(q.get('t') || (p ? 'players' : tab));
+  const ev = q.get('e');  // MGE tab: e=<start date> or e=history (past seasons)
+  if (ev && [...$('mgeSel').options].some(o => o.value === ev)) { $('mgeSel').value = ev; renderMge(); }
   if (p) selectPlayer(p); else if ($('playerDlg').open) $('playerDlg').close();
 }
 
