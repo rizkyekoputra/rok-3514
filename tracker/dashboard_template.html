@@ -343,6 +343,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
           <option value="all">All fines</option>
         </select>
         <select id="finesEv"></select>
+        <select id="finesOff"></select>
       </div>
       <div class="table-wrap"><table>
         <thead><tr>
@@ -1381,6 +1382,7 @@ const fineWhen = f => esc(fineLabel(f));
 // Event of a fine for the Fines filter: "mge:<start>" or "fort:<monday>"; label without the offense number
 const fineEv = f => (f.e ? 'mge:' : 'fort:') + f.wk;
 const fineEvLabel = f => f.e || `Weekly Fort ${weekLabel(f.wk)} ${f.wk.slice(0, 4)}`;
+const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
 const fineWhy = f => f.e ? `${fmt(f.m)} pts over` : `${f.m} forts short`;
 const unpaidOf = p => ledger ? shownFines().filter(f => P[f.p] === p).reduce((a, f) => a + Math.max(0, f.a - paidOf(f)), 0) : p.u;
 
@@ -1435,11 +1437,12 @@ function renderOfficer() {
 
 function renderFines() {
   renderClaims();
-  const q = $('finesSearch').value.trim().toLowerCase(), sel = $('finesSel').value, ev = $('finesEv').value;
+  const q = $('finesSearch').value.trim().toLowerCase(), sel = $('finesSel').value, ev = $('finesEv').value, off = $('finesOff').value;
   const rows = shownFines().map(f => ({f, paid: paidOf(f), name: f.p != null ? P[f.p].n : f.n}))
     .filter(r => (!q || r.name.toLowerCase().includes(q) || r.f.n.toLowerCase().includes(q)) &&
       (sel === 'all' || (sel === 'paid') === (r.paid >= r.f.a)) &&
-      (ev === 'all' || (ev === 'fort' ? !r.f.e : fineEv(r.f) === ev)))
+      (ev === 'all' || (ev === 'fort' ? !r.f.e : fineEv(r.f) === ev)) &&
+      (off === 'all' || (!r.f.e && String(r.f.o) === off)))
     .sort((a, b) => b.f.wk.localeCompare(a.f.wk) || b.f.a - a.f.a);
   $('finesBody').innerHTML = rows.map(({f, paid, name}) => {
     const l = ledger && ledger[f.id], full = paid >= f.a;
@@ -1591,7 +1594,11 @@ function openPay(f) {
 $('finesEv').innerHTML = '<option value="all">All events</option><option value="fort">Weekly Fort (all weeks)</option>' +
   [...new Map(shownFines().slice().sort((a, b) => b.wk.localeCompare(a.wk)).map(f => [fineEv(f), fineEvLabel(f)]))]
     .map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('');
-['finesSearch', 'finesSel', 'finesEv'].forEach(id => $(id).addEventListener('input', renderFines));
+// Offense filter: fort fines only (an MGE fine has no offense number)
+$('finesOff').innerHTML = '<option value="all">All offenses</option>' +
+  [...new Set(shownFines().filter(f => !f.e && f.o).map(f => f.o))].sort((a, b) => a - b)
+    .map(o => `<option value="${o}">Fort: ${ordinal(o)} offense</option>`).join('');
+['finesSearch', 'finesSel', 'finesEv', 'finesOff'].forEach(id => $(id).addEventListener('input', renderFines));
 
 // ---------- tabs (#t=players|activity|fines|review, plus p=<name> on the players tab) ----------
 const TABS = ['players', 'activity', 'fines', 'mge', 'canyon', 'aoo', 'kvk', 'review'];
