@@ -11,6 +11,11 @@ Total Tech Donations: <b>8,169,000</b> (main accounts: 5,432,600)
 Main accounts reaching 70 Forts: <b>73/93</b>
 Main accounts reaching 50K Tech: <b>76/93</b>
 
+<b><color=navy>FORT VS LAST WEEK</color></b> <i>(12–18 Oct)</i>
+Fort Credits: <b>19,374</b> <color=#2E8B57>▲ +2,953 (+18.0%)</color>
+Main accounts: <b>11,555</b> <color=red>▼ 79 (-0.7%)</color>
+Mains reaching 70: <b>73</b> <color=#2E8B57>▲ +4</color>
+
 <b><color=navy>TOP FORT REWARDS</color></b>
 <color=#DAA520><b>1.</b></color> kocmoc (829) – Legendary Trophy + 10K VIP + $5 Flux
 <color=#808080><b>2.</b></color> N A H K O D A (793) – Epic Trophy + 5K VIP
@@ -26,7 +31,7 @@ Main accounts reaching 50K Tech: <b>76/93</b>
 <b><color=red>LOW CONTRIBUTION</color></b>
 1st offense (forgiven): <b>6</b> players
 Fined: <b>14</b> players
-Below 50K Tech: <b>17</b> players
+Below 50K Tech: <b>17</b> mains, <b>20</b> farms
 
 Check the following mails for the full lists.
 

@@ -431,7 +431,7 @@ def main():
             if a.get('role') == 'R4' and k not in seen:
                 lines.append(dict(name=a['name'], type=a['type'], role='R4', forts=None, tech=None,
                                   offense='', action='', due=0, miss_f=None, miss_t=None))
-        write_report(wk, lines)
+        write_report(wk, lines, history[-1] if history else None)
         history.append((wk, lines))
 
     with open(os.path.join(HERE, 'status.csv'), 'w', newline='', encoding='utf-8-sig') as f:
@@ -460,13 +460,14 @@ def main():
     write_dashboard(history, state, accounts, fines, mges, canyon_results(), aoo_results())
 
 
-def write_report(wk, lines):
+def write_report(wk, lines, prev=None):
     start = date.fromisoformat(wk)
     end = start + timedelta(days=6)
     title = f'{start.day} {start:%b} – {end.day} {end:%b %Y}'
     main_fail = sorted([l for l in lines if l['offense']], key=lambda l: (-l['offense'], -(l['miss_f'] or 0)))
     farm_low = [l for l in lines if l['type'] == 'farm' and l['miss_f']]
     tech_low = sorted([l for l in lines if l['miss_t'] and l['type'] == 'main'], key=lambda l: -l['miss_t'])
+    farm_tech_low = sorted([l for l in lines if l['miss_t'] and l['type'] == 'farm'], key=lambda l: -l['miss_t'])
     cleared = [l for l in lines if l['action'].startswith('Cleared')]
     ranked = sorted([l for l in lines if l['forts'] is not None and l['type'] == 'main' and l['role'] != 'R5'],
                     key=lambda l: -l['forts'])
@@ -482,6 +483,7 @@ def write_report(wk, lines):
            '## Summary', '', '| | Players |', '|---|---|',
            f'| Main accounts below fort minimum | {len(main_fail)} |',
            f'| Main accounts below tech minimum | {len(tech_low)} |',
+           f'| Farms below tech minimum (no penalty) | {len(farm_tech_low)} |',
            f'| Farms below fort minimum (no penalty) | {len(farm_low)} |',
            f'| Offenses cleared this week | {len(cleared)} |', '',
            '## Ranking rewards', '', 'Farms and the R5 are excluded from the top 10; R4s can place.', '',
@@ -504,15 +506,45 @@ def write_report(wk, lines):
         out += ['', '## Cleared this week', ''] + [f"- {l['name']}" for l in cleared]
     out += ['', '## Tech donation below minimum (main accounts)', '', '| Player | Tech | Missing |', '|---|---|---|']
     out += [f"| {l['name']} | {l['tech']:,} | {l['miss_t']:,} |" for l in tech_low]
+    out += ['', '## Tech donation below minimum (farms, no penalty)', '', '| Player | Tech | Missing |', '|---|---|---|']
+    out += [f"| {l['name']} | {l['tech']:,} | {l['miss_t']:,} |" for l in farm_tech_low]
     out += ['', '## Farms below fort minimum (no penalty)', '', '| Player | Forts | Missing |', '|---|---|---|']
     out += [f"| {l['name']} | {l['forts']} | {l['miss_f']} |" for l in farm_low]
     out.append('')
     with open(os.path.join(HERE, 'reports', f'{wk}.md'), 'w', encoding='utf-8') as f:
         f.write('\n'.join(out))
-    write_mails(wk, title, lines, ranked, r4, main_fail, tech_low)
+    write_mails(wk, title, lines, ranked, r4, main_fail, tech_low, farm_tech_low, prev)
 
 
-def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low):
+def fort_stats(lines):
+    """(fort credits of all members, of main accounts, main accounts reaching MIN_FORTS, members ranked).
+    Members ranked only flags a partly captured week."""
+    ranked = [l for l in lines if l['forts'] is not None]
+    mains = [l for l in ranked if l['type'] == 'main']
+    return (sum(l['forts'] for l in ranked), sum(l['forts'] for l in mains),
+            sum(l['forts'] >= MIN_FORTS for l in mains), len(ranked))
+
+
+def vs_last_week(lines, prev):
+    """Summary-mail lines comparing this week's fort event with the previous week (prev = (monday, lines))."""
+    if not prev:
+        return []
+    def delta(now, then, pct=False):
+        d = now - then
+        if not d:
+            return '<i>same</i>'
+        arrow = '<color=#2E8B57>▲ +' if d > 0 else '<color=red>▼ '
+        return f'{arrow}{abs(d):,}{f" ({d / then:+.1%})" if pct and then else ""}</color>'
+    now, then = fort_stats(lines), fort_stats(prev[1])
+    start = date.fromisoformat(prev[0])
+    return ['', f'<b><color=navy>FORT VS LAST WEEK</color></b> <i>({start.day}–{start + timedelta(days=6):%-d %b})</i>',
+            f'Fort Credits: <b>{now[0]:,}</b> {delta(now[0], then[0], True)}',
+            f'Main accounts: <b>{now[1]:,}</b> {delta(now[1], then[1], True)}',
+            f'Mains reaching {MIN_FORTS}: <b>{now[2]}</b> {delta(now[2], then[2])}'] + \
+        (['<i>Last week was only partly captured, so the change is overstated.</i>'] if then[3] < 0.9 * now[3] else [])
+
+
+def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low, farm_tech_low, prev=None):
     """In-game alliance mails (RoK rich text), one file per topic, in mails/<monday>/."""
     head = lambda t: [f'<size=30><b>3514 | {t}</b></size>', f'<b>{title}</b>', '',
                       '<size=24><color=navy>══════ ✿ ══════</color></size>', '']
@@ -533,8 +565,8 @@ def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low):
         f'Total Tech Donations: <b>{tech_all:,}</b> (main accounts: {tech_main:,})',
         f'<i>Sum of all {len(counted)} members in the ranking, farms included.</i>', '',
         f'Main accounts reaching {MIN_FORTS} Forts: <b>{len(mains) - len(main_fail)}/{len(mains)}</b>',
-        f'Main accounts reaching {MIN_TECH // 1000}K Tech: <b>{len(mains) - len(tech_low)}/{len(mains)}</b>', '',
-        '<b><color=navy>TOP FORT REWARDS</color></b>']
+        f'Main accounts reaching {MIN_TECH // 1000}K Tech: <b>{len(mains) - len(tech_low)}/{len(mains)}</b>'] + \
+        vs_last_week(lines, prev) + ['', '<b><color=navy>TOP FORT REWARDS</color></b>']
     colors = ['#DAA520', '#808080', '#CD7F32']
     for i, l in enumerate(ranked[:len(REWARDS)]):
         reward = REWARDS[i] + (' + $5 Flux' if i == 0 and l['forts'] >= FLUX_FORTS else '')
@@ -544,7 +576,7 @@ def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low):
         '', '<b><color=red>LOW CONTRIBUTION</color></b>',
         f'1st offense (forgiven): <b>{len(first)}</b> players',
         f'Fined: <b>{len(fined)}</b> players',
-        f'Below {MIN_TECH // 1000}K Tech: <b>{len(tech_low)}</b> players',
+        f'Below {MIN_TECH // 1000}K Tech: <b>{len(tech_low)}</b> mains, <b>{len(farm_tech_low)}</b> farms',
         '', 'Check the following mails for the full lists.'] + foot
 
     ordinal = {2: '2nd', 3: '3rd'}
@@ -576,6 +608,13 @@ def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low):
         f'These main accounts donated less than <b>{MIN_TECH:,}</b> tech points this week.', ''],
         [f"• {l['name']} – {l['tech']:,}" for l in sorted(tech_low, key=lambda l: l['tech'])],
         ['', f'Please reach <b>{MIN_TECH // 1000}K</b> next week.'])
+    m4 = ('5_low_tech_farms', 'LOW TECH – FARMS', [
+        f'These farm accounts donated less than <b>{MIN_TECH:,}</b> tech points this week.',
+        'There is <b>no penalty</b>, but when the alliance needs room for a new member (main or farm), '
+        '<color=red><b>the lowest on this list are the first to be kicked</b></color>.',
+        '<i>Lowest first:</i>', ''],
+        [f"• {l['name']} – {l['tech']:,}" for l in sorted(farm_tech_low, key=lambda l: l['tech'])],
+        ['', f'Reach <b>{MIN_TECH // 1000}K</b> next week to keep your spot.'])
 
     rules = ['<size=30><b>3514 | WEEKLY FORT RULES</b></size>', '',
              '<size=24><color=navy>══════ ✿ ══════</color></size>', '',
@@ -609,10 +648,10 @@ def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low):
     os.makedirs(d, exist_ok=True)
     for old in os.listdir(d):
         os.remove(os.path.join(d, old))
-    for name, body in [('1_summary', summary), ('5_fort_rules', rules)]:
+    for name, body in [('1_summary', summary), ('6_fort_rules', rules)]:
         with open(os.path.join(d, f'{name}.txt'), 'w', encoding='utf-8') as f:
             f.write('\n'.join(body) + '\n')
-    for name, t, intro, items, outro in (m1, m2, m3):
+    for name, t, intro, items, outro in (m1, m2, m3, m4):
         parts = split_mail(t, head, intro, items or ['(none)'], outro + foot)
         for i, body in enumerate(parts):
             suffix = f'_part{i + 1}' if len(parts) > 1 else ''
