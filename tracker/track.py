@@ -17,6 +17,8 @@ Reads:
   mge/<start>_slots.csv  slot, name, governor_id, cap, tier: the Top-10 allocation (blank cap = no cap; slots with the
                     same tier, e.g. 7-10 with the same reward, may swap places freely)
   mge/<start>.csv   rank, governor_id, name, points: final ranking (import_mge.py)
+  mge/history.csv   season, date, rank, alliance, name, points, governor_id: in-game History's Mightiest Governors,
+                    top 10 of each past season (import_mge_history.py); shown only, no limits or fines
   canyon/canyons.csv  canyon (= start date), start, end: one row per Canyon Clash
   canyon/<start>.csv  rank, governor_id, name, defenses, attacks: combat statistics (import_canyon.py), attacks out of 3
   aoo/aoos.csv      aoo (= date), date, team, opponent, result, score, opponent_score, final, note: one row per Ark of
@@ -76,6 +78,12 @@ MAIN_ALLIANCE = '[14-X]THE MORTICIANS'
 REWARDS = ['Legendary Trophy + 10K VIP', 'Epic Trophy + 5K VIP', 'Epic Trophy'] + \
           ['Elite Trophy'] * 5 + ['Advanced Trophy'] * 2
 R4_REWARD = 'Advanced Trophy'
+# Weeks whose R4 trophy list is set by hand (Governor IDs), instead of every R4; [] = no R4 trophy that week
+R4_REWARD_MANUAL = {
+    '2026-10-12': ['107368414', '145955574', '143845047', '190986564',  # Totos, Depati Amir, MʀメSENOPATI, ツ 3D
+                   '145988051', '143851764', '158118163', '55664233'],  # Saxaa, ＡＧＡＭ, xxYxx, Dobel
+    '2026-10-19': [],
+}
 
 # MGE: fine per point over the player's cap, payable in one resource or a mix (in gold-equivalent, food = wood = 2 gold
 # and stone = 1.5 gold per unit of value, the same rates as the fort fines). Caps live in mge/mges.csv and mge/<start>_slots.csv.
@@ -462,7 +470,11 @@ def write_report(wk, lines):
     cleared = [l for l in lines if l['action'].startswith('Cleared')]
     ranked = sorted([l for l in lines if l['forts'] is not None and l['type'] == 'main' and l['role'] != 'R5'],
                     key=lambda l: -l['forts'])
-    r4 = [l for l in lines if l['role'] == 'R4']
+    if wk in R4_REWARD_MANUAL:
+        by_key = {l['key']: l for l in lines}
+        r4 = [by_key[k] for k in R4_REWARD_MANUAL[wk]]
+    else:
+        r4 = [l for l in lines if l['role'] == 'R4']
 
     out = [f'# Weekly Activity Report – {title}', '',
            f'Rules: min **{MIN_FORTS} forts** and **{MIN_TECH:,} tech** per week. '
@@ -479,7 +491,8 @@ def write_report(wk, lines):
         if i == 0:
             reward += ' + $5 Flux' if l['forts'] >= FLUX_FORTS else f' (no Flux: under {FLUX_FORTS})'
         out.append(f"| {i + 1} | {l['name']} | {l['forts']} | {reward} |")
-    out += ['', f'R4 ({R4_REWARD}):', '']
+    if r4:
+        out += ['', f'R4 ({R4_REWARD}):', '']
     out += [f"- {l['name']}" + (f" ({l['forts']} forts)" if l['forts'] is not None else ' (forts not captured)')
             for l in r4]
     out += ['', '## Fort penalties (main accounts)', '',
@@ -527,7 +540,7 @@ def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low):
         reward = REWARDS[i] + (' + $5 Flux' if i == 0 and l['forts'] >= FLUX_FORTS else '')
         place = f'<color={colors[i]}><b>{i + 1}.</b></color>' if i < 3 else f'<b>{i + 1}.</b>'
         summary.append(f"{place} {l['name']} ({l['forts']}) – {reward}")
-    summary += ['', f'<b>R4 – {R4_REWARD}</b>'] + [f"• {l['name']}" for l in r4] + [
+    summary += (['', f'<b>R4 – {R4_REWARD}</b>'] + [f"• {l['name']}" for l in r4] if r4 else []) + [
         '', '<b><color=red>LOW CONTRIBUTION</color></b>',
         f'1st offense (forgiven): <b>{len(first)}</b> players',
         f'Fined: <b>{len(fined)}</b> players',
@@ -793,6 +806,15 @@ def write_dashboard(history, state, accounts, fines, mges, canyons, aoos):
         mge.append(dict(s=ev['start'], e=ev['end'], t=ev['troop'], c=num(ev['default_cap']), l=mge_label(ev), f=ev['final'] == 'yes',
                         r=[[r['rank'], ids.get(r['key']), r['name'], r['points'], r['slot'], r['cap'], r['over'],
                             r['fine'], r['took']] for r in rows]))
+    mgh = []  # past MGE seasons, newest first: rows [rank, player index or None, alliance then, name then, points]
+    hist = read('mge/history.csv')
+    for season in sorted({int(r['season']) for r in hist}, reverse=True):
+        rows = [r for r in hist if int(r['season']) == season]
+        for r in rows:
+            if key(r) in ids:
+                players[ids[key(r)]].setdefault('mh', []).append([season, rows[0]['date'], int(r['rank']), num(r['points'])])
+        mgh.append(dict(n=season, d=rows[0]['date'],
+                        r=[[int(r['rank']), ids.get(key(r)), r['alliance'], r['name'], num(r['points'])] for r in rows]))
     canyon = []  # per Canyon Clash: rows [rank, player index or None, name then, defenses, attacks used]
     for ev, rows in canyons:
         for r in rows:
@@ -820,7 +842,7 @@ def write_dashboard(history, state, accounts, fines, mges, canyons, aoos):
     ledger = json.load(open(lp, encoding='utf-8')) if os.path.exists(lp) else {}
     data = dict(weeks=[wk for wk, _ in history], minF=MIN_FORTS, minT=MIN_TECH, players=players,
                 fines=fines, finesUrl=FINES_URL, scanDay=scan_day, namesDay=names_day, mainAlly=MAIN_ALLIANCE, kvks=kvks,
-                mges=mge, canyons=canyon, aoos=aoo, aooMin=AOO_MIN, mgeFine=MGE_FINE, fineKinds=FINE_KINDS, bank=BANK, claimsOn=CLAIMS_ON,
+                mges=mge, mgeHist=mgh, canyons=canyon, aoos=aoo, aooMin=AOO_MIN, mgeFine=MGE_FINE, fineKinds=FINE_KINDS, bank=BANK, claimsOn=CLAIMS_ON,
                 ledger=dict(paid=ledger.get('paid', {}), accounts=ledger.get('accounts', {})), officers=ledger.get('officers', []),
                 updated=date.today().isoformat())
     with open(os.path.join(HERE, 'dashboard_template.html'), encoding='utf-8') as f:

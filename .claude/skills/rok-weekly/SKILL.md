@@ -26,7 +26,7 @@ to read the rankings accurately, match names to Governor IDs, and keep `accounts
 | `tracker/mails/<monday>/` | In-game alliance mails, RoK rich text, each ≤ 2000 chars (generated) |
 | `tracker/status.csv`, `tracker/offense_log.csv` | Current status and full offense history (generated) |
 | `tracker/ch/<date>.csv` | City hall levels (`governor_id, name, ch`), from `scripts/import_ch.py`; the highest level seen per governor is the master list's **CH** column/filter (KvK is CH25 only) |
-| `tracker/mge/` | MGE inputs: `mges.csv`, `<start>_slots.csv` (Top-10 allocation), `<start>.csv` (ranking). See **MGE** below |
+| `tracker/mge/` | MGE inputs: `mges.csv`, `<start>_slots.csv` (Top-10 allocation), `<start>.csv` (ranking), `history.csv` (top 10 of past seasons). See **MGE** below |
 | `tracker/mge_log.csv`, `tracker/reports/mge-<start>.md`, `tracker/mails/mge-<start>/` | MGE over-limit fines and takeovers, report, sanctions mail (generated) |
 | `event/mge/<name (dates)>/` | Raw MGE ranking recordings / screenshots the user provides |
 | `tracker/canyon/` | Canyon Clash: `canyons.csv` (`canyon, start, end`), `<start>.csv` (combat statistics). See **Canyon Clash** below |
@@ -143,6 +143,16 @@ folder, then ask before publishing.
 
 Rule changes: the default cap is per event (`mges.csv`), Top-10 limits per event (slots file, from the leadership mail),
 fine rates in `MGE_FINE` at the top of `track.py`.
+
+**Past seasons (History's Mightiest Governors)**: the in-game history shows the top 10 of every past MGE season
+(season number, start date, `[tag]name`, points). Recorded in `event/mge/` (1280×592: `extract_frames.py VIDEO <scratch>
+--crop 0,0,1280,592 --fps 1`), transcribe `season|date|rank|alliance|name|points` (tag without brackets, blank if none),
+then `.venv/bin/python .claude/skills/rok-weekly/scripts/import_mge_history.py history.txt` (check), `--write` ->
+`tracker/mge/history.csv` (seasons in the file are replaced, others kept), `python3 tracker/track.py`. Names are matched
+against every name a governor ever had (old names, KvK lists, MGE rankings), e.g. ᴅʀメ / Agam メtreme = ＡＧＡＭ,
+Byakko メtreme = JDメ, Wowo BijiSatu / Pria ˢᵒˡᵒ = RockyメGirang. Shown on the MGE tab (season table + most top-10
+finishes) and in the player pop-up; no limits or fines. Imported: seasons 46–65 (26 Jan – 19 Oct 2026; season 65 = MGE
+19–24 Oct). Not matched (name only): 火 Noir, Jack PriaSolo, Skinnier, ᴿᴵAmbaleon.
 
 ## Canyon Clash
 

@@ -1,71 +1,80 @@
 ﻿governor_id,name,type,role,offenses,passing_streak,unpaid_gold,next_if_fail,lifetime_offenses,times_cleared,last_offense_week
-139556724,Ai real,main,,2,0,35000000,1M gold per missing fort + unpaid fines,2,0,2026-10-12
+139556724,Ai real,main,,3,0,104000000,Must migrate (or zeroed),3,0,2026-10-19
+69061362,HADE1999,main,,3,0,67000000,Must migrate (or zeroed),3,0,2026-10-19
+170854552,Xu Muuu,main,,3,0,90500000,Must migrate (or zeroed),3,0,2026-10-19
+name:иэхт,иэхт,main,,3,0,53500000,Must migrate (or zeroed),3,0,2026-10-19
+35959280,чм чм,main,,3,0,35000000,Must migrate (or zeroed),3,0,2026-10-19
+143927794,ᴳᴼ 乛iSeng,main,,3,0,70000000,Must migrate (or zeroed),3,0,2026-10-19
+171854288,ᴹᴬᴰMladen,main,,3,0,43000000,Must migrate (or zeroed),3,0,2026-10-19
+181007209,なおちん,main,,3,0,34000000,Must migrate (or zeroed),3,0,2026-10-19
+79930790,Ak HD,main,,2,0,4500000,1M gold per missing fort + unpaid fines,2,0,2026-10-19
 201952743,Arkan The Därk,main,,2,0,33000000,1M gold per missing fort + unpaid fines,2,0,2026-10-12
+109676919,Conquísta,main,,2,0,34500000,1M gold per missing fort + unpaid fines,2,0,2026-10-19
 198546430,FireLord,main,,2,0,0,1M gold per missing fort + unpaid fines,2,0,2026-10-12
-69061362,HADE1999,main,,2,0,0,1M gold per missing fort + unpaid fines,2,0,2026-10-12
 166206580,Kutang Bagak,main,,2,0,35000000,1M gold per missing fort + unpaid fines,2,0,2026-10-12
-146264613,Lóc Bóc,main,,2,0,0,1M gold per missing fort + unpaid fines,2,0,2026-10-12
+146264613,Lóc Bóc,main,,2,1,0,1M gold per missing fort + unpaid fines,2,0,2026-10-12
+169620110,PISANGkeju,main,,2,0,13000000,1M gold per missing fort + unpaid fines,2,0,2026-10-19
+181014308,Phuc loc,main,,2,0,14000000,1M gold per missing fort + unpaid fines,2,0,2026-10-19
+205685285,SIINISTA,main,,2,0,25000000,1M gold per missing fort + unpaid fines,2,0,2026-10-19
 69008732,Sanji Kunᵖʰ,main,,2,0,0,1M gold per missing fort + unpaid fines,2,0,2026-10-12
 204335189,Tottigno 72,main,,2,0,9000000,1M gold per missing fort + unpaid fines,2,0,2026-10-12
-170854552,Xu Muuu,main,,2,0,31500000,1M gold per missing fort + unpaid fines,2,0,2026-10-12
 77299661,XxayoubxX,main,,2,0,34000000,1M gold per missing fort + unpaid fines,2,0,2026-10-12
 40095145,YddrY,main,,2,0,0,1M gold per missing fort + unpaid fines,2,0,2026-10-12
+168303005,ZEESHAN KASHMAR,main,,2,0,30500000,1M gold per missing fort + unpaid fines,2,0,2026-10-19
 202239761,alex2000f,main,,2,0,26000000,1M gold per missing fort + unpaid fines,2,0,2026-10-12
-123147535,sadir,main,,2,0,0,1M gold per missing fort + unpaid fines,2,0,2026-10-12
+123147535,sadir,main,,2,1,0,1M gold per missing fort + unpaid fines,2,0,2026-10-12
 68013953,wowsih,main,,2,0,34500000,1M gold per missing fort + unpaid fines,2,0,2026-10-12
-116658943,Лехачь,main,,2,0,0,1M gold per missing fort + unpaid fines,2,0,2026-10-12
-name:иэхт,иэхт,main,,2,0,21500000,1M gold per missing fort + unpaid fines,2,0,2026-10-12
-35959280,чм чм,main,,2,0,0,1M gold per missing fort + unpaid fines,2,0,2026-10-12
-143927794,ᴳᴼ 乛iSeng,main,,2,0,0,1M gold per missing fort + unpaid fines,2,0,2026-10-12
-171854288,ᴹᴬᴰMladen,main,,2,0,0,1M gold per missing fort + unpaid fines,2,0,2026-10-12
-181007209,なおちん,main,,2,0,0,1M gold per missing fort + unpaid fines,2,0,2026-10-12
+116658943,Лехачь,main,,2,1,0,1M gold per missing fort + unpaid fines,2,0,2026-10-12
 12132610,么Angelzᴳᵈ,main,,2,0,0,1M gold per missing fort + unpaid fines,2,0,2026-10-12
-195359235,3inawy,main,,1,1,0,500K gold per missing fort,1,0,2026-10-05
-79930790,Ak HD,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
-name:Aм,Aм,main,,1,1,0,500K gold per missing fort,1,0,2026-10-05
 197055777,Ciscooooo,main,,1,0,0,500K gold per missing fort,1,0,2026-10-05
-109676919,Conquísta,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
-181995644,Emperor Jorge,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
-181047528,Jeyjœ,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
-195661719,KING GHOST CD,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
-62179665,Kangak,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
-175932098,Lorenzaメtreme,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
+181995644,Emperor Jorge,main,,1,1,0,500K gold per missing fort,1,0,2026-10-12
+172034317,Gembird,main,,1,0,0,500K gold per missing fort,1,0,2026-10-19
+150664679,HvMoltke,main,,1,0,0,500K gold per missing fort,1,0,2026-10-19
+181047528,Jeyjœ,main,,1,1,0,500K gold per missing fort,1,0,2026-10-12
+62179665,Kangak,main,,1,1,0,500K gold per missing fort,1,0,2026-10-12
+175932098,Lorenzaメtreme,main,,1,1,0,500K gold per missing fort,1,0,2026-10-12
+195661719,Mahmutaga23,main,,1,1,0,500K gold per missing fort,1,0,2026-10-12
 143465265,Momo Xtreme,main,,1,0,0,500K gold per missing fort,1,0,2026-10-05
-167152470,Nyyaaa,main,R4,1,1,0,500K gold per missing fort,1,0,2026-10-05
-169620110,PISANGkeju,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
-181014308,Phuc loc,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
-205685285,SIINISTA,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
-100124920,Sotasi,main,,1,1,0,500K gold per missing fort,1,0,2026-10-05
 90863521,SsCcorpion,main,,1,0,0,500K gold per missing fort,1,0,2026-10-05
 78586125,Szkips,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
-62800667,Want to sleep,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
+80204155,VinChishko,main,,1,0,0,500K gold per missing fort,1,0,2026-10-19
+62800667,Want to sleep,main,,1,1,0,500K gold per missing fort,1,0,2026-10-12
 158814183,Webzz,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
-168303005,ZEESHAN KASHMAR,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
-169126948,ʷˣ Exorcist,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
-65269485,٠313,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
-167300281,ᴷᴿdisastr,main,,1,1,0,500K gold per missing fort,1,0,2026-10-05
-name:ᴷᴿkangUdin,ᴷᴿkangUdin,main,,1,0,0,500K gold per missing fort,1,0,2026-10-12
-203309142,ᴹᶜ Bluepack,main,,1,1,0,500K gold per missing fort,1,0,2026-10-05
+185258749,diábolosメ,main,,1,0,0,500K gold per missing fort,1,0,2026-10-19
+163944768,färメ,main,,1,0,0,500K gold per missing fort,1,0,2026-10-19
+169126948,ʷˣ Exorcist,main,,1,1,0,500K gold per missing fort,1,0,2026-10-12
+65269485,٠313,main,,1,1,0,500K gold per missing fort,1,0,2026-10-12
+171235033,ᴷᴿkangUdin,main,,1,1,0,500K gold per missing fort,1,0,2026-10-12
 172540072,乂DDoms,main,,1,0,0,500K gold per missing fort,1,0,2026-10-05
-77541032,ATOMIV,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-177271555,Aisyahh,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-3249559,Arixion,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-177659341,Banunu メtreme,main,,0,1,0,Forgiven + Low Contribution label,0,0,
+106884408,亗VăN KăY亗,main,,1,0,0,500K gold per missing fort,1,0,2026-10-19
+195359235,3inawy,main,,0,2,0,Forgiven + Low Contribution label,1,1,2026-10-05
+name:Aм,Aм,main,,0,2,0,Forgiven + Low Contribution label,1,1,2026-10-05
+167152470,Nyyaaa,main,R4,0,2,0,Forgiven + Low Contribution label,1,1,2026-10-05
+100124920,Sotasi,main,,0,2,0,Forgiven + Low Contribution label,1,1,2026-10-05
+167300281,ᴷᴿdisastr,main,,0,2,0,Forgiven + Low Contribution label,1,1,2026-10-05
+203309142,ᴹᶜ Bluepack,main,,0,2,0,Forgiven + Low Contribution label,1,1,2026-10-05
+77541032,ATOMIV,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+39463858,ATOMV Farm,farm,,0,0,0,-,0,0,
+177271555,Aisyahh,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+3249559,Arixion,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+177659341,Banunu メtreme,main,,0,2,0,Forgiven + Low Contribution label,0,0,
 89455803,Bijinya Wowo 02,farm,,0,0,0,-,0,0,
 188187912,Bom09xx,farm,,0,0,0,-,0,0,
 name:Brísingamen,Brísingamen,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-177220380,BuildOzer,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-65163962,C4tWom4n,main,,0,2,0,Forgiven + Low Contribution label,0,0,
-41938978,Cebong,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-179442900,Chicken メtreme,main,,0,1,0,Forgiven + Low Contribution label,0,0,
+177220380,BuildOzer,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+65163962,C4tWom4n,main,,0,3,0,Forgiven + Low Contribution label,0,0,
+41938978,Cebong,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+183500674,Chicken メFarm,farm,,0,0,0,-,0,0,
+179442900,Chicken メtreme,main,,0,2,0,Forgiven + Low Contribution label,0,0,
 145393306,Ciprofloxasin,farm,,0,0,0,-,0,0,
-103375284,CumPewpew,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-145955574,Depati Amir,main,R4,0,1,0,Forgiven + Low Contribution label,0,0,
+103375284,CumPewpew,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+145955574,Depati Amir,main,R4,0,2,0,Forgiven + Low Contribution label,0,0,
 81759932,Dobel Farm001,farm,,0,0,0,-,0,0,
-55664233,Dobelメtreme,main,R4,0,1,0,Forgiven + Low Contribution label,0,0,
+154568434,Dobel Farm002,farm,,0,0,0,-,0,0,
+55664233,Dobelメtreme,main,R4,0,2,0,Forgiven + Low Contribution label,0,0,
 7749836,Dr Flamboyant,main,,0,1,0,Forgiven + Low Contribution label,0,0,
 170958701,EXORCIST F1,farm,,0,0,0,-,0,0,
-67856059,EdėlwėiS,main,,0,1,0,Forgiven + Low Contribution label,0,0,
+67856059,EdėlwėiS,main,,0,2,0,Forgiven + Low Contribution label,0,0,
 68877667,EdėlwėiS 02,farm,,0,0,0,-,0,0,
 71102618,EdėlwėiS 03,farm,,0,0,0,-,0,0,
 71102620,EdėlwėiS 04,farm,,0,0,0,-,0,0,
@@ -74,95 +83,99 @@ name:Brísingamen,Brísingamen,main,,0,1,0,Forgiven + Low Contribution label,0,0
 179287617,FarmAisyah1,farm,,0,0,0,-,0,0,
 name:Filler D39471,Filler D39471,farm,,0,0,0,-,0,0,
 180707837,Filler D3P471,farm,,0,0,0,-,0,0,
-181002152,GANIBAL メtreme,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-176296538,GENERAL TREV,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-172034317,Gembird,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-150664679,HvMoltke,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-175854595,JDメ,main,R4,0,1,0,Forgiven + Low Contribution label,0,0,
+181002152,GANIBAL メtreme,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+176296538,GENERAL TREV,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+179303423,GENERAL TREV 2,farm,,0,0,0,-,0,0,
+175854595,JDメ,main,R4,0,2,0,Forgiven + Low Contribution label,0,0,
 175870562,JDメ Farm,farm,,0,0,0,-,0,0,
 199412267,JDメ Farm 1,farm,,0,0,0,-,0,0,
 191137356,Jeyjo F1,farm,,0,0,0,-,0,0,
-180708263,KINGDOM 3514,main,R5,0,2,0,Forgiven + Low Contribution label,0,0,
+180708263,KINGDOM 3514,main,R5,0,3,0,Forgiven + Low Contribution label,0,0,
 name:KNTLkecil F4,KNTLkecil F4,farm,,0,0,0,-,0,0,
-81892314,KaLfiN,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-181207161,Khám phá,main,,0,1,0,Forgiven + Low Contribution label,0,0,
+181012304,KNTLkecil F4,farm,,0,0,0,-,0,0,
+81892314,KaLfiN,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+181207161,Khám phá,main,,0,2,0,Forgiven + Low Contribution label,0,0,
 175927562,Lorenza F,farm,,0,0,0,-,0,0,
-89233156,Mas Dar JosJis,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-176805899,MasterMoore,main,,0,1,0,Forgiven + Low Contribution label,0,0,
+89233156,Mas Dar JosJis,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+176805899,MasterMoore,main,,0,2,0,Forgiven + Low Contribution label,0,0,
 189342415,Mina F1,farm,,0,0,0,-,0,0,
 222586242,Mina F2,farm,,0,0,0,-,0,0,
-153690607,Miss Monique,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-143845047,MʀメSENOPATI,main,R4,0,1,0,Forgiven + Low Contribution label,0,0,
-103303898,N A H K O D A,main,,0,1,0,Forgiven + Low Contribution label,0,0,
+153690607,Miss Monique,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+38513869,MrDadan JosJis,farm,,0,0,0,-,0,0,
+90130614,MsNanik JosJis,farm,,0,0,0,-,0,0,
+143845047,MʀメSENOPATI,main,R4,0,2,0,Forgiven + Low Contribution label,0,0,
+103303898,N A H K O D A,main,,0,2,0,Forgiven + Low Contribution label,0,0,
 105746460,NAHKODA F1,farm,,0,0,0,-,0,0,
 195823109,NAHKODA F2,farm,,0,0,0,-,0,0,
 195920838,NAHKODA F3,farm,,0,0,0,-,0,0,
+195815331,NAHKODA F5,farm,,0,0,0,-,0,0,
 170164042,NyyaaaFarm,farm,,0,0,0,-,0,0,
 143125452,NyyaaaFarm G,farm,,0,0,0,-,0,0,
 171025043,NyyaaaFarm1,farm,,0,0,0,-,0,0,
 139309458,NyyaaaFarmS,farm,,0,0,0,-,0,0,
-181058237,OMY KINGDOMS,main,,0,2,0,Forgiven + Low Contribution label,0,0,
-145424316,PapiメSeno,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+181058237,OMY KINGDOMS,main,,0,3,0,Forgiven + Low Contribution label,0,0,
+145424316,PapiメSeno,main,,0,3,0,Forgiven + Low Contribution label,0,0,
 192336023,Phuc loc1,farm,,0,0,0,-,0,0,
-89400581,RockyメGirang,main,R4,0,1,0,Forgiven + Low Contribution label,0,0,
-180833917,SAU メ KHANG,main,,0,1,0,Forgiven + Low Contribution label,0,0,
+89400581,RockyメGirang,main,R4,0,2,0,Forgiven + Low Contribution label,0,0,
+180833917,SAU メ KHANG,main,,0,2,0,Forgiven + Low Contribution label,0,0,
 180710733,SAXAA F1,farm,,0,0,0,-,0,0,
 180974743,SAXAA F2,farm,,0,0,0,-,0,0,
 180891655,Sau Farm,farm,,0,0,0,-,0,0,
-145988051,Saxaa メtreme,main,R4,0,2,0,Forgiven + Low Contribution label,0,0,
-124169478,SenOpati ᵀᴹ,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-128919567,Senopati ᵀᴹ,main,,0,1,0,Forgiven + Low Contribution label,0,0,
+145988051,Saxaa メtreme,main,R4,0,3,0,Forgiven + Low Contribution label,0,0,
+124169478,SenOpati ᵀᴹ,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+128919567,Senopati ᵀᴹ,main,,0,2,0,Forgiven + Low Contribution label,0,0,
 66139477,SenoritaSTONKS,farm,,0,0,0,-,0,0,
-151103679,Shutaメ,main,,0,1,0,Forgiven + Low Contribution label,0,0,
+151103679,Shutaメ,main,,0,2,0,Forgiven + Low Contribution label,0,0,
 185517801,ShutaメF1,farm,,0,0,0,-,0,0,
+151458930,ShutaメF2,farm,,0,0,0,-,0,0,
 66309542,SirDanceAlot,farm,,0,0,0,-,0,0,
 146260346,Speak well,farm,,0,0,0,-,0,0,
 86698359,Ssoz,main,,0,2,0,Forgiven + Low Contribution label,0,0,
-57077978,Timo Ultra 2003,main,,0,2,0,Forgiven + Low Contribution label,0,0,
-107368414,Totos メtreme,main,R4,0,1,0,Forgiven + Low Contribution label,0,0,
+57077978,Timo Ultra 2003,main,,0,3,0,Forgiven + Low Contribution label,0,0,
+107368414,Totos メtreme,main,R4,0,2,0,Forgiven + Low Contribution label,0,0,
 65250242,Totos メtreme F1,farm,,0,0,0,-,0,0,
 109208479,Totos メtreme F2,farm,,0,0,0,-,0,0,
 180707935,Totos メtreme F3,farm,,0,0,0,-,0,0,
-161232337,U2B,main,,0,1,0,Forgiven + Low Contribution label,0,0,
+161232337,U2B,main,,0,2,0,Forgiven + Low Contribution label,0,0,
 68106395,U2BF,farm,,0,0,0,-,0,0,
-147039332,Ugly Kid Joe,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-182318303,UtTHaメ,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-72516681,UtTha,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+147039332,Ugly Kid Joe,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+182318303,UtTHaメ,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+72516681,UtTha,main,,0,3,0,Forgiven + Low Contribution label,0,0,
 182002889,UtTon,farm,,0,0,0,-,0,0,
 106895476,Văn Kăy f,farm,,0,0,0,-,0,0,
-144363507,Walid メ Dewi,main,,0,1,0,Forgiven + Low Contribution label,0,0,
 176575373,difffarm,farm,,0,0,0,-,0,0,
-185258749,diábolosメ,main,,0,2,0,Forgiven + Low Contribution label,0,0,
 204581156,diábolosメ F1,farm,,0,0,0,-,0,0,
-163944768,färメ,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-104503006,kocmoc,main,,0,1,0,Forgiven + Low Contribution label,0,0,
+104503006,kocmoc,main,,0,2,0,Forgiven + Low Contribution label,0,0,
 108814214,kocmoc2,farm,,0,0,0,-,0,0,
 151711800,kocmoc3,farm,,0,0,0,-,0,0,
+165819159,kocmoc6,farm,,0,0,0,-,0,0,
 170335847,mikima0,farm,,0,0,0,-,0,0,
 name:susuKNTLfarmx,susuKNTLfarmx,farm,,0,0,0,-,0,0,
 name:susuKNTLfarmz,susuKNTLfarmz,farm,,0,0,0,-,0,0,
-65787218,susuKNTLmaniez,main,,0,2,0,Forgiven + Low Contribution label,0,0,
-158118163,xxYxx,main,R4,0,1,0,Forgiven + Low Contribution label,0,0,
-7542395,xynee,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+65787218,susuKNTLmaniez,main,,0,3,0,Forgiven + Low Contribution label,0,0,
+158118163,xxYxx,main,R4,0,2,0,Forgiven + Low Contribution label,0,0,
+7542395,xynee,main,,0,3,0,Forgiven + Low Contribution label,0,0,
 193600497,xynee 01,farm,,0,0,0,-,0,0,
-180576879,ʳˡᶠDRAGON,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-200635359,ᴄɢ RedShanks,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-176386666,ᴬᵏdifffff,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-143222922,ᴬᶜWINTER,main,,0,1,0,Forgiven + Low Contribution label,0,0,
+194999342,xynee 02,farm,,0,0,0,-,0,0,
+180576879,ʳˡᶠDRAGON,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+200635359,ᴄɢ RedShanks,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+176386666,ᴬᵏdifffff,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+143222922,ᴬᶜWINTER,main,,0,2,0,Forgiven + Low Contribution label,0,0,
 200849376,ᴳᵒ4cheᴰʷ,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-131832414,ᴴᴹLightFX,main,,0,2,0,Forgiven + Low Contribution label,0,0,
-179745398,ᵂᴳ Serafino,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-190986564,ツ 3D,main,R4,0,1,0,Forgiven + Low Contribution label,0,0,
+131832414,ᴴᴹLightFX,main,,0,3,0,Forgiven + Low Contribution label,0,0,
+179745398,ᵂᴳ Serafino,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+198417806,ᶫʳ文 QueenF,farm,,0,0,0,-,0,0,
+190986564,ツ 3D,main,R4,0,2,0,Forgiven + Low Contribution label,0,0,
 145249382,ツ 3D farm 1,farm,,0,0,0,-,0,0,
 191969224,ツ 3D farm 2,farm,,0,0,0,-,0,0,
-181195856,メ S L A Y E R メ,main,R4,0,1,0,Forgiven + Low Contribution label,0,0,
+181195856,メ S L A Y E R メ,main,R4,0,2,0,Forgiven + Low Contribution label,0,0,
 173812467,乂DDoms1,farm,,0,0,0,-,0,0,
 173086933,乂DDoms2,farm,,0,0,0,-,0,0,
 177598328,乂DDoms3,farm,,0,0,0,-,0,0,
-194359727,么 EVENEZ,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-196791907,么 QUEEN,main,R4,0,2,0,Forgiven + Low Contribution label,0,0,
-106884408,亗VăN KăY亗,main,,0,2,0,Forgiven + Low Contribution label,0,0,
-127431256,戰乄LORD,main,,0,1,0,Forgiven + Low Contribution label,0,0,
+194359727,么 EVENEZ,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+196791907,么 QUEEN,main,R4,0,3,0,Forgiven + Low Contribution label,0,0,
+144363507,亗SeNopăti亗,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+127431256,戰乄LORD,main,,0,2,0,Forgiven + Low Contribution label,0,0,
 120215581,戰乄LORD 1,farm,,0,0,0,-,0,0,
-177257861,罪o逍遙,main,,0,1,0,Forgiven + Low Contribution label,0,0,
-143851764,ＡＧＡＭ,main,R4,0,1,0,Forgiven + Low Contribution label,0,0,
+177257861,罪o逍遙,main,,0,2,0,Forgiven + Low Contribution label,0,0,
+143851764,ＡＧＡＭ,main,R4,0,2,0,Forgiven + Low Contribution label,0,0,

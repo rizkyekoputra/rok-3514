@@ -381,6 +381,27 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       </table></div>
       <div class="sub" id="mgeCount"></div>
     </div>
+    <div class="card">
+      <h2>History's Mightiest Governors</h2>
+      <div class="sub">Top 10 of each past MGE season, from the in-game history. Alliance tags and names as they were then; for reference only, no limits or fines.</div>
+      <div class="controls">
+        <select id="mghSel"></select>
+        <input type="search" id="mghSearch" placeholder="Filter by name…" autocomplete="off">
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Season</th><th class="num">Rank</th><th>Player</th><th>Alliance then</th><th class="num">Points</th></tr></thead>
+        <tbody id="mghBody"></tbody>
+      </table></div>
+      <div class="sub" id="mghCount"></div>
+    </div>
+    <div class="card">
+      <h2>Most top-10 finishes</h2>
+      <div class="sub" id="mghTopSub"></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Player</th><th class="num">Top 10</th><th class="num">1st</th><th class="num">Best rank</th><th class="num">Most points</th><th>Seasons</th></tr></thead>
+        <tbody id="mghTopBody"></tbody>
+      </table></div>
+    </div>
   </section>
 
   <section data-panel="canyon" hidden>
@@ -743,6 +764,10 @@ function renderPlayer() {
       <tbody>${p.mg.slice().reverse().map(([s, rank, pts, over, fine]) => { const f = mgeFine(s, P.indexOf(p));
         return `<tr style="cursor:default"><td>${esc(MGE[s] ? MGE[s].l : s)}</td><td class="num">${rank}</td><td class="num">${fmt(pts)}</td>
         <td class="num">${over ? fmt(over) : '–'}</td><td>${f ? fineStatus(f) : '<span class="muted">–</span>'}</td></tr>`; }).join('')}</tbody></table></div>` : ''}
+    ${p.mh ? `<div class="p-sec">MGE top 10 (in-game history)</div><div class="table-wrap"><table class="kv">
+      <thead><tr><th>Season</th><th class="num">Rank</th><th class="num">Points</th></tr></thead>
+      <tbody>${p.mh.map(([n, d, rank, pts]) => `<tr style="cursor:default"><td>Season ${n} <span class="muted">${dayLabel(d)}</span></td>
+        <td class="num">${rank}</td><td class="num">${fmt(pts)}</td></tr>`).join('')}</tbody></table></div>` : ''}
     ${p.cc ? `<div class="p-sec">Canyon Clash</div><div class="table-wrap"><table class="kv">
       <thead><tr><th>Event</th><th class="num">Defenses</th><th class="num">Attacks</th></tr></thead>
       <tbody>${p.cc.slice().reverse().map(([s, dfn, att]) => `<tr style="cursor:default"><td>${esc(CANYON[s] ? CANYON[s].l : s)}</td>
@@ -1158,6 +1183,35 @@ function renderMge() {
   $('mgeSub').textContent = `${m.l}${m.f ? '' : ' · PROVISIONAL ranking: fines are not final and cannot be marked paid yet'} · Top-10 slots may go past their listed points as long as they finish at their slot (slots with the same reward, e.g. 7–10, may swap). ` +
     `Everyone else: max ${short(m.c)} points. Fine per point over: ${Object.entries(DATA.mgeFine).map(([r, v]) => fmt(v) + ' ' + r).join(' / ')} (one or a mix), paid to the bank KD.`;
 }
+// History's Mightiest Governors: per season {n, d, r: [[rank, player index or null, alliance then, name then, points]]}
+const MGH = DATA.mgeHist || [];
+const mghName = r => r[1] != null ? esc(P[r[1]].n) + (P[r[1]].n !== r[3] ? ` <span class="muted">as ${esc(r[3])}</span>` : '') : esc(r[3]);
+const mghSeason = m => `Season ${m.n} <span class="muted">${dayLabel(m.d)}</span>`;
+function renderMgh() {
+  const sel = $('mghSel').value, q = $('mghSearch').value.trim().toLowerCase();
+  const rows = MGH.filter(m => sel === 'all' || String(m.n) === sel).flatMap(m => m.r.map(r => [m, r]))
+    .filter(([, r]) => !q || r[3].toLowerCase().includes(q) || (r[1] != null && P[r[1]].n.toLowerCase().includes(q)));
+  $('mghBody').innerHTML = rows.map(([m, r]) => `<tr${r[1] != null ? ` data-i="${r[1]}"` : ' style="cursor:default"'}><td>${mghSeason(m)}</td>
+    <td class="num">${r[0]}</td><td>${mghName(r)}</td><td>${r[2] ? esc(`[${r[2]}]`) : '<span class="muted">–</span>'}</td><td class="num">${fmt(r[4])}</td></tr>`).join('')
+    || `<tr><td colspan="5" class="empty">${MGH.length ? 'No players match.' : 'No MGE history yet.'}</td></tr>`;
+  $('mghCount').textContent = MGH.length ? `${rows.length} row${rows.length === 1 ? '' : 's'} · seasons ${MGH[MGH.length - 1].n}–${MGH[0].n}` : '';
+  const by = new Map();  // one row per governor (or per name when not matched to a Governor ID)
+  MGH.forEach(m => m.r.forEach(r => {
+    const k = r[1] != null ? 'p' + r[1] : 'n' + r[3];
+    if (!by.has(k)) by.set(k, {r, s: []});
+    by.get(k).s.push([m.n, r[0], r[4]]);
+  }));
+  const top = [...by.values()].sort((a, b) => b.s.length - a.s.length || b.s.filter(x => x[1] === 1).length - a.s.filter(x => x[1] === 1).length ||
+    Math.min(...a.s.map(x => x[1])) - Math.min(...b.s.map(x => x[1])));
+  $('mghTopBody').innerHTML = top.map(({r, s}) => `<tr${r[1] != null ? ` data-i="${r[1]}"` : ' style="cursor:default"'}>
+    <td>${r[1] != null ? esc(P[r[1]].n) : esc(r[3])}</td><td class="num">${s.length}</td><td class="num">${s.filter(x => x[1] === 1).length || '–'}</td>
+    <td class="num">${Math.min(...s.map(x => x[1]))}</td><td class="num">${fmt(Math.max(...s.map(x => x[2])))}</td>
+    <td class="muted" style="white-space:normal">${s.map(x => `S${x[0]} #${x[1]}`).join(', ')}</td></tr>`).join('')
+    || '<tr><td colspan="6" class="empty">No MGE history yet.</td></tr>';
+  $('mghTopSub').textContent = MGH.length ? `Seasons ${MGH[MGH.length - 1].n}–${MGH[0].n}, matched by Governor ID across name changes.` : '';
+}
+$('mghSel').innerHTML = '<option value="all">All seasons</option>' + MGH.map(m => `<option value="${m.n}">Season ${m.n} · ${dayLabel(m.d)}</option>`).join('');
+['mghSel', 'mghSearch'].forEach(id => $(id).addEventListener('input', renderMgh));
 $('mgeSel').innerHTML = (DATA.mges || []).slice().reverse().map(m => `<option value="${m.s}">${esc(m.l)}${m.f ? '' : ' (provisional)'}</option>`).join('');
 ['mgeSel', 'mgeSearch', 'mgeShow'].forEach(id => $(id).addEventListener('input', renderMge));
 
@@ -1585,7 +1639,7 @@ function selectPlayer(p) {
 function closePlayer() { $('playerDlg').close(); }
 
 function renderAll() {
-  renderSubtitle(); renderTiles(); renderTable(); renderRoster(); renderReview(); renderKvk(); renderMge(); renderCanyon(); renderAoo();
+  renderSubtitle(); renderTiles(); renderTable(); renderRoster(); renderReview(); renderKvk(); renderMge(); renderMgh(); renderCanyon(); renderAoo();
   if (tab === 'activity') renderOverview();
   renderPlayer();
 }
@@ -1601,8 +1655,8 @@ document.querySelectorAll('th[data-k]').forEach(th => th.addEventListener('click
   const k = th.dataset.k;
   sortDir = sortK === k ? -sortDir : (k === 'n' || k === 't' ? 1 : -1); sortK = k; renderTable();
 }));
-// Player pop-up from the master list, weekly activity and KvK history only
-['tbody', 'rosterBody', 'kvkBody'].forEach(id => $(id).addEventListener('click', e => {
+// Player pop-up from the master list, weekly activity, KvK history and the MGE history
+['tbody', 'rosterBody', 'kvkBody', 'mghBody', 'mghTopBody'].forEach(id => $(id).addEventListener('click', e => {
   const tr = e.target.closest('tr[data-i]');
   if (tr && !e.target.closest('button, input, td.sel')) selectPlayer(P[+tr.dataset.i]);
 }));
