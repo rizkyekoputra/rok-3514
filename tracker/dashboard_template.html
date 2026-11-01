@@ -201,6 +201,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
     <button data-tab="activity" type="button">Weekly activity</button>
     <button data-tab="fines" type="button">Fines</button>
     <button data-tab="mge" id="mgeTabBtn" type="button">MGE</button>
+    <button data-tab="gh" type="button">20 GH</button>
     <button data-tab="canyon" type="button">Canyon Clash</button>
     <button data-tab="aoo" type="button">Ark of Osiris</button>
     <button data-tab="kvk" type="button">KvK history</button>
@@ -402,6 +403,33 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
         <thead><tr><th>Player</th><th class="num">Top 10</th><th class="num">1st</th><th class="num">Best rank</th><th class="num">Most points</th><th>Seasons</th></tr></thead>
         <tbody id="mghTopBody"></tbody>
       </table></div>
+    </div>
+  </section>
+
+  <section data-panel="gh" hidden>
+    <div class="controls">
+      <label class="sub" for="ghSel">Event</label>
+      <select id="ghSel"></select>
+    </div>
+    <div class="tiles" id="ghTiles"></div>
+    <div class="card">
+      <h2>Ranking</h2>
+      <div class="sub" id="ghSub"></div>
+      <div class="controls">
+        <input type="search" id="ghSearch" placeholder="Filter by name…" autocomplete="off">
+        <select id="ghShow">
+          <option value="all">Everyone captured</option>
+          <option value="over">Over the limit</option>
+        </select>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th class="num">Rank</th><th>Player</th><th>Alliance</th><th class="num">Limit</th><th class="num">Points</th>
+          <th class="num">Over</th><th class="num">Fine (gold)</th><th>Status</th>
+        </tr></thead>
+        <tbody id="ghBody"></tbody>
+      </table></div>
+      <div class="sub" id="ghCount"></div>
     </div>
   </section>
 
@@ -765,6 +793,11 @@ function renderPlayer() {
       <tbody>${p.mg.slice().reverse().map(([s, rank, pts, over, fine]) => { const f = mgeFine(s, P.indexOf(p));
         return `<tr style="cursor:default"><td>${esc(MGE[s] ? MGE[s].l : s)}</td><td class="num">${rank}</td><td class="num">${fmt(pts)}</td>
         <td class="num">${over ? fmt(over) : '–'}</td><td>${f ? fineStatus(f) : '<span class="muted">–</span>'}</td></tr>`; }).join('')}</tbody></table></div>` : ''}
+    ${p.gh ? `<div class="p-sec">20 GH</div><div class="table-wrap"><table class="kv">
+      <thead><tr><th>Event</th><th class="num">Rank</th><th class="num">Points</th><th class="num">Over limit</th><th>Fine</th></tr></thead>
+      <tbody>${p.gh.slice().reverse().map(([s, rank, pts, over]) => { const f = ghFine(s, P.indexOf(p));
+        return `<tr style="cursor:default"><td>${esc(GH[s] ? GH[s].l : s)}</td><td class="num">${rank}</td><td class="num">${fmt(pts)}</td>
+        <td class="num">${over ? fmt(over) : '–'}</td><td>${f ? fineStatus(f) : '<span class="muted">–</span>'}</td></tr>`; }).join('')}</tbody></table></div>` : ''}
     ${p.mh ? `<div class="p-sec">MGE top 10 (in-game history)</div><div class="table-wrap"><table class="kv">
       <thead><tr><th>Season</th><th class="num">Rank</th><th class="num">Points</th></tr></thead>
       <tbody>${p.mh.map(([n, d, rank, pts]) => `<tr style="cursor:default"><td>Season ${n} <span class="muted">${dayLabel(d)}</span></td>
@@ -916,7 +949,7 @@ function calcFields() {
   const was = Object.fromEntries([...document.querySelectorAll('#calcHave input')].map(i => [i.dataset.rss, i.value]));
   $('calcHave').innerHTML = Object.keys(calcRss()).map(r => `<label>${cap(r)}<input type="text" inputmode="decimal" data-rss="${r}" placeholder="0" autocomplete="off" value="${esc(was[r] || '')}">` +
     `<button class="hint" type="button" data-fill="${r}" hidden></button></label>`).join('');
-  const mge = $('calcKind').value === 'mge', rss = calcRss();
+  const mge = $('calcKind').value !== 'fort', rss = calcRss();
   // Rate table: one row per step of the fine (e.g. 2nd / 3rd fort offense), its value in each resource
   const res = ['gold', ...Object.keys(rss).filter(r => r !== 'gold')], k = KINDS[$('calcKind').value];
   const n = v => v >= 1e6 ? payFmt(v) : v >= 1e5 ? v / 1e3 + 'K' : fmt(v);
@@ -1151,7 +1184,7 @@ document.querySelectorAll('.dlg').forEach(d => {
 // ---------- MGE tab ----------
 // an MGE row: [rank, player index or null, name then, points, slot, limit (null = no cap), over, fine, took slot]
 const MGE = Object.fromEntries((DATA.mges || []).map(m => [m.s, m]));
-const mgeFine = (s, i, name) => F.find(f => f.e && f.wk === s && (i != null ? f.p === i : f.n === name));
+const mgeFine = (s, i, name) => F.find(f => f.t === 'mge' && f.wk === s && (i != null ? f.p === i : f.n === name));
 const fineStatus = f => { const paid = paidOf(f); return paid >= f.a ? '<span class="paid">✓ Paid</span>' : paid ? `${gold(paid)} of ${gold(f.a)} paid` : '<span class="below">Unpaid</span>'; };
 function renderMge() {
   const hist = $('mgeSel').value === 'history';  // past seasons (top 10 each) instead of one MGE's ranking
@@ -1221,6 +1254,41 @@ $('mghSel').innerHTML = '<option value="all">All seasons</option>' + MGH.map(m =
 $('mgeSel').innerHTML = (DATA.mges || []).slice().reverse().map(m => `<option value="${m.s}">${esc(m.l)}${m.f ? '' : ' (provisional)'}</option>`).join('') +
   (MGH.length ? `<option value="history">Past seasons: top 10 (seasons ${MGH[MGH.length - 1].n}–${MGH[0].n})</option>` : '');
 ['mgeSel', 'mgeSearch', 'mgeShow'].forEach(id => $(id).addEventListener('input', renderMge));
+
+// ---------- 20 GH (Gold Head) tab ----------
+// a 20 GH row: [rank, player index or null, name then, alliance tag, points, limit (null = no limit), over, fine]
+const GH = Object.fromEntries((DATA.ghs || []).map(g => [g.s, g]));
+const ghFine = (s, i, name) => F.find(f => f.t === 'gh' && f.wk === s && (i != null ? f.p === i : f.n === name));
+function renderGh() {
+  const g = GH[$('ghSel').value];
+  if (!g) { $('ghBody').innerHTML = '<tr><td colspan="8" class="empty">No 20 GH data yet.</td></tr>'; return; }
+  const q = $('ghSearch').value.trim().toLowerCase(), show = $('ghShow').value;
+  const name = r => r[1] != null ? P[r[1]].n : r[2];
+  const rows = g.r.filter(r => (!q || name(r).toLowerCase().includes(q) || r[2].toLowerCase().includes(q)) && (show === 'all' || r[6] > 0));
+  const fines = g.r.filter(r => r[7]).map(r => ghFine(g.s, r[1], r[2])).filter(Boolean);
+  const owed = fines.reduce((a, f) => a + Math.max(0, f.a - paidOf(f)), 0);
+  $('ghTiles').innerHTML = [
+    [short(g.c), `Point limit (${esc(g.ms)})`],
+    [fines.length, 'Players over the limit'],
+    [gold(fines.reduce((a, f) => a + f.a, 0)), 'Fines (gold value)'],
+    [gold(owed), 'Still unpaid (gold value)'],
+  ].map(([v, l]) => `<div class="tile"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+  $('ghBody').innerHTML = rows.map(r => {
+    const f = r[7] ? ghFine(g.s, r[1], r[2]) : null;
+    return `<tr${r[1] != null ? ` data-i="${r[1]}"` : ''}><td class="num">${r[0]}</td><td>${esc(name(r))}</td>
+      <td>${r[3] ? esc(`[${r[3]}]`) : '<span class="muted">–</span>'}</td>
+      <td class="num">${r[5] == null ? 'No limit' : fmt(r[5])}</td><td class="num">${fmt(r[4])}</td>
+      <td class="num">${r[6] ? `<span class="below">${fmt(r[6])}</span>` : '<span class="muted">–</span>'}</td>
+      <td class="num">${r[7] ? gold(r[7]) : '–'}</td><td>${f ? fineStatus(f) : '<span class="paid">OK</span>'}</td></tr>`;
+  }).join('') || '<tr><td colspan="8" class="empty">No players match.</td></tr>';
+  const free = g.r.filter(r => r[5] == null).map(name);
+  $('ghCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'} · ranks 1–${g.r.length} captured`;
+  $('ghSub').textContent = `${g.l}${g.f ? '' : ' · PROVISIONAL ranking: fines are not final and cannot be marked paid yet'} · Mission: ${g.ms}. ` +
+    `Max ${fmt(g.c)} points per player${free.length ? ` (no limit: ${free.join(', ')})` : ''}. Fine per point over: ` +
+    `${Object.entries(DATA.ghFine).map(([r, v]) => fmt(v) + ' ' + r).join(' / ')} (one or a mix), paid to the bank KD.`;
+}
+$('ghSel').innerHTML = (DATA.ghs || []).slice().reverse().map(g => `<option value="${g.s}">${esc(g.l)}${g.f ? '' : ' (provisional)'}</option>`).join('');
+['ghSel', 'ghSearch', 'ghShow'].forEach(id => $(id).addEventListener('input', renderGh));
 
 // ---------- Canyon Clash tab ----------
 // a Canyon Clash row: [rank, player index or null, name then, defenses, attacks used]; n = attacks each governor gets
@@ -1380,13 +1448,13 @@ let ledger = null, officer = null, approver = false, r4key = null;  // ledger: {
 let changes = {};  // account_id -> {type, by, decided, pending: {type, by, time}} from the ledger
 const paidOf = f => (f.h || 0) + (ledger && ledger[f.id] ? ledger[f.id].amount : 0);
 const shownFines = () => F;  // every fine, fort and MGE (MGE opened to everyone on 25 Oct 2026)
-// MGE fines carry e (event label) and m = points over the limit; fort fines have m = missing forts
+// MGE and 20 GH fines carry e (event label), t (kind) and m = points over the limit; fort fines have m = missing forts
 const ORD = n => n + (['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || 'th');
 // Fine label: the MGE event, or "Weekly Fort 12–18 Oct 2nd Offense" (o = offense number of a fort fine)
 const fineLabel = f => f.e || `Weekly Fort ${weekLabel(f.wk)}` + (f.o ? ` ${ORD(f.o)} Offense` : '');
 const fineWhen = f => esc(fineLabel(f));
-// Event of a fine for the Fines filter: "mge:<start>" or "fort:<monday>"; label without the offense number
-const fineEv = f => (f.e ? 'mge:' : 'fort:') + f.wk;
+// Event of a fine for the Fines filter: "mge:<start>", "gh:<start>" or "fort:<monday>"; label without the offense number
+const fineEv = f => (f.t || 'fort') + ':' + f.wk;
 const fineEvLabel = f => f.e || `Weekly Fort ${weekLabel(f.wk)} ${f.wk.slice(0, 4)}`;
 const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
 const fineWhy = f => f.e ? `${fmt(f.m)} pts over` : `${f.m} forts short`;
@@ -1607,7 +1675,7 @@ $('finesOff').innerHTML = '<option value="all">All offenses</option>' +
 ['finesSearch', 'finesSel', 'finesEv', 'finesOff'].forEach(id => $(id).addEventListener('input', renderFines));
 
 // ---------- tabs (#t=players|activity|fines|review, plus p=<name> on the players tab) ----------
-const TABS = ['players', 'activity', 'fines', 'mge', 'canyon', 'aoo', 'kvk', 'review'];
+const TABS = ['players', 'activity', 'fines', 'mge', 'gh', 'canyon', 'aoo', 'kvk', 'review'];
 let tab = 'activity';
 function setHash() {
   const q = new URLSearchParams({t: tab});
@@ -1620,6 +1688,7 @@ function renderSubtitle() {
     : tab === 'players' ? `${fmt(P.filter(p => !p.x).length)} governors · alliances from the scan of ${dayLabel(DATA.scanDay)}` + (DATA.namesDay ? ` · names and power from the member export of ${dayLabel(DATA.namesDay)}` : '')
     : tab === 'fines' ? 'Fines and whether they have been paid'
     : tab === 'mge' ? 'Mightiest Governor: point limits, takeovers and fines'
+    : tab === 'gh' ? '20 GH (Gold Head): point limits and fines'
     : tab === 'canyon' ? 'Canyon Clash: who used all their attacks'
     : tab === 'aoo' ? 'Ark of Osiris: who played, who did not, and low scores'
     : tab === 'kvk' ? 'Past KvK results, including governors not in the kingdom now'
@@ -1639,6 +1708,7 @@ function route() {
   showTab(q.get('t') || (p ? 'players' : tab));
   const ev = q.get('e');  // MGE tab: e=<start date> or e=history (past seasons)
   if (ev && [...$('mgeSel').options].some(o => o.value === ev)) { $('mgeSel').value = ev; renderMge(); }
+  if (ev && [...$('ghSel').options].some(o => o.value === ev)) { $('ghSel').value = ev; renderGh(); }  // 20 GH: e=<start>
   if (p) selectPlayer(p); else if ($('playerDlg').open) $('playerDlg').close();
 }
 
@@ -1654,7 +1724,7 @@ function selectPlayer(p) {
 function closePlayer() { $('playerDlg').close(); }
 
 function renderAll() {
-  renderSubtitle(); renderTiles(); renderTable(); renderRoster(); renderReview(); renderKvk(); renderMge(); renderMgh(); renderCanyon(); renderAoo();
+  renderSubtitle(); renderTiles(); renderTable(); renderRoster(); renderReview(); renderKvk(); renderMge(); renderMgh(); renderGh(); renderCanyon(); renderAoo();
   if (tab === 'activity') renderOverview();
   renderPlayer();
 }

@@ -4,7 +4,7 @@
 Reads:
   accounts.csv      governor_id, name, type (main/farm), confirmed
   weeks/<monday>.csv governor_id, name, fort_rank, forts, tech_rank, tech  (blank = not captured)
-  fines_paid.csv    governor_id, name, week, gold_paid, note  (entered by hand; week = "mge:<start>" for an MGE fine)
+  fines_paid.csv    governor_id, name, week, gold_paid, note  (entered by hand; week = "mge:<start>" / "gh:<start>" for an MGE / 20 GH fine)
   fines_online.csv  same columns, pulled from the R4 fines ledger (Google Sheet) by --pull
   scans/<date>.csv  latest kingdom scan = master player list (made by import_scan.py from the TOP500 xlsx)
   names/<date>.csv  governor_id, name, power from the latest member export (import_export.py): current name
@@ -19,6 +19,9 @@ Reads:
   mge/<start>.csv   rank, governor_id, name, points: final ranking (import_mge.py)
   mge/history.csv   season, date, rank, alliance, name, points, governor_id: in-game History's Mightiest Governors,
                     top 10 of each past season (import_mge_history.py); shown only, no limits or fines
+  gh/ghs.csv        gh (= start date), start, end, variant, mission, default_cap, final, note: one row per 20 GH (Gold
+                    Head) event, every two weeks; variant = its in-game name (e.g. Now or Never)
+  gh/<start>_slots.csv, gh/<start>.csv  same as MGE (slots with a blank cap have no limit; ranking with alliance)
   canyon/canyons.csv  canyon (= start date), start, end: one row per Canyon Clash
   canyon/<start>.csv  rank, governor_id, name, defenses, attacks: combat statistics (import_canyon.py), attacks out of 3
   aoo/aoos.csv      aoo (= date), date, team, opponent, result, score, opponent_score, final, note: one row per Ark of
@@ -35,6 +38,7 @@ Writes:
   status.csv                 current offense status per account
   reports/<monday>.md        weekly report for each week file
   mge_log.csv, reports/mge-<start>.md, mails/mge-<start>/   MGE results, over-cap fines and takeovers
+  gh_log.csv, reports/gh-<start>.md, mails/gh-<start>/      20 GH results and over-limit fines
 
 Usage: python3 track.py          rebuild from local files
        python3 track.py --pull   first refresh fines_online.csv and accounts_online.csv from the ledger
@@ -88,6 +92,9 @@ R4_REWARD_MANUAL = {
 # MGE: fine per point over the player's cap, payable in one resource or a mix (in gold-equivalent, food = wood = 2 gold
 # and stone = 1.5 gold per unit of value, the same rates as the fort fines). Caps live in mge/mges.csv and mge/<start>_slots.csv.
 MGE_FINE = {'food': 1000, 'wood': 1000, 'stone': 750, 'gold': 500}
+# 20 GH (Gold Head): fine per point over the limit (gold 10K; the other resources at the fort exchange rates).
+# Limits live in gh/ghs.csv (default_cap) and gh/<start>_slots.csv (e.g. rank 1 with no limit).
+GH_FINE = {'food': 20_000, 'wood': 20_000, 'stone': 15_000, 'gold': 10_000}
 CANYON_ATTACKS = 3  # attacks each governor gets in a Canyon Clash
 AOO_MIN = 10_000  # Ark of Osiris: individual points below this get a warning; 0 = did not participate
 MGE_CONTACTS = ['ＡＧＡＭ', 'Totos メtreme']  # named in the sanctions mail for working out a mixed payment
@@ -100,6 +107,8 @@ FORT_FINE = {2: 500_000, 3: 1_000_000}  # gold per missing fort at the 2nd and 3
 FINE_KINDS = {
     'mge': dict(label='MGE', rss={r: v / MGE_FINE['gold'] for r, v in MGE_FINE.items()},
                 steps=[['Per point over the limit', MGE_FINE['gold']]]),
+    'gh': dict(label='20 GH', rss={r: v / GH_FINE['gold'] for r, v in GH_FINE.items()},
+               steps=[['Per point over the limit', GH_FINE['gold']]]),
     'fort': dict(label='Fort', rss={'food': 2, 'wood': 2, 'stone': 1.5, 'gold': 1},  # 500K gold = 1M food/wood = 750K stone
                  steps=[['2nd offense, per missing fort', FORT_FINE[2]], ['3rd offense, per missing fort', FORT_FINE[3]]]),
 }
@@ -164,6 +173,8 @@ def pull_ledger():
     fines = {fine_id(r['governor_id'], r['week']): r for r in read('offense_log.csv') if num(r['fine_gold'])}
     fines.update({fine_id(r['governor_id'], 'mge|' + r['mge']): dict(r, week='mge:' + r['mge'])
                   for r in read('mge_log.csv') if num(r['fine_gold'])})
+    fines.update({fine_id(r['governor_id'], 'gh|' + r['gh']): dict(r, week='gh:' + r['gh'])
+                  for r in read('gh_log.csv') if num(r['fine_gold'])})
     with open(os.path.join(HERE, 'fines_online.csv'), 'w', newline='', encoding='utf-8-sig') as f:
         w = csv.writer(f)
         w.writerow(['governor_id', 'name', 'week', 'gold_paid', 'note'])
@@ -173,7 +184,7 @@ def pull_ledger():
                 w.writerow([r['governor_id'], r['name'], r['week'], int(p['amount']),
                             f"marked by {p['by']} {p['time'][:10]}"])
             else:
-                print(f'Ledger payment {fid} matches no fine in offense_log.csv or mge_log.csv, skipped')
+                print(f'Ledger payment {fid} matches no fine in offense_log.csv, mge_log.csv or gh_log.csv, skipped')
     print(f'Pulled {len(paid)} payment(s) from the fines ledger')
 
 
@@ -212,35 +223,43 @@ def penalty(offense, missing, unpaid):
 
 
 def mge_results(accounts):
-    """[(event, rows)] per MGE, oldest first. Slot holders may pass their listed points as long as they finish at
-    their slot or below (or anywhere within their tier: slots with the same reward may swap); finishing above that
-    (taking another slot) fines the points over their cap. Everyone else is fined for every point over the default cap,
-    and finishing in a slot allocated to someone else is a takeover."""
-    out = []
-    for ev in read('mge/mges.csv'):
-        slots = read(f"mge/{ev['mge']}_slots.csv")
-        slot_of = {key(s): s for s in slots}
-        owner = {int(s['slot']): s['name'] for s in slots}
-        top_of = {}  # highest slot a holder may reach without a takeover: the first slot of their tier
-        for s in slots:
-            t = s.get('tier', '')
-            top_of[int(s['slot'])] = min(int(x['slot']) for x in slots if t and x.get('tier', '') == t) if t else int(s['slot'])
-        rows = []
-        for r in read(f"mge/{ev['mge']}.csv"):
-            k, rank, pts = key(r), int(r['rank']), num(r['points'])
-            s = slot_of.get(k)
-            cap = (num(s['cap']) if s else num(ev['default_cap']))  # None = no cap
-            slot = int(s['slot']) if s else None
-            over = max(0, pts - cap) if cap is not None else 0
-            if s and rank >= top_of[slot]:
-                over = 0  # kept their rank, fell below it, or moved within their tier: listed points are only a guide
-            took = rank if rank in owner and slot != rank and (slot is None or rank < top_of[slot]) and over else None
-            acc = accounts.get(k, {})
-            rows.append(dict(key=k, name=r['name'], rank=rank, points=pts, slot=slot, cap=cap, over=over,
-                             fine=over * MGE_FINE['gold'], took=took, took_from=owner.get(took, ''),
-                             type=acc.get('type') or 'main', role=acc.get('role', '')))
-        out.append((ev, rows))
-    return out
+    """[(event, rows)] per MGE, oldest first (see limit_rows)."""
+    return [(ev, limit_rows(ev, read(f"mge/{ev['mge']}_slots.csv"), read(f"mge/{ev['mge']}.csv"), MGE_FINE, accounts))
+            for ev in read('mge/mges.csv')]
+
+
+def gh_results(accounts):
+    """[(event, rows)] per 20 GH event, oldest first; same limits as MGE (see limit_rows)."""
+    return [(ev, limit_rows(ev, read(f"gh/{ev['gh']}_slots.csv"), read(f"gh/{ev['gh']}.csv"), GH_FINE, accounts))
+            for ev in read('gh/ghs.csv')]
+
+
+def limit_rows(ev, slots, ranking, rates, accounts):
+    """Slot holders may pass their listed points as long as they finish at their slot or below (or anywhere within
+    their tier: slots with the same reward may swap); finishing above that (taking another slot) fines the points over
+    their cap. Everyone else is fined for every point over the default cap, and finishing in a slot allocated to
+    someone else is a takeover."""
+    slot_of = {key(s): s for s in slots}
+    owner = {int(s['slot']): s['name'] for s in slots}
+    top_of = {}  # highest slot a holder may reach without a takeover: the first slot of their tier
+    for s in slots:
+        t = s.get('tier', '')
+        top_of[int(s['slot'])] = min(int(x['slot']) for x in slots if t and x.get('tier', '') == t) if t else int(s['slot'])
+    rows = []
+    for r in ranking:
+        k, rank, pts = key(r), int(r['rank']), num(r['points'])
+        s = slot_of.get(k)
+        cap = (num(s['cap']) if s else num(ev['default_cap']))  # None = no cap
+        slot = int(s['slot']) if s else None
+        over = max(0, pts - cap) if cap is not None else 0
+        if s and rank >= top_of[slot]:
+            over = 0  # kept their rank, fell below it, or moved within their tier: listed points are only a guide
+        took = rank if rank in owner and slot != rank and (slot is None or rank < top_of[slot]) and over else None
+        acc = accounts.get(k, {})
+        rows.append(dict(key=k, name=r['name'], rank=rank, points=pts, slot=slot, cap=cap, over=over,
+                         fine=over * rates['gold'], took=took, took_from=owner.get(took, ''), ally=r.get('alliance', ''),
+                         type=acc.get('type') or 'main', role=acc.get('role', '')))
+    return rows
 
 
 def canyon_results():
@@ -262,6 +281,10 @@ def mge_label(ev):
     return event_label(f"MGE {ev['troop']}", ev)
 
 
+def gh_label(ev):
+    return event_label(f"20 GH {ev['variant']}", ev)
+
+
 def pay(n):
     """Amount to pay, rounded UP to 2 decimals of M or B, so paying the shown amount always covers the fine."""
     if n >= 1e9:
@@ -271,9 +294,9 @@ def pay(n):
     return f'{math.ceil(n / 1e3):g}K'
 
 
-def rss(over):
+def rss(over, rates=MGE_FINE):
     """Fine for points over the cap, in each resource it can be paid with."""
-    return ' / '.join(f'{pay(over * v)} {r.capitalize()}' for r, v in MGE_FINE.items())
+    return ' / '.join(f'{pay(over * v)} {r.capitalize()}' for r, v in rates.items())
 
 
 def write_mge(mges, paid):
@@ -356,6 +379,64 @@ def write_mge(mges, paid):
         with open(os.path.join(d, '1_results.txt'), 'w', encoding='utf-8') as f:
             f.write('\n'.join(results) + '\n')
         parts = split_mail('MGE SANCTIONS', head, intro, items or ['(none)'], outro)
+        for i, body in enumerate(parts):
+            with open(os.path.join(d, f"2_sanctions{f'_part{i + 1}' if len(parts) > 1 else ''}.txt"), 'w',
+                      encoding='utf-8') as f:
+                f.write(body)
+        for name in os.listdir(d):
+            assert len(open(os.path.join(d, name), encoding='utf-8').read()) <= MAIL_LIMIT, name
+
+
+def write_gh(ghs, paid):
+    """gh_log.csv, reports/gh-<start>.md and mails/gh-<start>/ for every 20 GH event."""
+    with open(os.path.join(HERE, 'gh_log.csv'), 'w', newline='', encoding='utf-8-sig') as f:
+        w = csv.writer(f)
+        w.writerow(['gh', 'governor_id', 'name', 'alliance', 'rank', 'points', 'cap', 'over', 'fine_gold', 'paid_gold'])
+        for ev, rows in ghs:
+            for r in rows:
+                if r['over']:
+                    w.writerow([ev['gh'], r['key'], r['name'], r['ally'], r['rank'], r['points'], r['cap'], r['over'],
+                                r['fine'], paid.get((r['key'], 'gh:' + ev['gh']), 0)])
+    for ev, rows in ghs:
+        title, dcap = gh_label(ev), num(ev['default_cap'])
+        fined = sorted([r for r in rows if r['over']], key=lambda r: -r['over'])
+        free = [s['name'] for s in read(f"gh/{ev['gh']}_slots.csv") if not num(s['cap'])]
+        rule = (f"Mission: {ev['mission']}. Max **{dcap:,} points** per player"
+                + (f" (no limit: {', '.join(free)})" if free else '') + '. Fine per point over: '
+                + ', '.join(f'{v:,} {r}' for r, v in GH_FINE.items()) + ' (one resource or a mix).')
+        out = [f'# {title}', '', rule, '', '| Rank | Alliance | Player | Points | Limit | Over | Fine (gold) | Or |',
+               '|---|---|---|---|---|---|---|---|']
+        for r in rows:
+            out.append(f"| {r['rank']} | {r['ally'] or '-'} | {r['name']} | {r['points']:,} | {short(r['cap'])} | "
+                       f"{r['over']:,} | {gold(r['fine']) if r['fine'] else '-'} | {rss(r['over'], GH_FINE) if r['over'] else '-'} |")
+        out += ['', f"Ranking captured: ranks 1–{max(r['rank'] for r in rows)}." + (f" {ev['note']}." if ev['note'] else ''), '']
+        with open(os.path.join(HERE, 'reports', f"gh-{ev['gh']}.md"), 'w', encoding='utf-8') as f:
+            f.write('\n'.join(out))
+
+        draft = [] if ev['final'] == 'yes' else ['<color=red><b>DRAFT – ranking not final, do not send</b></color>', '']
+        head = lambda t: draft + [f'<size=30><b>3514 | {t}</b></size>', f'<b>{title}</b>', '',
+                                  '<size=24><color=navy>══════ ✦ ⚔ ✦ ══════</color></size>', '']
+        foot = ['', '<b>Follow the limit. Do not disrupt Kingdom strategy.</b>', '<b>— KINGDOM 3514 LEADERSHIP</b>']
+        limit = f'<b>{dcap:,}</b> points' + (f" (no limit: {', '.join(free)})" if free else '')
+        results = head('20 GH RESULTS') + [f"Mission: <b>{ev['mission']}</b> · limit {limit}", '']
+        results += [f"{r['rank']}. {r['name']} – {r['points']:,}" + (f" – <color=red>+{r['over']:,} over</color>" if r['over']
+                    else ' – <color=green>OK</color>') for r in rows]
+        results += ['', f"<b>{len(fined)}</b> player{'s' if len(fined) != 1 else ''} went over the limit. Fines are in the next mail."] + foot
+        intro = [f'These players went over the 20 GH limit of {limit}.',
+                 '<i>Name – points – over the limit</i>', '<i>Fine: pay in ANY ONE resource below</i>', '']
+        items = [f"• <b>{r['name']}</b> – {r['points']:,} – +{r['over']:,}\n   {rss(r['over'], GH_FINE)}" for r in fined]
+        outro = ['', '<b>FINE PER POINT OVER THE LIMIT</b>',
+                 ' / '.join(f'{v:,} {r.capitalize()}' for r, v in GH_FINE.items()),
+                 'Want to pay with a <b>mix</b> of resources? Use the <b>Fine calculator</b> on the dashboard:',
+                 f'<color=#1E90FF>{DASHBOARD_URL}#t=fines</color>',
+                 f'<b>Send your fine to the bank KD: <color=#DAA520>{BANK}</color></b>'] + foot
+        d = os.path.join(HERE, 'mails', f"gh-{ev['gh']}")
+        os.makedirs(d, exist_ok=True)
+        for old in os.listdir(d):
+            os.remove(os.path.join(d, old))
+        with open(os.path.join(d, '1_results.txt'), 'w', encoding='utf-8') as f:
+            f.write('\n'.join(results) + '\n')
+        parts = split_mail('20 GH SANCTIONS', head, intro, items or ['(none)'], outro)
         for i, body in enumerate(parts):
             with open(os.path.join(d, f"2_sanctions{f'_part{i + 1}' if len(parts) > 1 else ''}.txt"), 'w',
                       encoding='utf-8') as f:
@@ -457,7 +538,15 @@ def main():
                                   a=r['fine'], m=r['over'], h=by_hand.get((r['key'], 'mge:' + ev['mge']), 0),
                                   e=mge_label(ev), pv=ev['final'] != 'yes', t='mge'))
     write_mge(mges, paid)
-    write_dashboard(history, state, accounts, fines, mges, canyon_results(), aoo_results())
+    ghs = gh_results(accounts)
+    for ev, rows in ghs:  # 20 GH fines too; payments keyed by week = "gh:<start>"
+        for r in rows:
+            if r['fine']:
+                fines.append(dict(id=fine_id(r['key'], 'gh|' + ev['gh']), k=r['key'], n=r['name'], wk=ev['gh'],
+                                  a=r['fine'], m=r['over'], h=by_hand.get((r['key'], 'gh:' + ev['gh']), 0),
+                                  e=gh_label(ev), pv=ev['final'] != 'yes', t='gh'))
+    write_gh(ghs, paid)
+    write_dashboard(history, state, accounts, fines, mges, canyon_results(), aoo_results(), ghs)
 
 
 def write_report(wk, lines, prev=None):
@@ -760,7 +849,7 @@ def farm_hints(p, mains):
     return hints
 
 
-def write_dashboard(history, state, accounts, fines, mges, canyons, aoos):
+def write_dashboard(history, state, accounts, fines, mges, canyons, aoos, ghs):
     """Fill dashboard_template.html with this season's data -> dashboard/index.html (public page).
     Players = everyone in the weekly rankings plus everyone in the latest scan (with Governor ID), plus governors who
     left the kingdom but are in an older scan, name list or KvK sheet (x = last date seen; found by search only)."""
@@ -845,6 +934,14 @@ def write_dashboard(history, state, accounts, fines, mges, canyons, aoos):
         mge.append(dict(s=ev['start'], e=ev['end'], t=ev['troop'], c=num(ev['default_cap']), l=mge_label(ev), f=ev['final'] == 'yes',
                         r=[[r['rank'], ids.get(r['key']), r['name'], r['points'], r['slot'], r['cap'], r['over'],
                             r['fine'], r['took']] for r in rows]))
+    gh = []  # per 20 GH event: rows [rank, player index or None, name then, alliance, points, cap, over, fine]
+    for ev, rows in ghs:
+        for r in rows:
+            if r['key'] in ids:
+                players[ids[r['key']]].setdefault('gh', []).append([ev['gh'], r['rank'], r['points'], r['over'], r['fine']])
+        gh.append(dict(s=ev['start'], e=ev['end'], v=ev['variant'], ms=ev['mission'], c=num(ev['default_cap']), l=gh_label(ev),
+                       f=ev['final'] == 'yes', nt=ev['note'],
+                       r=[[r['rank'], ids.get(r['key']), r['name'], r['ally'], r['points'], r['cap'], r['over'], r['fine']] for r in rows]))
     mgh = []  # past MGE seasons, newest first: rows [rank, player index or None, alliance then, name then, points]
     hist = read('mge/history.csv')
     for season in sorted({int(r['season']) for r in hist}, reverse=True):
@@ -881,7 +978,7 @@ def write_dashboard(history, state, accounts, fines, mges, canyons, aoos):
     ledger = json.load(open(lp, encoding='utf-8')) if os.path.exists(lp) else {}
     data = dict(weeks=[wk for wk, _ in history], minF=MIN_FORTS, minT=MIN_TECH, players=players,
                 fines=fines, finesUrl=FINES_URL, scanDay=scan_day, namesDay=names_day, mainAlly=MAIN_ALLIANCE, kvks=kvks,
-                mges=mge, mgeHist=mgh, canyons=canyon, aoos=aoo, aooMin=AOO_MIN, mgeFine=MGE_FINE, fineKinds=FINE_KINDS, bank=BANK, claimsOn=CLAIMS_ON,
+                mges=mge, mgeHist=mgh, ghs=gh, ghFine=GH_FINE, canyons=canyon, aoos=aoo, aooMin=AOO_MIN, mgeFine=MGE_FINE, fineKinds=FINE_KINDS, bank=BANK, claimsOn=CLAIMS_ON,
                 ledger=dict(paid=ledger.get('paid', {}), accounts=ledger.get('accounts', {})), officers=ledger.get('officers', []),
                 updated=date.today().isoformat())
     with open(os.path.join(HERE, 'dashboard_template.html'), encoding='utf-8') as f:

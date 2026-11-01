@@ -29,6 +29,8 @@ to read the rankings accurately, match names to Governor IDs, and keep `accounts
 | `tracker/mge/` | MGE inputs: `mges.csv`, `<start>_slots.csv` (Top-10 allocation), `<start>.csv` (ranking), `history.csv` (top 10 of past seasons). See **MGE** below |
 | `tracker/mge_log.csv`, `tracker/reports/mge-<start>.md`, `tracker/mails/mge-<start>/` | MGE over-limit fines and takeovers, report, sanctions mail (generated) |
 | `event/mge/<name (dates)>/` | Raw MGE ranking recordings / screenshots the user provides |
+| `tracker/gh/`, `tracker/gh_log.csv`, `reports/gh-<start>.md`, `mails/gh-<start>/` | 20 GH (Gold Head): inputs, then over-limit fines, report, results + sanctions mail (generated). See **20 GH** below |
+| `event/20gh/` | Raw 20 GH ranking screenshots / recordings the user provides |
 | `tracker/canyon/` | Canyon Clash: `canyons.csv` (`canyon, start, end`), `<start>.csv` (combat statistics). See **Canyon Clash** below |
 | `event/canyon-clash/` | Raw Canyon Clash combat-statistics recordings the user provides |
 | `tracker/aoo/` | Ark of Osiris: `aoos.csv` (`aoo, date, team, opponent, result, score, opponent_score`), `<date>.csv` (individual ranking). See **Ark of Osiris** below |
@@ -154,6 +156,24 @@ Byakko メtreme = JDメ, Wowo BijiSatu / Pria ˢᵒˡᵒ = RockyメGering. Shown
 link `#t=mge&e=history`: season table + most top-10 finishes) and in the player pop-up; no limits or fines. Imported: seasons 46–65 (26 Jan – 19 Oct 2026; season 65 = MGE
 19–24 Oct). Not matched (name only): 火 Noir, Jack PriaSolo, Skinnier, ᴿᴵAmbaleon.
 
+## 20 GH (Gold Head)
+
+A kingdom event every two weeks with a changing variant (its in-game name, e.g. **Now or Never**, mission: spend
+speedups). Same limit logic as MGE (`limit_rows()` in `track.py`): everyone (any alliance) may score at most the
+event's `default_cap` (now **50,000** points); the slots file lists ranks allocated with their own limit (blank cap =
+no limit; so far only `ツ 3D`, rank 1). Fine per point over: **10,000 gold** (`GH_FINE`; food/wood 20,000, stone 15,000
+at the fort exchange rates), paid through the same ledger (`t='gh'`, hand payments `week = gh:<start>`).
+
+Inputs in `tracker/gh/`: `ghs.csv` (`gh` = start date, `start, end, variant, mission, default_cap, final, note`),
+`<start>_slots.csv` (`slot, name, governor_id, cap, tier`), `<start>.csv` (`rank, governor_id, name, points, alliance`).
+Processing: read the results mail screenshots in `event/20gh/` (points use `.` as thousands separator in Indonesian),
+transcribe `rank|alliance|name|points` (tag without brackets), add the row to `ghs.csv` and the slots file, then
+`.venv/bin/python .claude/skills/rok-weekly/scripts/import_mge.py START ranking.txt --event gh` (check, `--overrides`),
+`--write`, `python3 tracker/track.py`. Outputs: `reports/gh-<start>.md`, `mails/gh-<start>/1_results.txt` +
+`2_sanctions*.txt`, `gh_log.csv`, dashboard **20 GH** tab (`#t=gh&e=<start>`), the pop-up's 20 GH section, Fines list
+and calculator ("20 GH fine"). A new variant or limit: new row in `ghs.csv`; a different fine rate: `GH_FINE`.
+Imported: Now or Never 30–31 Oct 2026 (top 10 from the results mail).
+
 ## Canyon Clash
 
 The in-game **Combat statistics** list (every member: defenses, attacks used out of 3) is recorded once per event into
@@ -188,7 +208,7 @@ name list or KvK sheet but not in the latest scan/export/rankings, kept with `x`
 sheet saw them: last seen in the latest KvK shows "Not seen since KvK <n> · still on the KvK map, or migrated" (they may be
 stuck on the map, not gone), earlier ones "Migrated out". The next scan/export after they return clears it) · Weekly activity · Fines (fort + MGE, with a public **Fine calculator**: fine in
 gold (as in the mail and Fines list), plus what the player has in food/wood/stone/gold -> what is left, in each resource, with tap-to-fill "+ rest" suggestions under the empty fields; the MGE
-sanctions mail links to it at `DASHBOARD_URL#t=fines`) · MGE · Canyon Clash · Ark of Osiris · KvK history · Review (R4 mode only: proposals waiting for the admin,
+sanctions mail links to it at `DASHBOARD_URL#t=fines`) · MGE · 20 GH · Canyon Clash · Ark of Osiris · KvK history · Review (R4 mode only: proposals waiting for the admin,
 and unconfirmed accounts in the alliance with farm hints from `farm_hints()` in `track.py`). Links: `#t=<tab>`, `#t=players&p=<name>`.
 Future events (KvK, AoO, 20 GH…) get their own tab and data folder, sharing the master list, R4 keys and fines ledger.
 
