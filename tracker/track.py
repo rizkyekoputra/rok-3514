@@ -428,7 +428,7 @@ def write_gh(ghs, paid):
         outro = ['', '<b>FINE PER POINT OVER THE LIMIT</b>',
                  ' / '.join(f'{v:,} {r.capitalize()}' for r, v in GH_FINE.items()),
                  'Want to pay with a <b>mix</b> of resources? Use the <b>Fine calculator</b> on the dashboard:',
-                 f'<color=#1E90FF>{DASHBOARD_URL}#t=fines</color>',
+                 f'<color=#1E90FF>{DASHBOARD_URL}#t=gh</color>',
                  f'<b>Send your fine to the bank KD: <color=#DAA520>{BANK}</color></b>'] + foot
         d = os.path.join(HERE, 'mails', f"gh-{ev['gh']}")
         os.makedirs(d, exist_ok=True)

@@ -1279,7 +1279,7 @@ function renderGh() {
       <td>${r[3] ? esc(`[${r[3]}]`) : '<span class="muted">–</span>'}</td>
       <td class="num">${r[5] == null ? 'No limit' : fmt(r[5])}</td><td class="num">${fmt(r[4])}</td>
       <td class="num">${r[6] ? `<span class="below">${fmt(r[6])}</span>` : '<span class="muted">–</span>'}</td>
-      <td class="num">${r[7] ? gold(r[7]) : '–'}</td><td>${f ? fineStatus(f) : '<span class="paid">OK</span>'}</td></tr>`;
+      <td class="num">${r[7] ? gold(r[7]) : '–'}</td><td>${f ? fineStatus(f) + (paidOf(f) < f.a ? ` <button class="act ghost" data-calc="${f.id}" type="button">Calculate</button>` : '') : '<span class="paid">OK</span>'}</td></tr>`;
   }).join('') || '<tr><td colspan="8" class="empty">No players match.</td></tr>';
   const free = g.r.filter(r => r[5] == null).map(name);
   $('ghCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'} · ranks 1–${g.r.length} captured`;
@@ -1289,6 +1289,16 @@ function renderGh() {
 }
 $('ghSel').innerHTML = (DATA.ghs || []).slice().reverse().map(g => `<option value="${g.s}">${esc(g.l)}${g.f ? '' : ' (provisional)'}</option>`).join('');
 ['ghSel', 'ghSearch', 'ghShow'].forEach(id => $(id).addEventListener('input', renderGh));
+// "Calculate": the fine calculator (shown under the ranking on this tab) filled with what is left of that fine
+$('ghBody').addEventListener('click', e => {
+  const b = e.target.closest('button[data-calc]'), f = b && F.find(f => f.id === b.dataset.calc);
+  if (!f) return;
+  $('calcKind').value = 'gh';
+  calcFields();
+  $('calcFine').value = payFull(f.a - paidOf(f));
+  renderCalc();
+  $('calcCard').scrollIntoView({behavior: 'smooth', block: 'start'});
+});
 
 // ---------- Canyon Clash tab ----------
 // a Canyon Clash row: [rank, player index or null, name then, defenses, attacks used]; n = attacks each governor gets
@@ -1698,6 +1708,12 @@ function showTab(t) {
   tab = TABS.includes(t) && (t !== 'review' || officer) ? t : 'activity';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   document.querySelectorAll('section[data-panel]').forEach(sec => { sec.hidden = sec.dataset.panel !== tab; });
+  // The fine calculator lives on the Fines tab; on the 20 GH tab it moves under the ranking, set to 20 GH fines
+  const calc = $('calcCard'), home = tab === 'gh' ? document.querySelector('section[data-panel="gh"]') : document.querySelector('section[data-panel="fines"]');
+  if (calc.parentNode !== home) {
+    if (tab === 'gh') { home.appendChild(calc); if (!$('calcFine').value.trim()) { $('calcKind').value = 'gh'; calcFields(); renderCalc(); } }
+    else home.prepend(calc);
+  }
   renderSubtitle();
   if (tab === 'activity') renderOverview();  // charts need a visible width
   setHash();

@@ -170,8 +170,9 @@ Processing: read the results mail screenshots in `event/20gh/` (points use `.` a
 transcribe `rank|alliance|name|points` (tag without brackets), add the row to `ghs.csv` and the slots file, then
 `.venv/bin/python .claude/skills/rok-weekly/scripts/import_mge.py START ranking.txt --event gh` (check, `--overrides`),
 `--write`, `python3 tracker/track.py`. Outputs: `reports/gh-<start>.md`, `mails/gh-<start>/1_results.txt` +
-`2_sanctions*.txt`, `gh_log.csv`, dashboard **20 GH** tab (`#t=gh&e=<start>`), the pop-up's 20 GH section, Fines list
-and calculator ("20 GH fine"). A new variant or limit: new row in `ghs.csv`; a different fine rate: `GH_FINE`.
+`2_sanctions*.txt`, `gh_log.csv`, dashboard **20 GH** tab (`#t=gh&e=<start>`; the fine calculator moves under its
+ranking set to "20 GH fine", and each unpaid fine has a **Calculate** button that fills it in; the sanctions mail links
+here), the pop-up's 20 GH section, Fines list. A new variant or limit: new row in `ghs.csv`; a different fine rate: `GH_FINE`.
 Imported: Now or Never 30–31 Oct 2026 (top 10 from the results mail).
 
 ## Canyon Clash

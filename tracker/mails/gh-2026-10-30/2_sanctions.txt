@@ -19,7 +19,7 @@ These players went over the 20 GH limit of <b>50,000</b> points (no limit: ツ 3
 <b>FINE PER POINT OVER THE LIMIT</b>
 20,000 Food / 20,000 Wood / 15,000 Stone / 10,000 Gold
 Want to pay with a <b>mix</b> of resources? Use the <b>Fine calculator</b> on the dashboard:
-<color=#1E90FF>https://rizkyekoputra.github.io/rok-3514-dashboard/#t=fines</color>
+<color=#1E90FF>https://rizkyekoputra.github.io/rok-3514-dashboard/#t=gh</color>
 <b>Send your fine to the bank KD: <color=#DAA520>KINGDOM 3514</color></b>
 
 <b>Follow the limit. Do not disrupt Kingdom strategy.</b>
