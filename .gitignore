@@ -3,3 +3,5 @@ __pycache__/
 .DS_Store
 # published separately (public GitHub Pages repo rok-3514-dashboard)
 tracker/dashboard/
+# raw recording over GitHub's 100MB limit (CH ranking 27 Oct, already in tracker/ch/2026-10-27.csv)
+all-player-with-city-hall-info.mp4
