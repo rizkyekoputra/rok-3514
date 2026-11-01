@@ -170,9 +170,8 @@ Processing: read the results mail screenshots in `event/20gh/` (points use `.` a
 transcribe `rank|alliance|name|points` (tag without brackets), add the row to `ghs.csv` and the slots file, then
 `.venv/bin/python .claude/skills/rok-weekly/scripts/import_mge.py START ranking.txt --event gh` (check, `--overrides`),
 `--write`, `python3 tracker/track.py`. Outputs: `reports/gh-<start>.md`, `mails/gh-<start>/1_results.txt` +
-`2_sanctions*.txt`, `gh_log.csv`, dashboard **20 GH** tab (`#t=gh&e=<start>`; the fine calculator moves under its
-ranking set to "20 GH fine", and each unpaid fine has a **Calculate** button that fills it in; the sanctions mail links
-here), the pop-up's 20 GH section, Fines list. A new variant or limit: new row in `ghs.csv`; a different fine rate: `GH_FINE`.
+`2_sanctions*.txt`, `gh_log.csv`, dashboard **20 GH** tab (`#t=gh&e=<start>`; the sanctions mail links here), the pop-up's
+20 GH section, Fines list. A new variant or limit: new row in `ghs.csv`; a different fine rate: `GH_FINE`.
 Imported: Now or Never 30–31 Oct 2026 (top 10 from the results mail).
 
 ## Canyon Clash
@@ -202,6 +201,11 @@ works too: blank kills, `final = no`, blank `result`, the scores shown at that m
 marks it provisional and shows "Did not participate" as unknown: only governors who entered are listed.
 
 ## Dashboard tabs
+
+**Fine calculators**: every tab with fines has its own calculator at the top, fixed to that kind (`data-calc-card` in
+the template: `fort` on Weekly activity, `mge`, `gh`); the Fines tab has the one for every kind (`all`, pick in a list).
+On the MGE and 20 GH rankings each unpaid fine has a **Calculate** button that fills in what is left of it. A new event
+with fines: add its `FINE_KINDS` entry and a `<div class="card" data-calc-card="<kind>">` at the top of its tab.
 
 Players (master list + player view; its search also finds **governors who left the kingdom**: anyone in an older scan,
 name list or KvK sheet but not in the latest scan/export/rankings, kept with `x` = last date seen, listed under the

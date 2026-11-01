@@ -255,6 +255,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
   </section>
 
   <section data-panel="activity" hidden>
+    <div class="card" data-calc-card="fort"></div>
     <div class="controls">
       <label class="sub" for="weekSel">Week</label>
       <select id="weekSel"></select>
@@ -307,22 +308,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
   </section>
 
   <section data-panel="fines" hidden>
-    <div class="card" id="calcCard">
-      <h2>Fine calculator</h2>
-      <div class="sub">Pay in any one resource, or mix them. Enter your fine and what you already have to see what is left.</div>
-      <div class="controls">
-        <label class="sub" for="calcKind">Fine for</label>
-        <select id="calcKind"></select>
-        <input type="text" id="calcFine" inputmode="decimal" placeholder="Your fine in gold, e.g. 787.79M or 787,790,000" autocomplete="off" style="flex:1 1 220px;min-width:0">
-        <span class="sub">gold</span>
-        <button class="act ghost" id="calcReset" type="button">Reset</button>
-      </div>
-      <div class="table-wrap" style="margin-top:12px"><table class="rates" id="calcRates"></table></div>
-      <div class="sub">Each row is worth the same in every column: pay one column, or mix them.</div>
-      <div class="sub" style="margin-top:12px">What you pay with (leave empty if none). Type the full number (commas are added for you) or a short form like 300M or 1.5B.</div>
-      <div class="calc" id="calcHave"></div>
-      <div class="calc-out" id="calcOut"></div>
-    </div>
+    <div class="card" data-calc-card="all"></div>
     <div class="card" id="claimsCard" hidden>
       <h2>Payment claims</h2>
       <div class="sub">Players who say they paid, with their proof. Check the bank KD first, then approve (records the payment)
@@ -358,6 +344,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
   </section>
 
   <section data-panel="mge" hidden>
+    <div class="card" data-calc-card="mge" id="mgeCalc"></div>
     <div class="controls">
       <label class="sub" for="mgeSel">Event</label>
       <select id="mgeSel"></select>
@@ -407,6 +394,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
   </section>
 
   <section data-panel="gh" hidden>
+    <div class="card" data-calc-card="gh"></div>
     <div class="controls">
       <label class="sub" for="ghSel">Event</label>
       <select id="ghSel"></select>
@@ -942,70 +930,96 @@ function groupDigits(i) {
   for (let n = 0; pos < v.length && n < digitsBefore; pos++) if (/\d/.test(v[pos])) n++;
   i.setSelectionRange(pos, pos);
 }
-$('calcKind').innerHTML = Object.entries(KINDS).map(([k, x]) => `<option value="${k}">${esc(x.label)} fine</option>`).join('');
-const calcRss = () => KINDS[$('calcKind').value].rss;
-// Resource fields of the chosen kind of fine (typed amounts are kept when switching)
-function calcFields() {
-  const was = Object.fromEntries([...document.querySelectorAll('#calcHave input')].map(i => [i.dataset.rss, i.value]));
-  $('calcHave').innerHTML = Object.keys(calcRss()).map(r => `<label>${cap(r)}<input type="text" inputmode="decimal" data-rss="${r}" placeholder="0" autocomplete="off" value="${esc(was[r] || '')}">` +
-    `<button class="hint" type="button" data-fill="${r}" hidden></button></label>`).join('');
-  const mge = $('calcKind').value !== 'fort', rss = calcRss();
-  // Rate table: one row per step of the fine (e.g. 2nd / 3rd fort offense), its value in each resource
-  const res = ['gold', ...Object.keys(rss).filter(r => r !== 'gold')], k = KINDS[$('calcKind').value];
-  const n = v => v >= 1e6 ? payFmt(v) : v >= 1e5 ? v / 1e3 + 'K' : fmt(v);
-  $('calcRates').innerHTML = `<thead><tr><th>${esc(k.label)} fine</th>${res.map(r => `<th class="num">${cap(r)}</th>`).join('')}</tr></thead>` +
-    `<tbody>${(k.steps || []).map(([what, g]) => `<tr><td>${esc(what)}</td>${res.map(r => `<td class="num">${n(g * rss[r])}</td>`).join('')}</tr>`).join('')}</tbody>`;
-  $('calcFine').placeholder = mge ? 'Your fine in gold, e.g. 787.79M or 787,790,000' : 'Your fine in gold, e.g. 35M or 35,000,000';
-}
-function renderCalc() {
-  const due = amount($('calcFine').value), rss = calcRss();  // the fine in gold, as in the mail and the Fines list
-  const have = [...document.querySelectorAll('#calcHave input')].map(i => [i.dataset.rss, amount(i.value)]);
-  const bad = have.filter(([, v]) => isNaN(v)).map(([r]) => cap(r));
-  if (!$('calcFine').value.trim()) {
-    document.querySelectorAll('#calcHave [data-fill]').forEach(b => { b.hidden = true; });
-    document.querySelectorAll('#calcHave input').forEach(i => { i.placeholder = '0'; });
-    $('calcOut').innerHTML = '<span class="muted">Enter your fine to start.</span>'; return;
+// One calculator per card: data-calc-card="all" (Fines tab: every kind, chosen in a list) or a kind of fine (its event
+// tab: fort on Weekly activity, mge, gh). calcs[kind] = {fill(gold)} for the "Calculate" buttons.
+const calcs = {};
+document.querySelectorAll('[data-calc-card]').forEach(card => {
+  const fixed = card.dataset.calcCard === 'all' ? null : card.dataset.calcCard;
+  if (fixed && !KINDS[fixed]) { card.remove(); return; }
+  card.innerHTML = `<h2>${fixed ? esc(KINDS[fixed].label) + ' fine calculator' : 'Fine calculator'}</h2>
+    <div class="sub">Pay in any one resource, or mix them. Enter your fine and what you already have to see what is left.</div>
+    <div class="controls">
+      ${fixed ? '' : '<label class="sub">Fine for <select class="c-kind"></select></label>'}
+      <input type="text" class="c-fine" inputmode="decimal" autocomplete="off" aria-label="Your fine in gold" style="flex:1 1 220px;min-width:0">
+      <span class="sub">gold</span>
+      <button class="act ghost c-reset" type="button">Reset</button>
+    </div>
+    <div class="table-wrap" style="margin-top:12px"><table class="rates c-rates"></table></div>
+    <div class="sub">Each row is worth the same in every column: pay one column, or mix them.</div>
+    <div class="sub" style="margin-top:12px">What you pay with (leave empty if none). Type the full number (commas are added for you) or a short form like 300M or 1.5B.</div>
+    <div class="calc c-have"></div>
+    <div class="calc-out c-out"></div>`;
+  const q = c => card.querySelector(c), kindSel = q('.c-kind'), fine = q('.c-fine'), haveBox = q('.c-have'), out = q('.c-out');
+  if (kindSel) kindSel.innerHTML = Object.entries(KINDS).map(([k, x]) => `<option value="${k}">${esc(x.label)} fine</option>`).join('');
+  const kind = () => fixed || kindSel.value, rssNow = () => KINDS[kind()].rss;
+  // Resource fields of the chosen kind of fine (typed amounts are kept when switching)
+  function fields() {
+    const was = Object.fromEntries([...haveBox.querySelectorAll('input')].map(i => [i.dataset.rss, i.value]));
+    haveBox.innerHTML = Object.keys(rssNow()).map(r => `<label>${cap(r)}<input type="text" inputmode="decimal" data-rss="${r}" placeholder="0" autocomplete="off" value="${esc(was[r] || '')}">` +
+      `<button class="hint" type="button" data-fill="${r}" hidden></button></label>`).join('');
+    const rss = rssNow(), k = KINDS[kind()];
+    // Rate table: one row per step of the fine (e.g. 2nd / 3rd fort offense), its value in each resource
+    const res = ['gold', ...Object.keys(rss).filter(r => r !== 'gold')];
+    const n = v => v >= 1e6 ? payFmt(v) : v >= 1e5 ? v / 1e3 + 'K' : fmt(v);
+    q('.c-rates').innerHTML = `<thead><tr><th>${esc(k.label)} fine</th>${res.map(r => `<th class="num">${cap(r)}</th>`).join('')}</tr></thead>` +
+      `<tbody>${(k.steps || []).map(([what, g]) => `<tr><td>${esc(what)}</td>${res.map(r => `<td class="num">${n(g * rss[r])}</td>`).join('')}</tr>`).join('')}</tbody>`;
+    fine.placeholder = kind() !== 'fort' ? 'Your fine in gold, e.g. 787.79M or 787,790,000' : 'Your fine in gold, e.g. 35M or 35,000,000';
   }
-  if (isNaN(due) || bad.length) { $('calcOut').innerHTML = `<span class="below">Can't read ${isNaN(due) ? 'the fine' : bad.join(', ')}</span>: use numbers like 787.79M or 1,575,569.`; return; }
-  const paid = have.reduce((a, [r, v]) => a + v / rss[r], 0), left = due - paid;
-  // Suggest under every empty resource as soon as the fine is entered (the whole fine, then the rest): tap to fill it in
-  const started = have.some(([, v]) => v > 0), word = started ? 'rest' : 'fine';
-  document.querySelectorAll('#calcHave [data-fill]').forEach(b => {
-    const r = b.dataset.fill, input = document.querySelector(`#calcHave [data-rss="${r}"]`), empty = !input.value.trim();
-    b.hidden = !(empty && left > 0);
-    if (!b.hidden) { b.dataset.v = payFull(left * rss[r]); b.textContent = `↑ tap to fill the ${word}: ${b.dataset.v}`; }
-    input.placeholder = b.hidden ? '0' : `${word}: ${payFmt(left * rss[r])}`;  // the suggestion sits in the empty field itself
+  function render() {
+    const due = amount(fine.value), rss = rssNow();  // the fine in gold, as in the mail and the Fines list
+    const have = [...haveBox.querySelectorAll('input')].map(i => [i.dataset.rss, amount(i.value)]);
+    const bad = have.filter(([, v]) => isNaN(v)).map(([r]) => cap(r));
+    if (!fine.value.trim()) {
+      haveBox.querySelectorAll('[data-fill]').forEach(b => { b.hidden = true; });
+      haveBox.querySelectorAll('input').forEach(i => { i.placeholder = '0'; });
+      out.innerHTML = '<span class="muted">Enter your fine to start.</span>'; return;
+    }
+    if (isNaN(due) || bad.length) { out.innerHTML = `<span class="below">Can't read ${isNaN(due) ? 'the fine' : bad.join(', ')}</span>: use numbers like 787.79M or 1,575,569.`; return; }
+    const paid = have.reduce((a, [r, v]) => a + v / rss[r], 0), left = due - paid;
+    // Suggest under every empty resource as soon as the fine is entered (the whole fine, then the rest): tap to fill it in
+    const started = have.some(([, v]) => v > 0), word = started ? 'rest' : 'fine';
+    haveBox.querySelectorAll('[data-fill]').forEach(b => {
+      const r = b.dataset.fill, input = haveBox.querySelector(`[data-rss="${r}"]`), empty = !input.value.trim();
+      b.hidden = !(empty && left > 0);
+      if (!b.hidden) { b.dataset.v = payFull(left * rss[r]); b.textContent = `↑ tap to fill the ${word}: ${b.dataset.v}`; }
+      input.placeholder = b.hidden ? '0' : `${word}: ${payFmt(left * rss[r])}`;  // the suggestion sits in the empty field itself
+    });
+    const used = have.filter(([, v]) => v > 0).map(([r, v]) => `${payFmt(v)} ${cap(r)}`).join(' + ');
+    out.innerHTML = `<div class="stats">
+        <div class="stat"><div class="v">${payFmt(due)}</div><div class="l">Fine (gold)</div></div>
+        <div class="stat"><div class="v">${payFmt(paid)}</div><div class="l">Covered (gold value)${used ? ' · ' + esc(used) : ''}</div></div>
+        <div class="stat ${left > 0 ? 'bad' : 'good'}"><div class="v">${left > 0 ? payFmt(left) : '0'}</div><div class="l">Still to pay (gold value)</div></div>
+      </div>` + (left > 0
+        ? `<div style="margin-top:10px"><b>Pay the rest with ONE of:</b> ${Object.entries(rss).map(([r, x]) => `<b>${payFmt(left * x)}</b> ${cap(r)}`).join(' · ')}</div>`
+        // a tiny extra only comes from rounding the suggestions up: don't flag it as overpaying
+        : `<div style="margin-top:10px" class="paid">✓ Fully covered${-left > due * 0.005 ? ` (${payFmt(-left)} gold value more than the fine)` : ''}.</div>`) +
+      `<div class="sub" style="margin-top:6px">Send everything to the bank KD, then tell an R4 what you sent.</div>`;
+  }
+  fine.addEventListener('input', e => { groupDigits(e.target); render(); });
+  if (kindSel) kindSel.addEventListener('input', () => { fields(); render(); });
+  q('.c-reset').addEventListener('click', () => {
+    card.querySelectorAll('.c-fine, .c-have input').forEach(i => { i.value = ''; });
+    fields();
+    render();
+    fine.focus();
   });
-  const used = have.filter(([, v]) => v > 0).map(([r, v]) => `${payFmt(v)} ${cap(r)}`).join(' + ');
-  $('calcOut').innerHTML = `<div class="stats">
-      <div class="stat"><div class="v">${payFmt(due)}</div><div class="l">Fine (gold)</div></div>
-      <div class="stat"><div class="v">${payFmt(paid)}</div><div class="l">Covered (gold value)${used ? ' · ' + esc(used) : ''}</div></div>
-      <div class="stat ${left > 0 ? 'bad' : 'good'}"><div class="v">${left > 0 ? payFmt(left) : '0'}</div><div class="l">Still to pay (gold value)</div></div>
-    </div>` + (left > 0
-      ? `<div style="margin-top:10px"><b>Pay the rest with ONE of:</b> ${Object.entries(rss).map(([r, x]) => `<b>${payFmt(left * x)}</b> ${cap(r)}`).join(' · ')}</div>`
-      // a tiny extra only comes from rounding the suggestions up: don't flag it as overpaying
-      : `<div style="margin-top:10px" class="paid">✓ Fully covered${-left > due * 0.005 ? ` (${payFmt(-left)} gold value more than the fine)` : ''}.</div>`) +
-    `<div class="sub" style="margin-top:6px">Send everything to the bank KD, then tell an R4 what you sent.</div>`;
-}
-$('calcFine').addEventListener('input', e => { groupDigits(e.target); renderCalc(); });
-$('calcKind').addEventListener('input', () => { calcFields(); renderCalc(); });
-$('calcReset').addEventListener('click', () => {
-  document.querySelectorAll('#calcFine, #calcHave input').forEach(i => { i.value = ''; });
-  calcFields();
-  renderCalc();
-  $('calcFine').focus();
+  haveBox.addEventListener('input', e => { if (e.target.matches('input')) groupDigits(e.target); render(); });
+  haveBox.addEventListener('click', e => {
+    const b = e.target.closest('button[data-fill]');
+    if (!b) return;
+    e.preventDefault();
+    haveBox.querySelector(`[data-rss="${b.dataset.fill}"]`).value = b.dataset.v;
+    render();
+  });
+  fields();
+  render();
+  if (fixed) calcs[fixed] = {fill(g) {  // "Calculate" on an event tab: start from what is left of that fine
+    haveBox.querySelectorAll('input').forEach(i => { i.value = ''; });
+    fine.value = payFull(g);
+    render();
+    card.scrollIntoView({behavior: 'smooth', block: 'start'});
+  }};
 });
-$('calcHave').addEventListener('input', e => { if (e.target.matches('input')) groupDigits(e.target); renderCalc(); });
-calcFields();
-$('calcHave').addEventListener('click', e => {
-  const b = e.target.closest('button[data-fill]');
-  if (!b) return;
-  e.preventDefault();
-  const i = document.querySelector(`#calcHave [data-rss="${b.dataset.fill}"]`);
-  i.value = b.dataset.v;
-  renderCalc();
-});
-renderCalc();
 
 // ---------- payment claims: players send proof, R4s approve or reject (fines_ledger/Code.js) ----------
 // Keep in sync with CLAIM in fines_ledger/Code.js
@@ -1185,11 +1199,13 @@ document.querySelectorAll('.dlg').forEach(d => {
 // an MGE row: [rank, player index or null, name then, points, slot, limit (null = no cap), over, fine, took slot]
 const MGE = Object.fromEntries((DATA.mges || []).map(m => [m.s, m]));
 const mgeFine = (s, i, name) => F.find(f => f.t === 'mge' && f.wk === s && (i != null ? f.p === i : f.n === name));
+const calcBtn = f => paidOf(f) < f.a ? ` <button class="act ghost" data-calc="${f.id}" type="button">Calculate</button>` : '';
 const fineStatus = f => { const paid = paidOf(f); return paid >= f.a ? '<span class="paid">✓ Paid</span>' : paid ? `${gold(paid)} of ${gold(f.a)} paid` : '<span class="below">Unpaid</span>'; };
 function renderMge() {
   const hist = $('mgeSel').value === 'history';  // past seasons (top 10 each) instead of one MGE's ranking
   $('mgeTiles').style.display = hist ? 'none' : '';  // .tiles sets display, so hidden alone would not hide it
   $('mgeRankCard').hidden = hist;
+  if ($('mgeCalc')) $('mgeCalc').hidden = hist;
   document.querySelectorAll('.mgh').forEach(c => c.hidden = !hist);
   if (hist) return;
   const m = MGE[$('mgeSel').value];
@@ -1216,7 +1232,7 @@ function renderMge() {
     return `<tr${r[1] != null ? ` data-i="${r[1]}"` : ''}><td class="num">${r[0]}</td><td>${esc(name(r))}${took}</td><td>${slot}</td>
       <td class="num">${r[5] == null ? 'No cap' : short(r[5])}</td><td class="num">${fmt(r[3])}</td>
       <td class="num">${r[6] ? `<span class="below">${fmt(r[6])}</span>` : '<span class="muted">–</span>'}</td>
-      <td class="num">${r[7] ? gold(r[7]) : '–'}</td><td>${f ? fineStatus(f) : r[4] != null ? '<span class="muted">Within allocation</span>' : '<span class="paid">OK</span>'}</td></tr>`;
+      <td class="num">${r[7] ? gold(r[7]) : '–'}</td><td>${f ? fineStatus(f) + calcBtn(f) : r[4] != null ? '<span class="muted">Within allocation</span>' : '<span class="paid">OK</span>'}</td></tr>`;
   }).join('') || '<tr><td colspan="8" class="empty">No players match.</td></tr>';
   $('mgeCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'} · ranks 1–${m.r.length} captured`;
   $('mgeSub').textContent = `${m.l}${m.f ? '' : ' · PROVISIONAL ranking: fines are not final and cannot be marked paid yet'} · Top-10 slots may go past their listed points as long as they finish at their slot (slots with the same reward, e.g. 7–10, may swap). ` +
@@ -1279,7 +1295,7 @@ function renderGh() {
       <td>${r[3] ? esc(`[${r[3]}]`) : '<span class="muted">–</span>'}</td>
       <td class="num">${r[5] == null ? 'No limit' : fmt(r[5])}</td><td class="num">${fmt(r[4])}</td>
       <td class="num">${r[6] ? `<span class="below">${fmt(r[6])}</span>` : '<span class="muted">–</span>'}</td>
-      <td class="num">${r[7] ? gold(r[7]) : '–'}</td><td>${f ? fineStatus(f) + (paidOf(f) < f.a ? ` <button class="act ghost" data-calc="${f.id}" type="button">Calculate</button>` : '') : '<span class="paid">OK</span>'}</td></tr>`;
+      <td class="num">${r[7] ? gold(r[7]) : '–'}</td><td>${f ? fineStatus(f) + calcBtn(f) : '<span class="paid">OK</span>'}</td></tr>`;
   }).join('') || '<tr><td colspan="8" class="empty">No players match.</td></tr>';
   const free = g.r.filter(r => r[5] == null).map(name);
   $('ghCount').textContent = `${rows.length} player${rows.length === 1 ? '' : 's'} · ranks 1–${g.r.length} captured`;
@@ -1289,16 +1305,11 @@ function renderGh() {
 }
 $('ghSel').innerHTML = (DATA.ghs || []).slice().reverse().map(g => `<option value="${g.s}">${esc(g.l)}${g.f ? '' : ' (provisional)'}</option>`).join('');
 ['ghSel', 'ghSearch', 'ghShow'].forEach(id => $(id).addEventListener('input', renderGh));
-// "Calculate": the fine calculator (shown under the ranking on this tab) filled with what is left of that fine
-$('ghBody').addEventListener('click', e => {
+// "Calculate" on an unpaid fine (20 GH and MGE tabs): that tab's calculator, filled with what is left of the fine
+['ghBody', 'mgeBody'].forEach(id => $(id).addEventListener('click', e => {
   const b = e.target.closest('button[data-calc]'), f = b && F.find(f => f.id === b.dataset.calc);
-  if (!f) return;
-  $('calcKind').value = 'gh';
-  calcFields();
-  $('calcFine').value = payFull(f.a - paidOf(f));
-  renderCalc();
-  $('calcCard').scrollIntoView({behavior: 'smooth', block: 'start'});
-});
+  if (f && calcs[f.t]) calcs[f.t].fill(f.a - paidOf(f));
+}));
 
 // ---------- Canyon Clash tab ----------
 // a Canyon Clash row: [rank, player index or null, name then, defenses, attacks used]; n = attacks each governor gets
@@ -1708,12 +1719,6 @@ function showTab(t) {
   tab = TABS.includes(t) && (t !== 'review' || officer) ? t : 'activity';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   document.querySelectorAll('section[data-panel]').forEach(sec => { sec.hidden = sec.dataset.panel !== tab; });
-  // The fine calculator lives on the Fines tab; on the 20 GH tab it moves under the ranking, set to 20 GH fines
-  const calc = $('calcCard'), home = tab === 'gh' ? document.querySelector('section[data-panel="gh"]') : document.querySelector('section[data-panel="fines"]');
-  if (calc.parentNode !== home) {
-    if (tab === 'gh') { home.appendChild(calc); if (!$('calcFine').value.trim()) { $('calcKind').value = 'gh'; calcFields(); renderCalc(); } }
-    else home.prepend(calc);
-  }
   renderSubtitle();
   if (tab === 'activity') renderOverview();  // charts need a visible width
   setHash();
