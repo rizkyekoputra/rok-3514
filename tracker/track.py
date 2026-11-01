@@ -39,6 +39,7 @@ Writes:
   reports/<monday>.md        weekly report for each week file
   mge_log.csv, reports/mge-<start>.md, mails/mge-<start>/   MGE results, over-cap fines and takeovers
   gh_log.csv, reports/gh-<start>.md, mails/gh-<start>/      20 GH results and over-limit fines
+  mails/unpaid/              every fine still unpaid (fort, MGE, 20 GH), per player, with the PAY_BY deadline
 
 Usage: python3 track.py          rebuild from local files
        python3 track.py --pull   first refresh fines_online.csv and accounts_online.csv from the ledger
@@ -60,6 +61,7 @@ FLUX_FORTS = 200
 MAIL_LIMIT = 2000  # in-game mail character limit
 BANK = 'KINGDOM 3514'  # bank KD account that receives fines
 DASHBOARD_URL = 'https://rizkyekoputra.github.io/rok-3514-dashboard/'  # public dashboard (tracker/dashboard/)
+PAY_BY = '2026-11-03'  # deadline in the unpaid fines mail (mails/unpaid/)
 CLEAR_AFTER = 2  # consecutive passing weeks that clear all recorded offenses
 
 # R4 fines ledger (Apps Script web app in fines_ledger/); the dashboard reads and writes it.
@@ -445,6 +447,52 @@ def write_gh(ghs, paid):
             assert len(open(os.path.join(d, name), encoding='utf-8').read()) <= MAIL_LIMIT, name
 
 
+def write_unpaid(fines, paid):
+    """mails/unpaid/: every final fine not fully paid, grouped per player (current name), biggest total first."""
+    _, names = latest('names')
+    owed = {}  # key -> [(label, gold left)]
+    for f in fines:
+        if f.get('pv'):
+            continue
+        left = f['a'] - paid.get((f['k'], f"{f['t']}:{f['wk']}" if f.get('t') else f['wk']), 0)
+        if left > 0:
+            mon = date.fromisoformat(f['wk'])
+            label = f.get('e') or f"Fort {mon.day}–{(mon + timedelta(days=6)).day} {(mon + timedelta(days=6)):%b} ({ORD(f['o'])} offense)"
+            owed.setdefault(f['k'], []).append((label, left, f['n']))
+    rows = sorted(owed.items(), key=lambda kv: -sum(x[1] for x in kv[1]))
+    total = sum(x[1] for _, v in rows for x in v)
+    by = date.fromisoformat(PAY_BY)
+    head = lambda t: [f'<size=30><b>3514 | {t}</b></size>', f'<b>Pay by {by.day} {by:%B %Y}</b>', '',
+                      '<size=24><color=navy>══════ ✦ ⚔ ✦ ══════</color></size>', '']
+    intro = [f'<b>{len(rows)}</b> players still have unpaid fines, <b>{pay(total)} gold</b> in total.',
+             f'<color=red><b>Pay everything by {by.day} {by:%B %Y}.</b></color>',
+             '<i>Name – still to pay (gold) – what the fine is for</i>', '']
+    items = []
+    for k, v in rows:
+        n = names[k]['name'] if k in names else v[-1][2]
+        items.append(f"• <b>{n}</b> – {pay(sum(x[1] for x in v))} gold\n" +
+                     '\n'.join(f"   {lbl}: {pay(left)}" for lbl, left, _ in v))
+    outro = ['', '<b>HOW TO PAY</b>',
+             'Pay in gold, or in any resource: 1 gold = 2 Food = 2 Wood = 1.5 Stone (or a mix).',
+             f'Fine calculator: <color=#1E90FF>{DASHBOARD_URL}#t=fines</color>',
+             f'<b>Send to the bank KD: <color=#DAA520>{BANK}</color></b>, then tell an R4 or send proof on the dashboard.',
+             '', '<b>— KINGDOM 3514 LEADERSHIP</b>']
+    d = os.path.join(HERE, 'mails', 'unpaid')
+    os.makedirs(d, exist_ok=True)
+    for old in os.listdir(d):
+        os.remove(os.path.join(d, old))
+    parts = split_mail('UNPAID FINES', head, intro, items or ['(none)'], outro)
+    for i, body in enumerate(parts):
+        with open(os.path.join(d, f"unpaid_fines{f'_part{i + 1}' if len(parts) > 1 else ''}.txt"), 'w', encoding='utf-8') as f:
+            f.write(body)
+    for name in os.listdir(d):
+        assert len(open(os.path.join(d, name), encoding='utf-8').read()) <= MAIL_LIMIT, name
+
+
+def ORD(n):
+    return f"{n}{'th' if 10 < n % 100 < 14 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
+
+
 def short(n):
     return 'No cap' if n is None else f'{round(n / 1e6, 2):g}M' if n >= 1e6 else f'{n:,}'
 
@@ -546,6 +594,7 @@ def main():
                                   a=r['fine'], m=r['over'], h=by_hand.get((r['key'], 'gh:' + ev['gh']), 0),
                                   e=gh_label(ev), pv=ev['final'] != 'yes', t='gh'))
     write_gh(ghs, paid)
+    write_unpaid(fines, paid)
     write_dashboard(history, state, accounts, fines, mges, canyon_results(), aoo_results(), ghs)
 
 
