@@ -15,6 +15,7 @@ Main accounts reaching 50K Tech: <b>76/111</b>
 Fort Credits: <b>19,374</b> <color=#2E8B57>▲ +2,953 (+18.0%)</color>
 Main accounts: <b>11,555</b> <color=red>▼ 79 (-0.7%)</color>
 Mains reaching 70: <b>73</b> <color=#2E8B57>▲ +4</color>
+<i>Last week was only partly captured, so the change is overstated.</i>
 
 <b><color=navy>TOP FORT REWARDS</color></b>
 <color=#DAA520><b>1.</b></color> kocmoc (829) – Legendary Trophy + 10K VIP + $5 Flux
