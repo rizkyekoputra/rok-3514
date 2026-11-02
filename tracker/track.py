@@ -80,15 +80,14 @@ FARM_TAIL = re.compile(r'(\s*(farm\w*|f\s*\d+|f|\d+))+\s*$', re.I)
 # Events are tracked for this alliance only; the master list shows every governor in the scan.
 MAIN_ALLIANCE = '[14-X]THE MORTICIANS'
 
-# Top-10 fort rewards; farms and the R5 are not eligible, R4s are. Every R4 also gets R4_REWARD.
+# Top-10 fort rewards; farms and the R5 are not eligible, R4s are. R4s get R4_REWARD, handed out manually.
 REWARDS = ['Legendary Trophy + 10K VIP', 'Epic Trophy + 5K VIP', 'Epic Trophy'] + \
           ['Elite Trophy'] * 5 + ['Advanced Trophy'] * 2
 R4_REWARD = 'Advanced Trophy'
-# Weeks whose R4 trophy list is set by hand (Governor IDs), instead of every R4; [] = no R4 trophy that week
+# R4 trophies are given manually: a week lists its R4s in the report/mail only if set here (Governor IDs)
 R4_REWARD_MANUAL = {
     '2026-10-12': ['107368414', '145955574', '143845047', '190986564',  # Totos, Depati Amir, MʀメSENOPATI, ツ 3D
                    '145988051', '143851764', '158118163', '55664233'],  # Saxaa, ＡＧＡＭ, xxYxx, Dobel
-    '2026-10-19': [],
 }
 
 # MGE: fine per point over the player's cap, payable in one resource or a mix (in gold-equivalent, food = wood = 2 gold
@@ -609,11 +608,8 @@ def write_report(wk, lines, prev=None):
     cleared = [l for l in lines if l['action'].startswith('Cleared')]
     ranked = sorted([l for l in lines if l['forts'] is not None and l['type'] == 'main' and l['role'] != 'R5'],
                     key=lambda l: -l['forts'])
-    if wk in R4_REWARD_MANUAL:
-        by_key = {l['key']: l for l in lines}
-        r4 = [by_key[k] for k in R4_REWARD_MANUAL[wk]]
-    else:
-        r4 = [l for l in lines if l['role'] == 'R4']
+    by_key = {l.get('key'): l for l in lines}
+    r4 = [by_key[k] for k in R4_REWARD_MANUAL.get(wk, [])]
 
     out = [f'# Weekly Activity Report – {title}', '',
            f'Rules: min **{MIN_FORTS} forts** and **{MIN_TECH:,} tech** per week. '

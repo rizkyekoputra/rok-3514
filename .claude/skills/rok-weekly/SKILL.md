@@ -48,7 +48,7 @@ Never hand-edit generated files; change inputs and rerun `python3 tracker/track.
 - Fort penalties apply to **main accounts, including R4 and R5**; farms never get penalties.
   1st forgiven + Low Contribution label · 2nd 500K gold × missing forts · 3rd 1M gold × missing + unpaid fines · 4th must migrate (or zeroed).
 - **2 passing weeks in a row wipe all current offenses**; history stays in `offense_log.csv`; unpaid fines stay owed.
-- Rewards: top 10 by forts among main accounts **including R4**; **farms and the R5 excluded**. 1 Legendary Trophy + 10K VIP (+$5 Flux if ≥200 forts), 2 Epic Trophy + 5K VIP, 3 Epic Trophy, 4–8 Elite Trophy, 9–10 Advanced Trophy; every R4 also gets an Advanced Trophy (on top of any top-10 reward).
+- Rewards: top 10 by forts among main accounts **including R4**; **farms and the R5 excluded**. 1 Legendary Trophy + 10K VIP (+$5 Flux if ≥200 forts), 2 Epic Trophy + 5K VIP, 3 Epic Trophy, 4–8 Elite Trophy, 9–10 Advanced Trophy; R4s get an Advanced Trophy, handed out **manually**: the report and summary mail list no R4s unless that week's Governor IDs are set in `R4_REWARD_MANUAL` (`track.py`).
 - Fines are paid to the bank KD account **KINGDOM 3514** (the R5).
 - Fort counts are per-participant credits (every rally member gets credit). A sum of forts is **"fort credits"**, never "forts destroyed".
 
