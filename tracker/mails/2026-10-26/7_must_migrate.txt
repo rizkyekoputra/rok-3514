@@ -3,22 +3,25 @@
 
 <size=24><color=navy>══════ ✿ ══════</color></size>
 
-These main accounts missed <b>70 Forts</b> for the <b>4th time</b>.
+These main accounts failed the fort rule (<b>70 Forts/week</b>) for the <b>4th time</b>.
 <color=red><b>They must migrate out of Kingdom 3514.</b></color>
-<i>Name (Governor ID) – Forts/70 – unpaid fines</i>
+<i>Name (Governor ID) – Forts – unpaid fines</i>
 
+<b>Not in 14-X</b> <i>(not in the alliance, counted as 0 Forts)</i>
+• <b>YddrY</b> (40095145) – 70M gold
+• <b>alex2000f</b> (202239761) – 96M gold
+• <b>чм чм</b> (35959280)
+• <b>FireLord</b> (198546430) – 70M gold
+• <b>Tottigno 72</b> (204335189) – 79M gold
+• <b>Arkan The Därk</b> (201952743) – 103M gold
+• <b>Kutang Bagak</b> (166206580) – 105M gold
+• <b>XxayoubxX</b> (77299661) – 104M gold
+• <b>wowsih</b> (68013953) – 104.5M gold
+• <b>么Angelzᴳᵈ</b> (12132610) – 70M gold
+
+<b>In 14-X, below 70 Forts</b>
 • <b>Ai real</b> (139556724) – 0/70 – 104M gold
 • <b>HADE1999</b> (69061362) – 0/70 – 67M gold
-• <b>YddrY</b> (40095145) – 0/70 – 70M gold
-• <b>alex2000f</b> (202239761) – 0/70 – 96M gold
-• <b>чм чм</b> (35959280) – 0/70
-• <b>FireLord</b> (198546430) – 0/70 – 70M gold
-• <b>Tottigno 72</b> (204335189) – 0/70 – 79M gold
-• <b>Arkan The Därk</b> (201952743) – 0/70 – 103M gold
-• <b>Kutang Bagak</b> (166206580) – 0/70 – 105M gold
-• <b>XxayoubxX</b> (77299661) – 0/70 – 104M gold
-• <b>wowsih</b> (68013953) – 0/70 – 104.5M gold
-• <b>么Angelzᴳᵈ</b> (12132610) – 0/70 – 70M gold
 • <b>Sanji Kunᵖʰ</b> (69008732) – 2/70 – 70M gold
 • <b>ᴹᴬᴰMladen</b> (171854288) – 19/70
 • <b>Xu Muuu</b> (170854552) – 30/70

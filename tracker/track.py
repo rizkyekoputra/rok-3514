@@ -528,7 +528,7 @@ def main():
             s = state.setdefault(k, dict(offenses=0, streak=0, unpaid=0, lifetime=0, cleared=0, last=''))
             s.update(name=r['name'], type=typ, role=acc.get('role', ''))
             row = dict(key=k, name=r['name'], type=typ, role=acc.get('role', ''), forts=forts, tech=tech,
-                       offense='', action='', due=0,
+                       offense='', action='', due=0, ranked=bool(r.get('fort_rank')),
                        miss_f=max(0, MIN_FORTS - forts) if forts is not None else None,
                        miss_t=max(0, MIN_TECH - tech) if tech is not None else None)
             if typ == 'main' and forts is not None:
@@ -741,12 +741,18 @@ def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low, farm_tech_low
 
     # Sent kingdom-wide as a King's mail, so Governor IDs identify the players
     migrate = [l for l in fined if l['offense'] >= 4]
+    gone = [l for l in migrate if not l['ranked']]  # not in the alliance ranking: counted as 0 forts
+    stayed = [l for l in migrate if l['ranked']]
+    entry = lambda l, forts=True: (f"• <b>{l['name']}</b> ({l['key'] if str(l['key']).isdigit() else 'no ID'})"
+                                   + (f" – {l['forts']}/{MIN_FORTS}" if forts else '')
+                                   + (f" – {gold(l['due'])}" if l['due'] else ''))
     m5 = ('7_must_migrate', 'MUST MIGRATE', [
-        f'These main accounts missed <b>{MIN_FORTS} Forts</b> for the <b>4th time</b>.',
+        f'These main accounts failed the fort rule (<b>{MIN_FORTS} Forts/week</b>) for the <b>4th time</b>.',
         '<color=red><b>They must migrate out of Kingdom 3514.</b></color>',
-        '<i>Name (Governor ID) – Forts/70 – unpaid fines</i>', ''],
-        [f"• <b>{l['name']}</b> ({l['key'] if str(l['key']).isdigit() else 'no ID'}) – {l['forts']}/{MIN_FORTS}"
-         + (f" – {gold(l['due'])}" if l['due'] else '') for l in migrate],
+        '<i>Name (Governor ID) – Forts – unpaid fines</i>', ''],
+        ([f'<b>Not in {MAIN_ALLIANCE[1:5]}</b> <i>(not in the alliance, counted as 0 Forts)</i>']
+         + [entry(l, False) for l in gone] + [''] if gone else []) +
+        ([f'<b>In {MAIN_ALLIANCE[1:5]}, below {MIN_FORTS} Forts</b>'] + [entry(l) for l in stayed] if stayed else []),
         ['', '<color=red><b>Failure to migrate means your account will be ZEROED.</b></color>',
          f'Unpaid fines go to the bank KD: <b>{BANK}</b>.', '', '<b>— KINGDOM 3514 LEADERSHIP</b>'])
 
