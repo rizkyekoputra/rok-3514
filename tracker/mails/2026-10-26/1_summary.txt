@@ -15,7 +15,6 @@ Main accounts reaching 50K Tech: <b>65/111</b>
 Fort Credits: <b>14,889</b> <color=red>▼ 4,485 (-23.1%)</color>
 Main accounts: <b>9,702</b> <color=red>▼ 1,853 (-16.0%)</color>
 Mains reaching 70: <b>71</b> <color=red>▼ 2</color>
-<i>Last week was only partly captured, so the change is overstated.</i>
 
 <b><color=navy>TOP FORT REWARDS</color></b>
 <color=#DAA520><b>1.</b></color> N A H K O D A (506) – Legendary Trophy + 10K VIP + $5 Flux
@@ -30,8 +29,8 @@ Mains reaching 70: <b>71</b> <color=red>▼ 2</color>
 <b>10.</b> 么 QUEEN (213) – Advanced Trophy
 
 <b><color=red>LOW CONTRIBUTION</color></b>
-1st offense (forgiven): <b>9</b> players
-Fined: <b>31</b> players
+1st offense (forgiven): <b>6</b> players
+Fined: <b>34</b> players
 Below 50K Tech: <b>46</b> mains, <b>25</b> farms
 
 Check the following mails for the full lists.
