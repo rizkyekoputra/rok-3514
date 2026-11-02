@@ -1,44 +1,43 @@
-<size=30><b>3514 | UNPAID FINES (1/2)</b></size>
+<size=30><b>3514 | UNPAID FINES (1/3)</b></size>
 <b>Pay by 3 November 2026</b>
 
 <size=24><color=navy>══════ ✦ ⚔ ✦ ══════</color></size>
 
-<b>18</b> players still have unpaid fines, <b>2.18B gold</b> in total.
+<b>33</b> players still have unpaid fines, <b>3.36B gold</b> in total.
 <color=red><b>Pay everything by 3 November 2026.</b></color>
 <i>Name – still to pay (gold) – what the fine is for</i>
 
 • <b>Serkan Bekir</b> – 577.25M gold
    20 GH Now or Never 30–31 Oct 2026: 577.25M
-• <b>Ak HD</b> – 495.18M gold
+• <b>Ak HD</b> – 519.18M gold
    Fort 19–25 Oct (2nd offense): 4.5M
+   Fort 26–1 Nov (3rd offense): 24M
    20 GH Now or Never 30–31 Oct 2026: 490.68M
 • <b>ᴹᶜ Bluepack</b> – 407.52M gold
    MGE Infantry 19–24 Oct 2026: 407.52M
 • <b>ʳˡᶠDRAGON</b> – 112.19M gold
    20 GH Now or Never 30–31 Oct 2026: 112.19M
+• <b>Kutang Bagak</b> – 105M gold
+   Fort 12–18 Oct (2nd offense): 35M
+   Fort 26–1 Nov (3rd offense): 70M
+• <b>wowsih</b> – 104.5M gold
+   Fort 12–18 Oct (2nd offense): 34.5M
+   Fort 26–1 Nov (3rd offense): 70M
+• <b>Conquísta</b> – 104.5M gold
+   Fort 19–25 Oct (2nd offense): 34.5M
+   Fort 26–1 Nov (3rd offense): 70M
+• <b>XxayoubxX</b> – 104M gold
+   Fort 12–18 Oct (2nd offense): 34M
+   Fort 26–1 Nov (3rd offense): 70M
 • <b>Ai real</b> – 104M gold
    Fort 12–18 Oct (2nd offense): 35M
    Fort 19–25 Oct (3rd offense): 69M
-• <b>GANIBAL メtreme</b> – 76.1M gold
-   20 GH Now or Never 30–31 Oct 2026: 76.1M
-• <b>HADE1999</b> – 67M gold
-   Fort 19–25 Oct (3rd offense): 67M
-• <b>иэхт</b> – 53.5M gold
-   Fort 12–18 Oct (2nd offense): 21.5M
-   Fort 19–25 Oct (3rd offense): 32M
-• <b>Kutang Bagak</b> – 35M gold
-   Fort 12–18 Oct (2nd offense): 35M
-• <b>wowsih</b> – 34.5M gold
-   Fort 12–18 Oct (2nd offense): 34.5M
-• <b>Conquísta</b> – 34.5M gold
-   Fort 19–25 Oct (2nd offense): 34.5M
-• <b>XxayoubxX</b> – 34M gold
-   Fort 12–18 Oct (2nd offense): 34M
-• <b>なおちん</b> – 34M gold
-   Fort 19–25 Oct (3rd offense): 34M
-• <b>Arkan The Därk</b> – 33M gold
+• <b>Arkan The Därk</b> – 103M gold
    Fort 12–18 Oct (2nd offense): 33M
-• <b>ZEESHAN KASHMAR</b> – 30.5M gold
-   Fort 19–25 Oct (2nd offense): 30.5M
-• <b>alex2000f</b> – 26M gold
+   Fort 26–1 Nov (3rd offense): 70M
+• <b>alex2000f</b> – 96M gold
    Fort 12–18 Oct (2nd offense): 26M
+   Fort 26–1 Nov (3rd offense): 70M
+• <b>ZEESHAN KASHMAR</b> – 88.5M gold
+   Fort 19–25 Oct (2nd offense): 30.5M
+   Fort 26–1 Nov (3rd offense): 58M
