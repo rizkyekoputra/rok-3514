@@ -58,6 +58,7 @@ from datetime import date, timedelta
 MIN_FORTS = 70
 MIN_TECH = 50_000
 FLUX_FORTS = 200
+NO_FLUX_WEEKS = {'2026-10-26'}  # weeks without the $5 Flux for 1st place (paused to evaluate the 1+1 rule)
 MAIL_LIMIT = 2000  # in-game mail character limit
 BANK = 'KINGDOM 3514'  # bank KD account that receives fines
 DASHBOARD_URL = 'https://rizkyekoputra.github.io/rok-3514-dashboard/'  # public dashboard (tracker/dashboard/)
@@ -624,7 +625,7 @@ def write_report(wk, lines, prev=None):
            '| Place | Player | Forts | Reward |', '|---|---|---|---|']
     for i, l in enumerate(ranked[:len(REWARDS)]):
         reward = REWARDS[i]
-        if i == 0:
+        if i == 0 and wk not in NO_FLUX_WEEKS:
             reward += ' + $5 Flux' if l['forts'] >= FLUX_FORTS else f' (no Flux: under {FLUX_FORTS})'
         out.append(f"| {i + 1} | {l['name']} | {l['forts']} | {reward} |")
     if r4:
@@ -703,7 +704,7 @@ def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low, farm_tech_low
         vs_last_week(lines, prev) + ['', '<b><color=navy>TOP FORT REWARDS</color></b>']
     colors = ['#DAA520', '#808080', '#CD7F32']
     for i, l in enumerate(ranked[:len(REWARDS)]):
-        reward = REWARDS[i] + (' + $5 Flux' if i == 0 and l['forts'] >= FLUX_FORTS else '')
+        reward = REWARDS[i] + (' + $5 Flux' if i == 0 and l['forts'] >= FLUX_FORTS and wk not in NO_FLUX_WEEKS else '')
         place = f'<color={colors[i]}><b>{i + 1}.</b></color>' if i < 3 else f'<b>{i + 1}.</b>'
         summary.append(f"{place} {l['name']} ({l['forts']}) – {reward}")
     summary += (['', f'<b>R4 – {R4_REWARD}</b>'] + [f"• {l['name']}" for l in r4] if r4 else []) + [
@@ -738,6 +739,17 @@ def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low, farm_tech_low
          '<color=red><b>Next failure: 1M gold x missing Forts + unpaid fines.</b></color>',
          f'Reach {MIN_FORTS} Forts for {CLEAR_AFTER} weeks in a row to clear your record.'])
 
+    # Sent kingdom-wide as a King's mail, so Governor IDs identify the players
+    migrate = [l for l in fined if l['offense'] >= 4]
+    m5 = ('7_must_migrate', 'MUST MIGRATE', [
+        f'These main accounts missed <b>{MIN_FORTS} Forts</b> for the <b>4th time</b>.',
+        '<color=red><b>They must migrate out of Kingdom 3514.</b></color>',
+        '<i>Name (Governor ID) – Forts/70 – unpaid fines</i>', ''],
+        [f"• <b>{l['name']}</b> ({l['key'] if str(l['key']).isdigit() else 'no ID'}) – {l['forts']}/{MIN_FORTS}"
+         + (f" – {gold(l['due'])}" if l['due'] else '') for l in migrate],
+        ['', '<color=red><b>Failure to migrate means your account will be ZEROED.</b></color>',
+         f'Unpaid fines go to the bank KD: <b>{BANK}</b>.', '', '<b>— KINGDOM 3514 LEADERSHIP</b>'])
+
     m3 = ('4_low_tech', 'LOW TECH DONATION', [
         f'These main accounts donated less than <b>{MIN_TECH:,}</b> tech points this week.', ''],
         [f"• {l['name']} – {l['tech']:,}" for l in sorted(tech_low, key=lambda l: l['tech'])],
@@ -756,12 +768,15 @@ def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low, farm_tech_low
              f'[ FORT ] Minimum <b>{MIN_FORTS} Forts/week</b>',
              f'[ TECH ] Minimum <b>{MIN_TECH // 1000}K Tech Donations/week</b>', '',
              '<b>RANKING REWARDS</b> <i>(main accounts incl. R4; farms and R5 excluded)</i>',
-             f'<color=#DAA520><b>1st:</b></color> {REWARDS[0]} + $5 Flux <i>(min {FLUX_FORTS} Forts)</i>',
+             f'<color=#DAA520><b>1st:</b></color> {REWARDS[0]}' + ('' if wk in NO_FLUX_WEEKS else f' + $5 Flux <i>(min {FLUX_FORTS} Forts)</i>'),
              f'<color=#808080><b>2nd:</b></color> {REWARDS[1]}',
              f'<color=#CD7F32><b>3rd:</b></color> {REWARDS[2]}',
              f'<b>4th–8th:</b> {REWARDS[3]}',
              f'<b>9th–10th:</b> {REWARDS[8]}',
-             f'<b>R4:</b> {R4_REWARD}', '',
+             f'<b>R4:</b> {R4_REWARD}'] + \
+            ([f'<i>The $5 Flux for 1st place is paused this week while we see how members do forts with the 1+1 rule.</i>']
+             if wk in NO_FLUX_WEEKS else []) + [
+             '',
              '<b><color=red>MAIN ACCOUNT FORT RULES</color></b>',
              'Applies to <b>all main accounts</b>, including R4 and R5. Farms have no penalty.',
              '•  <b>1st offense:</b> Forgiven + Low Contribution label',
@@ -787,6 +802,13 @@ def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low, farm_tech_low
             f.write('\n'.join(body) + '\n')
     for name, t, intro, items, outro in (m1, m2, m3, m4):
         parts = split_mail(t, head, intro, items or ['(none)'], outro + foot)
+        for i, body in enumerate(parts):
+            suffix = f'_part{i + 1}' if len(parts) > 1 else ''
+            with open(os.path.join(d, f'{name}{suffix}.txt'), 'w', encoding='utf-8') as f:
+                f.write(body)
+    if migrate:
+        name, t, intro, items, outro = m5
+        parts = split_mail(t, head, intro, items, outro)
         for i, body in enumerate(parts):
             suffix = f'_part{i + 1}' if len(parts) > 1 else ''
             with open(os.path.join(d, f'{name}{suffix}.txt'), 'w', encoding='utf-8') as f:
