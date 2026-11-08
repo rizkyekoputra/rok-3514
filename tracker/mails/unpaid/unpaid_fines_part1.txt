@@ -3,7 +3,7 @@
 
 <size=24><color=navy>══════ ✦ ⚔ ✦ ══════</color></size>
 
-<b>38</b> players still have unpaid fines, <b>3.92B gold</b> in total.
+<b>37</b> players still have unpaid fines, <b>3.88B gold</b> in total.
 <color=red><b>Pay everything by 3 November 2026.</b></color>
 <i>Name – still to pay (gold) – what the fine is for</i>
 
