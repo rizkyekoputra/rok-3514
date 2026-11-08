@@ -5,29 +5,30 @@
 
 These main accounts failed the fort rule (<b>70 Forts/week</b>) for the <b>4th time</b>.
 <color=red><b>They must migrate out of Kingdom 3514.</b></color>
-<i>Name (Governor ID) – Forts – unpaid fines</i>
+<i>Name (Governor ID) – Forts</i>
 
 <b>Not in 14-X</b> <i>(not in the alliance, counted as 0 Forts)</i>
-• <b>YddrY</b> (40095145) – 70M gold
-• <b>alex2000f</b> (202239761) – 96M gold
+• <b>YddrY</b> (40095145)
+• <b>alex2000f</b> (202239761)
 • <b>чм чм</b> (35959280)
-• <b>FireLord</b> (198546430) – 70M gold
-• <b>Tottigno 72</b> (204335189) – 79M gold
-• <b>Arkan The Därk</b> (201952743) – 103M gold
-• <b>Kutang Bagak</b> (166206580) – 105M gold
-• <b>XxayoubxX</b> (77299661) – 104M gold
-• <b>wowsih</b> (68013953) – 104.5M gold
-• <b>么Angelzᴳᵈ</b> (12132610) – 70M gold
+• <b>FireLord</b> (198546430)
+• <b>Tottigno 72</b> (204335189)
+• <b>Arkan The Därk</b> (201952743)
+• <b>Kutang Bagak</b> (166206580)
+• <b>XxayoubxX</b> (77299661)
+• <b>wowsih</b> (68013953)
+• <b>么Angelzᴳᵈ</b> (12132610)
 
 <b>In 14-X, below 70 Forts</b>
-• <b>Ai real</b> (139556724) – 0/70 – 104M gold
-• <b>HADE1999</b> (69061362) – 0/70 – 67M gold
-• <b>Sanji Kunᵖʰ</b> (69008732) – 2/70 – 70M gold
+• <b>Ai real</b> (139556724) – 0/70
+• <b>HADE1999</b> (69061362) – 0/70
+• <b>Sanji Kunᵖʰ</b> (69008732) – 2/70
 • <b>ᴹᴬᴰMladen</b> (171854288) – 19/70
 • <b>Xu Muuu</b> (170854552) – 30/70
-• <b>иэхт</b> (no ID) – 59/70 – 53.5M gold
+• <b>иэхт</b> (no ID) – 59/70
 
+<b>Migrate by Thursday 5 November 2026.</b>
 <color=red><b>Failure to migrate means your account will be ZEROED.</b></color>
-Unpaid fines go to the bank KD: <b>KINGDOM 3514</b>.
+Need a migration passport? Ask an R4 of 14-X.
 
 <b>— KINGDOM 3514 LEADERSHIP</b>

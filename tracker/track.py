@@ -58,6 +58,7 @@ from datetime import date, timedelta
 MIN_FORTS = 70
 MIN_TECH = 50_000
 FLUX_FORTS = 200
+MIGRATE_BY = {'2026-10-26': '2026-11-05'}  # must-migrate deadline per week (King's mail); missing = no date
 NO_FLUX_WEEKS = {'2026-10-26'}  # weeks without the $5 Flux for 1st place (paused to evaluate the 1+1 rule)
 MAIL_LIMIT = 2000  # in-game mail character limit
 BANK = 'KINGDOM 3514'  # bank KD account that receives fines
@@ -744,17 +745,17 @@ def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low, farm_tech_low
     gone = [l for l in migrate if not l['ranked']]  # not in the alliance ranking: counted as 0 forts
     stayed = [l for l in migrate if l['ranked']]
     entry = lambda l, forts=True: (f"• <b>{l['name']}</b> ({l['key'] if str(l['key']).isdigit() else 'no ID'})"
-                                   + (f" – {l['forts']}/{MIN_FORTS}" if forts else '')
-                                   + (f" – {gold(l['due'])}" if l['due'] else ''))
+                                   + (f" – {l['forts']}/{MIN_FORTS}" if forts else ''))
     m5 = ('7_must_migrate', 'MUST MIGRATE', [
         f'These main accounts failed the fort rule (<b>{MIN_FORTS} Forts/week</b>) for the <b>4th time</b>.',
         '<color=red><b>They must migrate out of Kingdom 3514.</b></color>',
-        '<i>Name (Governor ID) – Forts – unpaid fines</i>', ''],
+        '<i>Name (Governor ID) – Forts</i>', ''],
         ([f'<b>Not in {MAIN_ALLIANCE[1:5]}</b> <i>(not in the alliance, counted as 0 Forts)</i>']
          + [entry(l, False) for l in gone] + [''] if gone else []) +
         ([f'<b>In {MAIN_ALLIANCE[1:5]}, below {MIN_FORTS} Forts</b>'] + [entry(l) for l in stayed] if stayed else []),
-        ['', '<color=red><b>Failure to migrate means your account will be ZEROED.</b></color>',
-         f'Unpaid fines go to the bank KD: <b>{BANK}</b>.', '', '<b>— KINGDOM 3514 LEADERSHIP</b>'])
+        [''] + ([f"<b>Migrate by {date.fromisoformat(MIGRATE_BY[wk]):%A %-d %B %Y}.</b>"] if wk in MIGRATE_BY else []) +
+        ['<color=red><b>Failure to migrate means your account will be ZEROED.</b></color>',
+         f'Need a migration passport? Ask an R4 of {MAIN_ALLIANCE[1:5]}.', '', '<b>— KINGDOM 3514 LEADERSHIP</b>'])
 
     m3 = ('4_low_tech', 'LOW TECH DONATION', [
         f'These main accounts donated less than <b>{MIN_TECH:,}</b> tech points this week.', ''],
