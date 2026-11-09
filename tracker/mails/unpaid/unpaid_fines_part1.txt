@@ -3,7 +3,7 @@
 
 <size=24><color=navy>══════ ✦ ⚔ ✦ ══════</color></size>
 
-<b>35</b> players still have unpaid fines, <b>3.85B gold</b> in total.
+<b>39</b> players still have unpaid fines, <b>4.33B gold</b> in total.
 <color=red><b>Pay everything by 3 November 2026.</b></color>
 <i>Name – still to pay (gold) – what the fine is for</i>
 
@@ -15,7 +15,8 @@
    20 GH Now or Never 30–31 Oct 2026: 490.68M
 • <b>ᴹᶜ Bluepack</b> – 407.52M gold
    MGE Infantry 19–24 Oct 2026: 407.52M
-• <b>ʳˡᶠDRAGON</b> – 112.19M gold
+• <b>ʳˡᶠDRAGON</b> – 141.19M gold
+   Fort 2–8 Nov (2nd offense): 29M
    20 GH Now or Never 30–31 Oct 2026: 112.19M
 • <b>Kutang Bagak</b> – 105M gold
    Fort 12–18 Oct (2nd offense): 35M
@@ -35,9 +36,9 @@
 • <b>Webzz</b> – 105M gold
    Fort 19–25 Oct (2nd offense): 35M
    Fort 26–1 Nov (3rd offense): 70M
-• <b>Conquísta</b> – 104.5M gold
-   Fort 19–25 Oct (2nd offense): 34.5M
-   Fort 26–1 Nov (3rd offense): 70M
-• <b>wowsih</b> – 104.5M gold
-   Fort 12–18 Oct (2nd offense): 34.5M
-   Fort 19–25 Oct (3rd offense): 70M
+• <b>Ssoz</b> – 105M gold
+   Fort 26–1 Nov (2nd offense): 35M
+   Fort 2–8 Nov (3rd offense): 70M
+• <b>ᴳᵒ4cheᴰʷ</b> – 105M gold
+   Fort 26–1 Nov (2nd offense): 35M
+   Fort 2–8 Nov (3rd offense): 70M
