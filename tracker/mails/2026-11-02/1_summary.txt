@@ -3,18 +3,18 @@
 
 <size=24><color=navy>══════ ✿ ══════</color></size>
 
-Fort Credits: <b>14,478</b> (main accounts: 9,630)
+Fort Credits: <b>14,478</b> (main accounts: 9,431)
 <i>Sum of every member's fort count. A fort destroyed in a rally counts once for each participant, so this is not the number of unique forts destroyed.</i>
-Total Tech Donations: <b>7,631,100</b> (main accounts: 4,994,500)
+Total Tech Donations: <b>7,631,100</b> (main accounts: 4,811,400)
 <i>Sum of all 174 members in the ranking, farms included.</i>
 
-Main accounts reaching 70 Forts: <b>70/110</b>
-Main accounts reaching 50K Tech: <b>69/110</b>
+Main accounts reaching 70 Forts: <b>70/107</b>
+Main accounts reaching 50K Tech: <b>66/107</b>
 
 <b><color=navy>FORT VS LAST WEEK</color></b> <i>(26–1 Nov)</i>
 Fort Credits: <b>14,478</b> <color=red>▼ 411 (-2.8%)</color>
-Main accounts: <b>9,630</b> <color=#2E8B57>▲ +229 (+2.4%)</color>
-Mains reaching 70: <b>70</b> <color=#2E8B57>▲ +1</color>
+Main accounts: <b>9,431</b> <color=#2E8B57>▲ +344 (+3.8%)</color>
+Mains reaching 70: <b>70</b> <color=#2E8B57>▲ +4</color>
 
 <b><color=navy>TOP FORT REWARDS</color></b>
 <color=#DAA520><b>1.</b></color> UtTha (547) – Legendary Trophy + 10K VIP
@@ -29,7 +29,7 @@ Mains reaching 70: <b>70</b> <color=#2E8B57>▲ +1</color>
 <b>10.</b> susuKNTLmaniez (191) – Advanced Trophy
 
 <b><color=red>LOW CONTRIBUTION</color></b>
-1st offense (forgiven): <b>6</b> players
+1st offense (forgiven): <b>3</b> players
 Fined: <b>34</b> players
 Below 50K Tech: <b>41</b> mains, <b>32</b> farms
 
