@@ -724,15 +724,16 @@ def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low, farm_tech_low
         ['', '<b>Next failure: 500K gold x missing Forts.</b>',
          f'Reach {MIN_FORTS} Forts for {CLEAR_AFTER} weeks in a row to clear your record.'])
 
-    fines = []
-    for l in fined:
-        what = '<color=red><b>MUST MIGRATE</b></color>' if l['offense'] >= 4 else \
-            f"<b>{gold(l['due']).replace(' gold', '')}</b> ({ordinal[l['offense']]})"
-        fines.append(f"• {l['name']} – {l['forts']}/{MIN_FORTS} – {what}")
+    # 4th offenses (must migrate) get their own mail (m5), not this one
+    fines = [f"• {l['name']} – {l['forts']}/{MIN_FORTS} – "
+             f"<b>{gold(l['due']).replace(' gold', '')}</b> ({ordinal[l['offense']]})"
+             for l in fined if l['offense'] < 4]
     m2 = ('3_fort_fines', 'FORT – FINES', [
         f'These main accounts missed <b>{MIN_FORTS} Forts</b> again. Pay your fine this week.',
         f'<i>Name – Forts/{MIN_FORTS} – fine in gold (offense)</i>', ''],
         fines,
+        ([''] + ['<i>4th offenses (must migrate) are in a separate mail.</i>']
+         if any(l['offense'] >= 4 for l in fined) else []) +
         ['', f'<b>Send your fine to the bank KD: <color=#DAA520>{BANK}</color></b>', '',
          '<b>PAY PER MISSING FORT</b>',
          '2nd: 500K gold = 1M Food / 1M Wood / 750K Stone',
