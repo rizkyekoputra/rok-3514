@@ -529,7 +529,7 @@ def main():
             s = state.setdefault(k, dict(offenses=0, streak=0, unpaid=0, lifetime=0, cleared=0, last=''))
             s.update(name=r['name'], type=typ, role=acc.get('role', ''))
             row = dict(key=k, name=r['name'], type=typ, role=acc.get('role', ''), forts=forts, tech=tech,
-                       offense='', action='', due=0, ranked=bool(r.get('fort_rank')),
+                       offense='', action='', due=0, ranked=bool(r.get('fort_rank')), tech_ranked=bool(r.get('tech_rank')),
                        miss_f=max(0, MIN_FORTS - forts) if forts is not None else None,
                        miss_t=max(0, MIN_TECH - tech) if tech is not None else None)
             if typ == 'main' and forts is not None:
@@ -760,14 +760,15 @@ def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low, farm_tech_low
 
     m3 = ('4_low_tech', 'LOW TECH DONATION', [
         f'These main accounts donated less than <b>{MIN_TECH:,}</b> tech points this week.', ''],
-        [f"• {l['name']} – {l['tech']:,}" for l in sorted(tech_low, key=lambda l: l['tech'])],
+        # only players in this week's tech recording; zero-filled absentees are left out of the mails
+        [f"• {l['name']} – {l['tech']:,}" for l in sorted(tech_low, key=lambda l: l['tech']) if l['tech_ranked']],
         ['', f'Please reach <b>{MIN_TECH // 1000}K</b> next week.'])
     m4 = ('5_low_tech_farms', 'LOW TECH – FARMS', [
         f'These farm accounts donated less than <b>{MIN_TECH:,}</b> tech points this week.',
         'There is <b>no penalty</b>, but when the alliance needs room for a new member (main or farm), '
         '<color=red><b>the lowest on this list are the first to be kicked</b></color>.',
         '<i>Lowest first:</i>', ''],
-        [f"• {l['name']} – {l['tech']:,}" for l in sorted(farm_tech_low, key=lambda l: l['tech'])],
+        [f"• {l['name']} – {l['tech']:,}" for l in sorted(farm_tech_low, key=lambda l: l['tech']) if l['tech_ranked']],
         ['', f'Reach <b>{MIN_TECH // 1000}K</b> next week to keep your spot.'])
 
     rules = ['<size=30><b>3514 | WEEKLY FORT RULES</b></size>', '',
