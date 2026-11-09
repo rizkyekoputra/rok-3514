@@ -59,7 +59,7 @@ MIN_FORTS = 70
 MIN_TECH = 50_000
 FLUX_FORTS = 200
 MIGRATE_BY = {'2026-10-26': '2026-11-05'}  # must-migrate deadline per week (King's mail); missing = no date
-NO_FLUX_WEEKS = {'2026-10-26'}  # weeks without the $5 Flux for 1st place (paused to evaluate the 1+1 rule)
+NO_FLUX_WEEKS = {'2026-10-26', '2026-11-02'}  # weeks without the $5 Flux for 1st place (paused to evaluate the 1+1 rule)
 MAIL_LIMIT = 2000  # in-game mail character limit
 BANK = 'KINGDOM 3514'  # bank KD account that receives fines
 DASHBOARD_URL = 'https://rizkyekoputra.github.io/rok-3514-dashboard/'  # public dashboard (tracker/dashboard/)
