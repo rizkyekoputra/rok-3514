@@ -6,10 +6,10 @@
 Fort Credits: <b>14,478</b> (main accounts: 9,630)
 <i>Sum of every member's fort count. A fort destroyed in a rally counts once for each participant, so this is not the number of unique forts destroyed.</i>
 Total Tech Donations: <b>7,631,100</b> (main accounts: 4,994,500)
-<i>Sum of all 175 members in the ranking, farms included.</i>
+<i>Sum of all 174 members in the ranking, farms included.</i>
 
-Main accounts reaching 70 Forts: <b>70/111</b>
-Main accounts reaching 50K Tech: <b>69/111</b>
+Main accounts reaching 70 Forts: <b>70/110</b>
+Main accounts reaching 50K Tech: <b>69/110</b>
 
 <b><color=navy>FORT VS LAST WEEK</color></b> <i>(26–1 Nov)</i>
 Fort Credits: <b>14,478</b> <color=red>▼ 411 (-2.8%)</color>
@@ -29,9 +29,9 @@ Mains reaching 70: <b>70</b> <color=#2E8B57>▲ +1</color>
 <b>10.</b> susuKNTLmaniez (191) – Advanced Trophy
 
 <b><color=red>LOW CONTRIBUTION</color></b>
-1st offense (forgiven): <b>7</b> players
+1st offense (forgiven): <b>6</b> players
 Fined: <b>34</b> players
-Below 50K Tech: <b>42</b> mains, <b>32</b> farms
+Below 50K Tech: <b>41</b> mains, <b>32</b> farms
 
 Check the following mails for the full lists.
 
