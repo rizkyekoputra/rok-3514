@@ -20,6 +20,7 @@ to read the rankings accurately, match names to Governor IDs, and keep `accounts
 | `tracker/fines_online.csv` | Same columns, payments R4s marked on the dashboard; written by `track.py --pull` (generated) |
 | `tracker/accounts_online.csv` | `governor_id, name, type, approved_by, proposed_by, decided`: approved farm/main changes (proposed by an R4 or a player; `approved_by` = the R4, approver or `admin` who decided); written by `track.py --pull`, overrides `accounts.csv` (generated) |
 | `.github/workflows/recalc.yml` + `tracker/publish_ci.sh` | GitHub Action: `track.py --pull` and republish the dashboard. Started by the sheet on approval, hourly, or `gh workflow run recalc.yml`. Uses the `DASHBOARD_DEPLOY_KEY` secret; refuses to publish if the live dashboard has a week the repo lacks |
+| `tracker/migrate_online.csv` | `governor_id, name, must, marked_by, marked, migrated_out, out_by, out_date, times_zeroed, last_zeroed`: the dashboard's Must migrate tab (`Migrate` tab of the ledger), written by `track.py --pull` (generated). `must` = `must` (R4 marked) or `revoke` (lifted; for a 4th offense only until the next failed week). The latest week's `7_must_migrate` mail leaves out `migrated_out = yes` and revoked accounts and adds R4-marked ones under "Marked by Kingdom Leadership" |
 | `tracker/ledger.json` | Last pulled ledger: payments, account changes and SHA-256 of active R4 keys (never the keys). Published with the dashboard so R4 links work instantly even when the Google web app is slow; a rotated or new key works after the next pull (`publish.sh` or the hourly Action) (generated) |
 | `tracker/fines_ledger/` | Apps Script (clasp project, owned by the Google account clasp is logged in as) bound to the "3514 Fines" Google Sheet: `Officers` tab = one personal dashboard key per R4, `Payments` tab = append-only payment log, `Accounts` tab = farm/main proposals (status proposed/approved/rejected; the admin, i.e. the user / sheet owner, not the R5, decides via the **3514** menu; approvers (`APPROVERS` in `Code.js` or `approver = yes` in Officers, e.g. Totos メtreme, ＡＧＡＭ) can approve/reject on the dashboard Review tab, and their own farm/main changes (single or multi-select in the master list) apply at once, which starts the Action using a GitHub token kept in Script Properties). `track.py` `FINES_URL` points at its web app |
 | `tracker/reports/<monday>.md` | Weekly report (generated) |
@@ -237,6 +238,8 @@ Future events (KvK, AoO, 20 GH…) get their own tab and data folder, sharing th
      player — e.g. `KNTLkecil F4` once fuzzy-matched `KNTLkecil F3`). Put corrections in an overrides CSV
      (`name,governor_id`, empty ID = name-only) and rerun with `--overrides`.
    - When clean, rerun with `--write`. It writes the week file, records renames and adds new accounts.
+   - Zero-fill (0 forts / 0 tech rows for IDs seen before but missing this week): first run `python3 tracker/track.py --pull`
+     and skip every account with `migrated_out = yes` in `tracker/migrate_online.csv`.
 5. **Run** `python3 tracker/track.py`, then read `tracker/reports/<monday>.md`.
 6. **Report to the user**: renames (especially R4/R5), who left, rewards, 2nd+ offenses with fines, new 1st offenses,
    tech below minimum, notable movers, and the list of unconfirmed mains to classify. Point to the mails folder.
@@ -254,6 +257,11 @@ Future events (KvK, AoO, 20 GH…) get their own tab and data folder, sharing th
   10 minutes. A daily trigger (made by `setup()`) deletes proof files 30 days after the decision, and unfinished uploads
   after a day. The script needs the `drive.file` and `script.scriptapp` scopes: after changing them the ledger account
   must run `setup` once in the script editor to grant them, before `clasp update-deployment`.
+- **Must migrate**: dashboard tab `#t=migrate`. Auto = main with current offenses ≥ 4; R4s (any key, no approver needed)
+  can mark Must migrate / Revoke (also in the master list), Migrated out / Undo, and Record zero (optional note) / Undo.
+  Ledger `Migrate` tab is append-only (`time, account_id, player, action, by, note, ref`); the web app returns the public
+  state (`migrate`: mark, migrated out, zero count) to everyone and the zero log with officer names (`zeroList`) only with
+  a valid key. The published `ledger.json` carries the public part only.
 - **Fine paid**: R4s mark payments on the dashboard with their personal `?key=` link ("Mark paid" opens a form with one
   field per resource, with tap-to-fill suggestions; recorded as gold value at the fine kind's rates); `publish.sh` pulls them.
   Only if the user reports one directly, append to `tracker/fines_paid.csv` (week = Monday the fine was issued, or

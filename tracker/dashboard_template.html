@@ -113,8 +113,11 @@ th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--bord
 th { font-size: 12px; color: var(--text-secondary); font-weight: 600; cursor: pointer; user-select: none; }
 th.num, td.num { text-align: right; }
 /* only these lists open the player pop-up (see the row click handler) */
-:is(#tbody, #rosterBody, #kvkBody) tr { cursor: pointer; }
-:is(#tbody, #rosterBody, #kvkBody) tr:hover { background: var(--chip-bg); }
+:is(#tbody, #rosterBody, #kvkBody, #migBody, #migOutBody) tr { cursor: pointer; }
+:is(#tbody, #rosterBody, #kvkBody, #migBody, #migOutBody) tr:hover { background: var(--chip-bg); }
+.acts { display: flex; flex-wrap: wrap; gap: 4px; }
+td .acts { flex-wrap: nowrap; }
+button.act.warn { background: none; color: var(--critical); border-color: var(--critical); }
 .below { color: var(--critical); font-weight: 600; }
 .below::after { content: " ▼"; font-size: 10px; }
 .empty { color: var(--text-muted); padding: 24px 0; text-align: center; }
@@ -200,6 +203,7 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
     <button data-tab="players" type="button">Players</button>
     <button data-tab="activity" type="button">Weekly activity</button>
     <button data-tab="fines" type="button">Fines</button>
+    <button data-tab="migrate" type="button">Must migrate <span class="badge" id="migCount"></span></button>
     <button data-tab="mge" id="mgeTabBtn" type="button">MGE</button>
     <button data-tab="gh" type="button">20 GH</button>
     <button data-tab="canyon" type="button">Canyon Clash</button>
@@ -341,6 +345,46 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
       <div class="sub" id="finesCount"></div>
     </div>
 
+  </section>
+
+  <section data-panel="migrate" hidden>
+    <div class="tiles" id="migTiles"></div>
+    <div class="card">
+      <h2>Must migrate</h2>
+      <div class="sub" id="migSub"></div>
+      <div class="controls">
+        <input type="search" id="migSearch" placeholder="Filter by name or ID…" autocomplete="off">
+        <select id="migShow">
+          <option value="all">Everyone on the list</option>
+          <option value="auto">4th offense</option>
+          <option value="manual">Marked by an R4</option>
+          <option value="zeroed">Zeroed at least once</option>
+        </select>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Player</th><th id="migActTh" hidden></th><th>ID</th><th>Why</th>
+          <th class="num" title="Forts in the latest week (0 = not in the alliance ranking)">Forts</th><th class="num">Unpaid fines</th><th class="num">Times zeroed</th><th>Last zeroed</th></tr></thead>
+        <tbody id="migBody"></tbody>
+      </table></div>
+      <div class="sub" id="migListCount"></div>
+    </div>
+    <div class="card">
+      <h2>Migrated out</h2>
+      <div class="sub">Marked by an R4 once the account left Kingdom 3514. They are left out of the must-migrate list and the weekly zero-fill.</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Player</th><th id="migOutActTh" hidden></th><th>ID</th><th>Marked by</th><th>When</th><th class="num">Times zeroed</th></tr></thead>
+        <tbody id="migOutBody"></tbody>
+      </table></div>
+    </div>
+    <div class="card" id="zeroCard" hidden>
+      <h2>Zero log</h2>
+      <div class="sub">Every zero recorded, newest first, with the R4 who recorded it. Only R4s see who did it; players see the count.</div>
+      <div class="hints" id="zeroByOfficer" style="margin-top:10px"></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>When</th><th>Player</th><th>Recorded by</th><th>Note</th><th></th></tr></thead>
+        <tbody id="zeroBody"></tbody>
+      </table></div>
+    </div>
   </section>
 
   <section data-panel="mge" hidden>
@@ -765,6 +809,7 @@ function renderPlayer() {
       ${ranked ? '' : '<span>Not in the alliance fort/tech rankings</span>'}
       ${!p.hn && p.pn && p.pn.length ? `<span>Previously: ${p.pn.map(esc).join(', ')}</span>` : ''}
     </div>
+    ${migNote(p)}
     ${p.hn ? `<div class="p-sec">Name history</div><div class="names">${p.hn.slice().reverse().map(([n, a, b, src], i) => {
       const kv = (src || '').match(/\d+/g), dates = kv && kv.every(x => KVK[x] && KVK[x].e) ? kvkWhen(kv[0]) + (kv.length > 1 ? ' – ' + kvkWhen(kv[kv.length - 1]).replace('≈ ', '') : '')
         : !a ? 'before tracking' : a === b ? dayLabel(a) : `${dayLabel(a)} – ${dayLabel(b)}`;
@@ -819,6 +864,8 @@ function renderPlayer() {
 // ---------- master list ----------
 let rSortK = 'pw', rSortDir = -1;
 function statusCell(p) {
+  const mc = migChip(p);
+  if (mc) return mc;
   if (p.x) return `<span class="muted">${onMap(p) ? goneNote(p) : 'Last seen ' + dayLabel(p.x)}</span>`;
   const c = changes[p.id] || {}, st = typeState(p);
   if (st === 'pending') return `<span class="chip"><span class="dot" style="background:var(--warning)"></span>${c.pending.type}? waiting for approval</span>`;
@@ -851,7 +898,7 @@ function renderRoster() {
       ${officer ? `<td class="sel">${can(p) ? `<input type="checkbox" data-sel="${P.indexOf(p)}"${picked.has(P.indexOf(p)) ? ' checked' : ''} aria-label="Select ${esc(p.n)}">` : ''}</td>` : ''}
       <td>${esc(p.n)}</td><td class="muted" style="font-variant-numeric:tabular-nums">${p.g || '–'}</td><td>${p.a ? esc(p.a) : p.x ? `<span class="muted">${goneTxt(p)}</span>` : '<span class="muted">–</span>'}</td>
       <td class="num">${p.ch || '<span class="muted">–</span>'}</td><td class="num">${short(p.pw)}</td><td class="num">${short(p.kp)}</td>
-      <td>${typeTxt(p)}</td><td>${statusCell(p)}</td>${officer ? `<td style="white-space:nowrap">${typeButtons(p)}</td>` : ''}</tr>`).join('') ||
+      <td>${typeTxt(p)}</td><td>${statusCell(p)}</td>${officer ? `<td style="white-space:nowrap">${typeButtons(p)} ${migButtons(p, true)}</td>` : ''}</tr>`).join('') ||
     `<tr><td colspan="${officer ? 10 : 8}" class="empty">No players match.</td></tr>`;
   $('rosterActTh').hidden = $('rosterSelTh').hidden = !officer;
   renderBulk();
@@ -1396,7 +1443,7 @@ $('rosterAll').addEventListener('change', e => {
 // the change at once and refreshes everything from the sheet in the background.
 function saving(b) { b.disabled = true; b.dataset.label = b.textContent; b.textContent = 'Saving…'; }
 function notSaved(b, err) { alert('Not saved: ' + err.message + '. Try again.'); b.disabled = false; b.textContent = b.dataset.label; }
-function saved() { renderMge(); renderOfficer(); renderFines(); renderPlayer(); renderTable(); renderRoster(); renderReview(); loadLedger(); }
+function saved() { renderMge(); renderOfficer(); renderFines(); renderPlayer(); renderTable(); renderRoster(); renderReview(); renderMigrate(); loadLedger(); }
 function typeSaved(ids, type, approved) {
   const now = new Date().toISOString();
   ids.forEach(id => { changes[id] = approved ? {type, by: officer, decided: now} : {...changes[id], pending: {type, by: officer, time: now}}; });
@@ -1467,6 +1514,8 @@ function renderTable() {
 const F = DATA.fines || [];
 let ledger = null, officer = null, approver = false, r4key = null;  // ledger: {fine_id: {amount, by, time}} once loaded
 let changes = {};  // account_id -> {type, by, decided, pending: {type, by, time}} from the ledger
+// account_id -> {m: 'must' | 'revoke', mb, mt, out: {by, time}, z: times zeroed, zt: last zeroed} (Migrate tab of the ledger)
+let mig = {}, zeroList = [];  // zeroList (R4 mode only): [{ref, account_id, player, by, time, note}], oldest first
 const paidOf = f => (f.h || 0) + (ledger && ledger[f.id] ? ledger[f.id].amount : 0);
 const shownFines = () => F;  // every fine, fort and MGE (MGE opened to everyone on 25 Oct 2026)
 // MGE and 20 GH fines carry e (event label), t (kind) and m = points over the limit; fort fines have m = missing forts
@@ -1509,13 +1558,15 @@ async function loadLedger() {
         AbortSignal.timeout ? {signal: AbortSignal.timeout(60000)} : {});
       const j = await r.json();
       ledger = j.paid || {}; changes = j.accounts || {}; claims = j.claims || {}; claimList = j.claimList || [];
+      if (j.migrate) mig = j.migrate;  // older web app versions have no Migrate tab: keep the published copy
+      zeroList = j.zeroList || [];
       if (r4key) { officer = j.officer || null; approver = !!j.approver; }
       break;
     } catch (e) {
       if (attempt === 2) $('finesSub').textContent = `Could not reach the sheet just now; showing data from the last update (${DATA.updated}).`;
     }
   }
-  renderOfficer(); renderFines(); renderPlayer(); renderTable(); renderRoster(); renderReview(); renderMge();
+  renderOfficer(); renderFines(); renderPlayer(); renderTable(); renderRoster(); renderReview(); renderMge(); renderMigrate();
 }
 
 function renderOfficer() {
@@ -1523,7 +1574,7 @@ function renderOfficer() {
   bar.hidden = !r4key || !ledger;
   bar.classList.toggle('bad', !officer);
   bar.innerHTML = officer
-    ? `<span>Logged in as <b>${esc(officer)}</b> (R4${approver ? ', approver' : ''}) · mark payments in <a href="#t=fines">Fines</a>, check accounts in <a href="#t=review">Review</a>.</span><button class="act ghost" id="logoutBtn" type="button">Leave R4 mode</button>`
+    ? `<span>Logged in as <b>${esc(officer)}</b> (R4${approver ? ', approver' : ''}) · mark payments in <a href="#t=fines">Fines</a>, check accounts in <a href="#t=review">Review</a>, record zeros in <a href="#t=migrate">Must migrate</a>.</span><button class="act ghost" id="logoutBtn" type="button">Leave R4 mode</button>`
     : `<span>This R4 link is not valid or has been revoked. Ask the admin for a new one.</span><button class="act ghost" id="logoutBtn" type="button">Dismiss</button>`;
   const b = $('logoutBtn'); if (b) b.addEventListener('click', forgetKey);
   $('finesActTh').hidden = !officer;
@@ -1573,6 +1624,137 @@ function typeNote(p) {
     : c.type === p.t && c.decided ? `<span class="chip">Set as ${c.type} on ${dayLabel(c.decided.slice(0, 10))}${c.approvedBy ? ` by ${esc(c.approvedBy)}` : ''}${c.by && c.by !== c.approvedBy ? ` (proposed by ${esc(c.by)})` : ''}</span>` : '';
   return note + ' ' + typeButtons(p);
 }
+
+// ---------- must migrate (any R4 marks; everyone sees the list) ----------
+// On the list: a 4th+ fort offense now (automatic), or marked by an R4. A revoke lifts both; for a 4th offense only
+// until the next failed week. "Migrated out" moves the account to its own list.
+const isoDay = d => d.toISOString().slice(0, 10);
+const weekEnd = wk => isoDay(new Date(new Date(wk + 'T00:00:00Z').getTime() + 6 * 864e5));
+const lastFail = p => weeks.filter(w => p.w[w] && p.w[w].o >= 4).pop();  // last week with a 4th+ offense
+const autoMust = p => !isFarm(p) && p.o >= 4 && !!lastFail(p);
+function migState(p) {
+  const m = mig[p.id] || {};
+  if (m.out) return 'out';
+  if (m.m === 'must') return 'manual';
+  if (!autoMust(p)) return '';
+  return m.m === 'revoke' && m.mt.slice(0, 10) > weekEnd(lastFail(p)) ? 'revoked' : 'auto';
+}
+const onMigList = p => ['auto', 'manual'].includes(migState(p));
+const zeroTxt = m => m && m.z ? `${m.z}× zeroed · last ${dayLabel(m.zt.slice(0, 10))}` : '';
+function migChip(p) {
+  const st = migState(p), m = mig[p.id] || {};
+  return st === 'out' ? `<span class="chip"><span class="dot" style="background:var(--text-secondary)"></span>Migrated out</span>`
+    : st ? `<span class="chip"><span class="dot" style="background:${st === 'revoked' ? 'var(--good)' : 'var(--critical)'}"></span>${st === 'revoked' ? 'Must migrate lifted' : '✕ Must migrate'}</span>`
+    : '';
+}
+// R4 buttons; compact = the master list (just must migrate / revoke)
+function migButtons(p, compact) {
+  if (!officer || p.x) return '';
+  const i = P.indexOf(p), st = migState(p), b = (op, label, cls = 'ghost') => `<button class="act ${cls}" data-mig="${op}" data-i="${i}" type="button">${label}</button>`;
+  if (st === 'out') return compact ? '' : b('back', 'Undo migrated out');
+  const must = onMigList(p) ? b('revoke', compact ? 'Revoke must migrate' : 'Revoke') : b('must', 'Must migrate', compact ? 'ghost' : 'warn');
+  return compact ? must : must + ' ' + b('out', 'Migrated out') + ' ' + b('zero', 'Record zero', 'warn');
+}
+function migNote(p) {
+  const st = migState(p), m = mig[p.id] || {}, lf = lastFail(p);
+  const why = [
+    st === 'out' ? `Migrated out · marked by ${esc(m.out.by)}, ${dayLabel(m.out.time.slice(0, 10))}` : '',
+    autoMust(p) && st !== 'out' ? `${ORD(p.o)} fort offense (${weekLabel(lf)})` : '',
+    m.m === 'must' ? `Marked must migrate by ${esc(m.mb)}, ${dayLabel(m.mt.slice(0, 10))}` : '',
+    m.m === 'revoke' && (st === 'revoked' || autoMust(p)) ? `Lifted by ${esc(m.mb)}, ${dayLabel(m.mt.slice(0, 10))}` + (st === 'auto' ? ', before a later failed week' : '') : '',
+    zeroTxt(m)].filter(Boolean);
+  const zs = officer ? zeroList.filter(z => z.account_id === p.id) : [];
+  if (!why.length && !officer) return '';
+  return `<div class="p-sec">Must migrate</div>
+    <div class="p-meta">${migChip(p) || '<span class="muted">Not on the list</span>'}${why.map(w => `<span>${w}</span>`).join('')}</div>
+    ${officer && !p.x ? `<div class="acts" style="margin-top:8px">${migButtons(p)}</div>` : ''}
+    ${zs.length ? `<div class="table-wrap"><table class="kv"><thead><tr><th>Zeroed on</th><th>Recorded by</th><th>Note</th><th></th></tr></thead>
+      <tbody>${zs.slice().reverse().map(z => zeroRow(z, false)).join('')}</tbody></table></div>` : ''}`;
+}
+const zeroRow = (z, withName) => { const i = P.findIndex(p => p.id === z.account_id);
+  return `<tr style="cursor:default"><td>${dayLabel(z.time.slice(0, 10))} <span class="muted">${z.time.slice(11, 16)} UTC</span></td>
+    ${withName ? `<td>${i >= 0 ? `<a href="#t=migrate&p=${encodeURIComponent(P[i].n)}">${esc(P[i].n)}</a>` : esc(z.player)}</td>` : ''}
+    <td>${esc(z.by)}</td><td style="white-space:normal">${z.note ? esc(z.note) : '<span class="muted">–</span>'}</td>
+    <td>${i >= 0 ? `<button class="act ghost" data-mig="zero_undo" data-ref="${esc(z.ref)}" data-i="${i}" type="button">Undo</button>` : ''}</td></tr>`; };
+
+function renderMigrate() {
+  const q = $('migSearch').value.trim().toLowerCase(), show = $('migShow').value;
+  const list = P.filter(onMigList), out = P.filter(p => migState(p) === 'out');
+  const rows = list.filter(p => matches(p, q) && (show === 'all' || (show === 'zeroed' ? (mig[p.id] || {}).z :
+    show === 'auto' ? migState(p) === 'auto' || autoMust(p) : (mig[p.id] || {}).m === 'must')))
+    .sort((a, b) => ((mig[b.id] || {}).z || 0) - ((mig[a.id] || {}).z || 0) || b.o - a.o || a.n.localeCompare(b.n));
+  const lw = weeks[weeks.length - 1], forts = p => p.w[lw] ? `<span class="${p.w[lw].f < DATA.minF ? 'below' : ''}">${p.w[lw].f}</span>` : '<span class="muted">–</span>';
+  $('migBody').innerHTML = rows.map(p => { const m = mig[p.id] || {}, lf = lastFail(p);
+    const why = [autoMust(p) ? `${ORD(p.o)} offense · ${weekLabel(lf)}` : '', m.m === 'must' ? `Marked by ${esc(m.mb)} · ${dayLabel(m.mt.slice(0, 10))}` : '']
+      .filter(Boolean).join('<br>');
+    return `<tr data-i="${P.indexOf(p)}"><td>${esc(p.n)}</td>${officer ? `<td><div class="acts">${migButtons(p)}</div></td>` : ''}
+      <td class="muted" style="font-variant-numeric:tabular-nums">${p.g || 'no ID'}</td><td>${why}</td><td class="num">${forts(p)}</td>
+      <td class="num">${unpaidOf(p) ? gold(unpaidOf(p)) : '–'}</td><td class="num">${m.z || '–'}</td>
+      <td>${m.zt ? dayLabel(m.zt.slice(0, 10)) : '<span class="muted">–</span>'}</td></tr>`; }).join('') ||
+    `<tr><td colspan="${officer ? 9 : 8}" class="empty">${list.length ? 'No players match.' : 'Nobody has to migrate.'}</td></tr>`;
+  $('migOutBody').innerHTML = out.sort((a, b) => (mig[b.id].out.time).localeCompare(mig[a.id].out.time)).map(p => { const m = mig[p.id];
+    return `<tr data-i="${P.indexOf(p)}"><td>${esc(p.n)}</td>${officer ? `<td>${migButtons(p)}</td>` : ''}
+      <td class="muted" style="font-variant-numeric:tabular-nums">${p.g || 'no ID'}</td><td>${esc(m.out.by)}</td>
+      <td>${dayLabel(m.out.time.slice(0, 10))}</td><td class="num">${m.z || '–'}</td></tr>`; }).join('') ||
+    `<tr><td colspan="${officer ? 6 : 5}" class="empty">Nobody marked yet.</td></tr>`;
+  $('migActTh').hidden = $('migOutActTh').hidden = !officer;
+  const zeroed = Object.values(mig).filter(m => m.z);
+  $('migTiles').innerHTML = [
+    [list.length, 'Must migrate now'],
+    [gold(list.reduce((a, p) => a + unpaidOf(p), 0)), 'Their unpaid fines (gold)'],
+    [out.length, 'Migrated out'],
+    [zeroed.reduce((a, m) => a + m.z, 0), `Zeros recorded · ${zeroed.length} account${zeroed.length === 1 ? '' : 's'}`],
+  ].map(([v, l]) => `<div class="tile"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+  $('migCount').textContent = list.length || '';
+  $('migListCount').textContent = `${rows.length} of ${list.length} shown`;
+  $('migSub').textContent = `Main accounts at their 4th fort offense (or later) and accounts an R4 marked. Failure to migrate means the account is zeroed. ` +
+    `An R4 can lift it (a 4th offense comes back with the next failed week) or mark the account as migrated out once it has left.` +
+    (officer ? ' Record each zero with "Record zero"; the count shows for everyone, who did it only for R4s.' : '');
+  $('zeroCard').hidden = !officer;
+  if (officer) {
+    const by = {};
+    zeroList.forEach(z => { by[z.by] = (by[z.by] || 0) + 1; });
+    $('zeroByOfficer').innerHTML = Object.entries(by).sort((a, b) => b[1] - a[1])
+      .map(([n, c]) => `<span class="chip">${esc(n)} · <b>${c}</b> zero${c === 1 ? '' : 's'}</span>`).join('') || '<span class="muted">No zeros recorded yet.</span>';
+    $('zeroBody').innerHTML = zeroList.slice().reverse().map(z => zeroRow(z, true)).join('') ||
+      '<tr><td colspan="5" class="empty">No zeros recorded yet.</td></tr>';
+  }
+}
+
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button[data-mig]');
+  if (!b || !officer) return;
+  const p = P[+b.dataset.i], op = b.dataset.mig, st = migState(p);
+  let note = '';
+  if (op === 'zero') {
+    note = prompt(`Record a zero on ${p.n}?\n\nOptional note (what was done, who joined):`, '');
+    if (note === null) return;
+  } else if (!confirm({
+    must: `Mark ${p.n} as must migrate?\n\nThey go on the Must migrate list (and the next King's mail) until an R4 revokes it.`,
+    revoke: `Lift must migrate for ${p.n}?\n\n` + (autoMust(p) ? 'They leave the list until their next failed fort week.' : 'They leave the list.'),
+    out: `Mark ${p.n} as migrated out of Kingdom 3514?\n\nThey move to the Migrated out list and are no longer zero-filled in the weekly rankings.`,
+    back: `Undo "migrated out" for ${p.n}?`,
+    zero_undo: `Remove this zero record for ${p.n}?`,
+  }[op])) return;
+  saving(b);
+  try {
+    const r = await fetch(DATA.finesUrl, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify({key: r4key, action: 'migrate', op, account_id: p.id, player: p.n, note, ref: b.dataset.ref})});
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'not saved');
+    const now = new Date().toISOString(), m = {...(mig[p.id] || {})};
+    if (op === 'must' || op === 'revoke') Object.assign(m, {m: op, mb: officer, mt: now});
+    if (op === 'out') m.out = {by: officer, time: now};
+    if (op === 'back') delete m.out;
+    if (op === 'zero') { m.z = (m.z || 0) + 1; m.zt = now; zeroList = [...zeroList, {ref: j.ref, account_id: p.id, player: p.n, by: officer, time: now, note: note || undefined}]; }
+    if (op === 'zero_undo') { zeroList = zeroList.filter(z => z.ref !== b.dataset.ref); m.z = Math.max(0, (m.z || 1) - 1);
+      const left = zeroList.filter(z => z.account_id === p.id).pop(); m.zt = left ? left.time : undefined; }
+    mig = {...mig, [p.id]: m};
+    saved();
+  } catch (err) { notSaved(b, err); }
+});
+$('migSearch').addEventListener('input', renderMigrate);
+$('migShow').addEventListener('input', renderMigrate);
 
 async function sendPayment(f, action, amount) {
   const r = await fetch(DATA.finesUrl, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
@@ -1696,7 +1878,7 @@ $('finesOff').innerHTML = '<option value="all">All offenses</option>' +
 ['finesSearch', 'finesSel', 'finesEv', 'finesOff'].forEach(id => $(id).addEventListener('input', renderFines));
 
 // ---------- tabs (#t=players|activity|fines|review, plus p=<name> on the players tab) ----------
-const TABS = ['players', 'activity', 'fines', 'mge', 'gh', 'canyon', 'aoo', 'kvk', 'review'];
+const TABS = ['players', 'activity', 'fines', 'migrate', 'mge', 'gh', 'canyon', 'aoo', 'kvk', 'review'];
 let tab = 'activity';
 function setHash() {
   const q = new URLSearchParams({t: tab});
@@ -1708,6 +1890,7 @@ function renderSubtitle() {
     tab === 'activity' ? `${weekLabel(week)} ${week.slice(0, 4)}${partial(week) ? ` · partial data (${seen(week)} of ${maxSeen} players captured)` : ''} · minimum ${DATA.minF} forts and ${fmt(DATA.minT)} tech per week`
     : tab === 'players' ? `${fmt(P.filter(p => !p.x).length)} governors · alliances from the scan of ${dayLabel(DATA.scanDay)}` + (DATA.namesDay ? ` · names and power from the member export of ${dayLabel(DATA.namesDay)}` : '')
     : tab === 'fines' ? 'Fines and whether they have been paid'
+    : tab === 'migrate' ? 'Who must migrate out of Kingdom 3514, who has left, and how often each account was zeroed'
     : tab === 'mge' ? 'Mightiest Governor: point limits, takeovers and fines'
     : tab === 'gh' ? '20 GH (Gold Head): point limits and fines'
     : tab === 'canyon' ? 'Canyon Clash: who used all their attacks'
@@ -1745,7 +1928,7 @@ function selectPlayer(p) {
 function closePlayer() { $('playerDlg').close(); }
 
 function renderAll() {
-  renderSubtitle(); renderTiles(); renderTable(); renderRoster(); renderReview(); renderKvk(); renderMge(); renderMgh(); renderGh(); renderCanyon(); renderAoo();
+  renderSubtitle(); renderTiles(); renderTable(); renderRoster(); renderReview(); renderMigrate(); renderKvk(); renderMge(); renderMgh(); renderGh(); renderCanyon(); renderAoo();
   if (tab === 'activity') renderOverview();
   renderPlayer();
 }
@@ -1762,7 +1945,7 @@ document.querySelectorAll('th[data-k]').forEach(th => th.addEventListener('click
   sortDir = sortK === k ? -sortDir : (k === 'n' || k === 't' ? 1 : -1); sortK = k; renderTable();
 }));
 // Player pop-up from the master list, weekly activity, KvK history and the MGE history
-['tbody', 'rosterBody', 'kvkBody', 'mghBody', 'mghTopBody'].forEach(id => $(id).addEventListener('click', e => {
+['tbody', 'rosterBody', 'kvkBody', 'mghBody', 'mghTopBody', 'migBody', 'migOutBody'].forEach(id => $(id).addEventListener('click', e => {
   const tr = e.target.closest('tr[data-i]');
   if (tr && !e.target.closest('button, input, td.sel')) selectPlayer(P[+tr.dataset.i]);
 }));
@@ -1813,7 +1996,7 @@ let rt;
 addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (tab === 'activity') renderOverview(); renderPlayer(); }, 150); });
 // With ?key= the page stays behind the "Checking" screen until the key is verified, then renders in R4 mode.
 readKey();
-if (DATA.ledger) { ledger = DATA.ledger.paid || {}; changes = DATA.ledger.accounts || {}; }
+if (DATA.ledger) { ledger = DATA.ledger.paid || {}; changes = DATA.ledger.accounts || {}; mig = DATA.ledger.migrate || {}; }
 (async () => {
   const known = await identify();
   if (r4key && !known) await loadLedger();  // key not in the published list (e.g. just made): ask the sheet

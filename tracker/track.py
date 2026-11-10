@@ -33,6 +33,10 @@ Reads:
                     dashboard works before the slow web app answers
   accounts_online.csv  governor_id, name, type, approved_by, proposed_by, decided: farm/main changes proposed on the
                     dashboard (by an R4 or a player) and approved in the ledger (--pull); they override accounts.csv
+  migrate_online.csv  governor_id, name, must, marked_by, marked, migrated_out, out_by, out_date, times_zeroed,
+                    last_zeroed: the dashboard's Must migrate list (--pull). must = "must" (marked by an R4) or "revoke"
+                    (lifted, also an automatic 4th offense until the next failed week); migrated_out = yes once an R4
+                    marked the account as gone. Used for the latest week's must-migrate mail and the zero-fill skip list
 
 Writes:
   status.csv                 current offense status per account
@@ -42,7 +46,7 @@ Writes:
   mails/unpaid/              every fine still unpaid (fort, MGE, 20 GH), per player, with the PAY_BY deadline
 
 Usage: python3 track.py          rebuild from local files
-       python3 track.py --pull   first refresh fines_online.csv and accounts_online.csv from the ledger
+       python3 track.py --pull   first refresh fines_online.csv, accounts_online.csv and migrate_online.csv from the ledger
 """
 import csv
 import hashlib
@@ -169,8 +173,9 @@ def pull_ledger():
                 raise
             print('Ledger slow to answer, retrying once')
     pull_accounts(ledger.get('accounts', {}))
+    pull_migrate(ledger.get('migrate', {}))
     with open(os.path.join(HERE, 'ledger.json'), 'w', encoding='utf-8') as f:
-        json.dump({x: ledger.get(x, {} if x != 'officers' else []) for x in ('paid', 'accounts', 'officers')},
+        json.dump({x: ledger.get(x, {} if x != 'officers' else []) for x in ('paid', 'accounts', 'migrate', 'officers')},
                   f, ensure_ascii=False, indent=1, sort_keys=True)
     paid = ledger['paid']
     fines = {fine_id(r['governor_id'], r['week']): r for r in read('offense_log.csv') if num(r['fine_gold'])}
@@ -191,11 +196,18 @@ def pull_ledger():
     print(f'Pulled {len(paid)} payment(s) from the fines ledger')
 
 
-def pull_accounts(changes):
-    names = {key(a): a['name'] for a in read('accounts.csv')}
-    for wk in os.listdir(os.path.join(HERE, 'weeks')):
+def known_names():
+    """key -> name of every account the ledger may refer to (accounts, weekly rankings, latest scan and export)."""
+    names = {k: r['name'] for k, r in list(latest('scans')[1].items()) + list(latest('names')[1].items())}
+    names.update({key(a): a['name'] for a in read('accounts.csv')})
+    for wk in sorted(os.listdir(os.path.join(HERE, 'weeks'))):
         if wk.endswith('.csv'):
             names.update({key(r): r['name'] for r in read(f'weeks/{wk}')})
+    return names
+
+
+def pull_accounts(changes):
+    names = known_names()
     ids = {account_id(k): k for k in names}
     approved = {i: c for i, c in changes.items() if c.get('type') in ('farm', 'main')}
     with open(os.path.join(HERE, 'accounts_online.csv'), 'w', newline='', encoding='utf-8-sig') as f:
@@ -209,6 +221,35 @@ def pull_accounts(changes):
             gid = '' if k.startswith('name:') else k
             w.writerow([gid, names[k], c['type'], c.get('approvedBy') or '', c['by'], c['decided'][:10]])
     print(f'Pulled {len(approved)} approved account change(s) from the ledger')
+
+
+def pull_migrate(state):
+    """Ledger Migrate tab -> migrate_online.csv (must-migrate marks, migrated out, times zeroed) with Governor IDs."""
+    names = known_names()
+    ids = {account_id(k): k for k in names}
+    with open(os.path.join(HERE, 'migrate_online.csv'), 'w', newline='', encoding='utf-8-sig') as f:
+        w = csv.writer(f)
+        w.writerow(['governor_id', 'name', 'must', 'marked_by', 'marked', 'migrated_out', 'out_by', 'out_date',
+                    'times_zeroed', 'last_zeroed'])
+        for i, m in sorted(state.items(), key=lambda kv: names.get(ids.get(kv[0]), '')):
+            if i not in ids:
+                print(f'Ledger must-migrate entry {i} matches no known account, skipped')
+                continue
+            k, out = ids[i], m.get('out') or {}
+            w.writerow(['' if k.startswith('name:') else k, names[k], m.get('m', ''), m.get('mb', ''), (m.get('mt') or '')[:10],
+                        'yes' if out else '', out.get('by', ''), (out.get('time') or '')[:10], m.get('z', 0), (m.get('zt') or '')[:10]])
+    print(f'Pulled {len(state)} must-migrate entr{"y" if len(state) == 1 else "ies"} from the ledger')
+
+
+def read_migrate():
+    """key -> migrate_online.csv row"""
+    return {key(r): r for r in read('migrate_online.csv')}
+
+
+def revoked_since(m, wk):
+    """True if an R4 lifted must-migrate after week wk ended (a later failed week puts the player back on the list)."""
+    end = (date.fromisoformat(wk) + timedelta(days=6)).isoformat()
+    return bool(m) and m['must'] == 'revoke' and m['marked'] > end
 
 
 def penalty(offense, missing, unpaid):
@@ -561,7 +602,7 @@ def main():
             if a.get('role') == 'R4' and k not in seen:
                 lines.append(dict(name=a['name'], type=a['type'], role='R4', forts=None, tech=None,
                                   offense='', action='', due=0, miss_f=None, miss_t=None))
-        write_report(wk, lines, history[-1] if history else None)
+        write_report(wk, lines, history[-1] if history else None, read_migrate() if wk == weeks[-1] else None)
         history.append((wk, lines))
 
     with open(os.path.join(HERE, 'status.csv'), 'w', newline='', encoding='utf-8-sig') as f:
@@ -599,7 +640,7 @@ def main():
     write_dashboard(history, state, accounts, fines, mges, canyon_results(), aoo_results(), ghs)
 
 
-def write_report(wk, lines, prev=None):
+def write_report(wk, lines, prev=None, mig=None):
     start = date.fromisoformat(wk)
     end = start + timedelta(days=6)
     title = f'{start.day} {start:%b} – {end.day} {end:%b %Y}'
@@ -649,7 +690,7 @@ def write_report(wk, lines, prev=None):
     out.append('')
     with open(os.path.join(HERE, 'reports', f'{wk}.md'), 'w', encoding='utf-8') as f:
         f.write('\n'.join(out))
-    write_mails(wk, title, lines, ranked, r4, main_fail, tech_low, farm_tech_low, prev)
+    write_mails(wk, title, lines, ranked, r4, main_fail, tech_low, farm_tech_low, prev, mig)
 
 
 def fort_stats(lines):
@@ -680,8 +721,10 @@ def vs_last_week(lines, prev):
         (['<i>Last week was only partly captured, so the change is overstated.</i>'] if then[3] < 0.9 * now[3] else [])
 
 
-def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low, farm_tech_low, prev=None):
-    """In-game alliance mails (RoK rich text), one file per topic, in mails/<monday>/."""
+def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low, farm_tech_low, prev=None, mig=None):
+    """In-game alliance mails (RoK rich text), one file per topic, in mails/<monday>/.
+    mig (latest week only): the dashboard's Must migrate marks; the must-migrate mail then leaves out accounts marked
+    migrated out or revoked, and adds accounts R4s marked as must migrate."""
     head = lambda t: [f'<size=30><b>3514 | {t}</b></size>', f'<b>{title}</b>', '',
                       '<size=24><color=navy>══════ ✿ ══════</color></size>', '']
     foot = ['', '<b>Contribute and keep Kingdom 3514 strong!</b>']
@@ -743,6 +786,12 @@ def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low, farm_tech_low
 
     # Sent kingdom-wide as a King's mail, so Governor IDs identify the players
     migrate = [l for l in fined if l['offense'] >= 4]
+    marked = []
+    if mig is not None:
+        migrate = [l for l in migrate if not (mig.get(l['key'], {}).get('migrated_out') or revoked_since(mig.get(l['key']), wk))]
+        listed = {l['key'] for l in migrate}
+        marked = [dict(key=k, name=m['name']) for k, m in sorted(mig.items(), key=lambda kv: kv[1]['name'])
+                  if m['must'] == 'must' and not m['migrated_out'] and k not in listed]
     gone = [l for l in migrate if not l['ranked']]  # not in the alliance ranking: counted as 0 forts
     stayed = [l for l in migrate if l['ranked']]
     entry = lambda l, forts=True: (f"• <b>{l['name']}</b> ({l['key'] if str(l['key']).isdigit() else 'no ID'})"
@@ -753,7 +802,8 @@ def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low, farm_tech_low
         '<i>Name (Governor ID) – Forts</i>', ''],
         ([f'<b>Not in {MAIN_ALLIANCE[1:5]}</b> <i>(not in the alliance, counted as 0 Forts)</i>']
          + [entry(l, False) for l in gone] + [''] if gone else []) +
-        ([f'<b>In {MAIN_ALLIANCE[1:5]}, below {MIN_FORTS} Forts</b>'] + [entry(l) for l in stayed] if stayed else []),
+        ([f'<b>In {MAIN_ALLIANCE[1:5]}, below {MIN_FORTS} Forts</b>'] + [entry(l) for l in stayed] if stayed else []) +
+        ([''] * bool(stayed) + ['<b>Marked by Kingdom Leadership</b>'] + [entry(l, False) for l in marked] if marked else []),
         [''] + ([f"<b>Migrate by {date.fromisoformat(MIGRATE_BY[wk]):%A %-d %B %Y}.</b>"] if wk in MIGRATE_BY else []) +
         ['<color=red><b>Failure to migrate means your account will be ZEROED.</b></color>',
          f'Need a migration passport? Ask an R4 of {MAIN_ALLIANCE[1:5]}.', '', '<b>— KINGDOM 3514 LEADERSHIP</b>'])
@@ -815,7 +865,7 @@ def write_mails(wk, title, lines, ranked, r4, main_fail, tech_low, farm_tech_low
             suffix = f'_part{i + 1}' if len(parts) > 1 else ''
             with open(os.path.join(d, f'{name}{suffix}.txt'), 'w', encoding='utf-8') as f:
                 f.write(body)
-    if migrate:
+    if migrate or marked:
         name, t, intro, items, outro = m5
         parts = split_mail(t, head, intro, items, outro)
         for i, body in enumerate(parts):
@@ -1055,7 +1105,8 @@ def write_dashboard(history, state, accounts, fines, mges, canyons, aoos, ghs):
     data = dict(weeks=[wk for wk, _ in history], minF=MIN_FORTS, minT=MIN_TECH, players=players,
                 fines=fines, finesUrl=FINES_URL, scanDay=scan_day, namesDay=names_day, mainAlly=MAIN_ALLIANCE, kvks=kvks,
                 mges=mge, mgeHist=mgh, ghs=gh, ghFine=GH_FINE, canyons=canyon, aoos=aoo, aooMin=AOO_MIN, mgeFine=MGE_FINE, fineKinds=FINE_KINDS, bank=BANK, claimsOn=CLAIMS_ON,
-                ledger=dict(paid=ledger.get('paid', {}), accounts=ledger.get('accounts', {})), officers=ledger.get('officers', []),
+                ledger=dict(paid=ledger.get('paid', {}), accounts=ledger.get('accounts', {}), migrate=ledger.get('migrate', {})),
+                officers=ledger.get('officers', []),
                 updated=date.today().isoformat())
     with open(os.path.join(HERE, 'dashboard_template.html'), encoding='utf-8') as f:
         html = f.read()

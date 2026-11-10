@@ -7,6 +7,9 @@
 // Claims tab: players' "I've paid" submissions with proof files (screenshots/recordings, kept in a private Drive folder);
 // R4s approve or reject them on the dashboard. Approving appends a Payments row, so it counts like a payment an R4 marked.
 // Proof files are deleted CLAIM.keepDays after the decision (daily trigger made by setup()).
+// Migrate tab: append-only log of the must-migrate list, written by any R4 on the dashboard: must / revoke (mark or lift
+// must migrate; a revoke also lifts an automatic 4th offense until the next failed week), out / back (migrated out of the
+// kingdom, or undo), zero / zero_undo (one zeroing of the account, ref = its id). Who zeroed whom is only sent to R4s.
 // Deployed as a Web app: execute as the owner, access "Anyone" (keys gate writes, reads are public).
 
 const DASHBOARD = 'https://rizkyekoputra.github.io/rok-3514-dashboard/';
@@ -21,6 +24,7 @@ const HEADERS = {
   Officers: ['name', 'key', 'status', 'link', 'approver'],
   Payments: ['time', 'fine_id', 'player', 'week', 'amount', 'by', 'action'],
   Accounts: ['time', 'account_id', 'player', 'type', 'by', 'status', 'decided', 'decided_by', 'note'],
+  Migrate: ['time', 'account_id', 'player', 'action', 'by', 'note', 'ref'],
   Claims: ['time', 'claim_id', 'fine_id', 'player', 'week', 'fine', 'sent', 'gold_value', 'note', 'expect', 'files', 'bytes',
            'status', 'token', 'decided', 'decided_by', 'reason', 'cleaned'],
 };
@@ -188,6 +192,45 @@ function propose(req) {
   } finally { lock.releaseLock(); }
 }
 
+// ---------- must migrate ----------
+
+const MIGRATE_OPS = ['must', 'revoke', 'out', 'back', 'zero', 'zero_undo'];
+
+// account_id -> {m: 'must' | 'revoke', mb: by, mt: time, out: {by, time}, z: times zeroed, zt: last zero time}.
+// zeros (R4s only): [{ref, account_id, player, by, time, note}], oldest first.
+function migrateState() {
+  const st = {}, zeros = [];
+  rows('Migrate').forEach(([time, id, player, action, by, note, ref]) => {
+    const a = st[id] || (st[id] = {}), t = new Date(time).toISOString();
+    if (action === 'must' || action === 'revoke') Object.assign(a, {m: action, mb: by, mt: t});
+    else if (action === 'out') a.out = {by, time: t};
+    else if (action === 'back') delete a.out;
+    else if (action === 'zero') zeros.push({ref: String(ref), account_id: id, player, by, time: t, note: note || undefined});
+    else if (action === 'zero_undo') { const i = zeros.findIndex(z => z.ref === String(ref)); if (i >= 0) zeros.splice(i, 1); }
+  });
+  zeros.forEach(z => { const a = st[z.account_id]; a.z = (a.z || 0) + 1; a.zt = z.time; });
+  Object.keys(st).forEach(id => { if (!Object.keys(st[id]).length) delete st[id]; });
+  return {st, zeros};
+}
+
+// R4: {key, action: "migrate", op, account_id, player, note, ref (zero_undo: the zero to remove)}
+function migrate(req, by) {
+  if (!/^[0-9a-f]{10}$/.test(req.account_id) || !MIGRATE_OPS.includes(req.op)) return {ok: false, error: 'bad request'};
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    let ref = '';
+    if (req.op === 'zero') ref = newKey().slice(0, 10);
+    if (req.op === 'zero_undo') {
+      ref = String(req.ref || '');
+      if (!migrateState().zeros.some(z => z.ref === ref && z.account_id === req.account_id)) return {ok: false, error: 'that zero record is already gone'};
+    }
+    tab('Migrate').appendRow([new Date(), req.account_id, plain(req.player), req.op, by,
+                              String(req.note || '').trim().slice(0, 200).replace(/^([=+\-@])/, "'$1"), ref]);
+    return {ok: true, by, ref};
+  } finally { lock.releaseLock(); }
+}
+
 // GET: {paid: {fine_id: {amount, by, time}}, accounts: accountChanges(), officer: name or null for ?key=}
 function doGet(e) {
   const paid = {};
@@ -195,9 +238,10 @@ function doGet(e) {
     if (action === 'undo') delete paid[fid];
     else paid[fid] = {amount: Number(amount), by, time: new Date(time).toISOString()};
   });
-  const o = officer(e.parameter.key);
+  const o = officer(e.parameter.key), mig = migrateState();
   return out({paid, accounts: accountChanges(), officer: o && o.name, approver: !!(o && o.approver), officers: officerList(),
-              claims: publicClaims(), claimList: o ? officerClaims() : undefined});
+              claims: publicClaims(), claimList: o ? officerClaims() : undefined,
+              migrate: mig.st, zeroList: o ? mig.zeros : undefined});
 }
 
 // SHA-256 of each active key (never the key): published with the dashboard so an R4 link works at once,
@@ -219,6 +263,7 @@ function officerList() {
 //   {action: "claim_file", claim_id, token, name, type, data (base64)}  one proof file; then {action: "claim_done", ...}
 //   {key, action: "claim_view", claim_id, file_id}                     R4: one proof file as base64
 //   {key, action: "claim_approve", claim_id, amount} | {key, action: "claim_reject", claim_id, reason}
+//   {key, action: "migrate", op: must | revoke | out | back | zero | zero_undo, account_id, player, note, ref}
 function doPost(e) {
   let req;
   try { req = JSON.parse(e.postData.contents); } catch (err) { return out({ok: false, error: 'bad request'}); }
@@ -231,6 +276,7 @@ function doPost(e) {
   if (!o) return out({ok: false, error: 'invalid key'});
   const by = o.name;
   if (req.action === 'claim_view') return out(claimView(req));
+  if (req.action === 'migrate') return out(migrate(req, by));
   if (req.action === 'claim_approve' || req.action === 'claim_reject') return out(decideClaim(req, by));
   if (req.action === 'approve' || req.action === 'reject') {
     if (!/^[0-9a-f]{10}$/.test(req.account_id)) return out({ok: false, error: 'bad request'});

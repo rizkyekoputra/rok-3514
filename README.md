@@ -58,6 +58,20 @@ dashboard's MGE tab.
 Tell Claude when an account is a farm or R4, or when someone pays a fine; it updates the account list or
 payment log and recalculates everything.
 
+## Must migrate
+
+The dashboard's **Must migrate** tab lists every main account at its 4th fort offense (or later) plus accounts an R4
+marked, with unpaid fines and how many times each was zeroed. With their personal R4 link, R4s can:
+
+- mark any account as **Must migrate** (master list or player pop-up), or **Revoke** it. Revoking a 4th offense lasts
+  until the player's next failed week;
+- mark an account **Migrated out** once it has left (it moves to its own list and is no longer zero-filled), or undo that;
+- **Record zero** each time the account is zeroed, with an optional note. Everyone sees the count; only R4s see who
+  recorded each zero (the Zero log, with a tally per R4).
+
+Every action is kept in the `Migrate` tab of the ledger sheet. `track.py --pull` copies it to
+`tracker/migrate_online.csv`, and the latest week's must-migrate mail follows it.
+
 ## What's in here
 
 | Path | Contents |
@@ -71,6 +85,7 @@ payment log and recalculates everything.
 | `tracker/reports/<monday>.md` | Weekly report: summary, rewards, penalties, low tech, farms |
 | `tracker/mails/<monday>/` | In-game mails (RoK rich text, max 2,000 characters each) |
 | `tracker/status.csv` | Each player's current offenses, passing streak and unpaid fines |
+| `tracker/migrate_online.csv` | Must-migrate marks, migrated-out accounts and zero counts from the dashboard (pulled) |
 | `tracker/offense_log.csv` | Every offense and clearance ever recorded |
 | `tracker/dashboard_template.html` | Dashboard page; filled with data by `track.py` |
 | `tracker/publish.sh` | Pushes the dashboard to GitHub Pages |
