@@ -99,6 +99,37 @@ Old name lists (e.g. a past KvK sheet shared by link) seed history the same way:
 `python3 .claude/skills/rok-weekly/scripts/import_name_list.py <sheet link or csv> --date YYYY-MM-DD`
 (use the date the names were current, e.g. the end of the period the sheet covers; matched by Governor ID).
 
+## CH25 power (dashboard tab)
+
+Built by `power_trend()` in `track.py` from every member export (`tracker/names/<date>.csv`) and the CH rosters
+(`tracker/ch/`): per export, the sum of Power of the top `POWER_TOP` (300) governors at `POWER_CH` (25) or above.
+Only ~225 CH25 governors are in the kingdom, so it is all of them. The tab also shows the same governors present in
+every export in the chosen range (so arrivals/departures don't move it), where the change came from (left, joined,
+same governors), and every CH25 governor's power at both ends. Updates itself with each new export.
+
+## Immigration log
+
+The in-game **Immigration Log** (emigrated out / entered via same-season immigration, with UTC dates) is recorded
+into `data-from-ingame/` (848×392: crop `95,22,560,388` and upscale to read). Transcribe `date|time|out/in|name|special`
+newest first (date = the "UTC yyyy/mm/dd" header above the row) into `tracker/immigration_src/<recorded>.txt`, then
+`python3 .claude/skills/rok-weekly/scripts/import_immigration.py FILE --overrides tracker/immigration_src/overrides.csv`
+(check `--`/`??` lines; old names are matched against every name a governor ever had), `--write` ->
+`tracker/immigration.csv` (merged, duplicates dropped), `python3 tracker/track.py`. An account whose latest event is
+an emigration counts as **migrated out** (Must migrate tab, must-migrate mail, zero-fill skip) without an R4 mark; the
+Must migrate tab lists the whole log, and the pop-up shows each event. Imported: 19 Sep – 10 Nov 2026.
+
+## KvK battle roster
+
+The **Lost Kingdom Battle Roster** (alliance list with slots, then each alliance's governors by rank, plus No
+Alliance) is recorded into `kvk/kvk_<n>_<name>/`. Read every frame (the list scrolls fast: 10 fps frames, every 3rd),
+transcribe `alliance|rank|name|power` (rank Leader/R4/R3/R2/R1, blank for No alliance) into
+`tracker/kvk/kvk<N>_roster_src.txt`; check each alliance's count against its Slots (the game's alliance Power counts
+all members, so only No Alliance's power can be checked against the screen). Then from the scripts folder:
+`python3 import_kvk_roster.py N FILE --date YYYY-MM-DD` (matches by name, confirmed or found by power vs the latest
+export; check `~~` lines; `--overrides name,governor_id`), `--write` -> `tracker/kvk/kvk<N>_roster.csv` + `rosters.csv`,
+`python3 tracker/track.py`. Dashboard tab **KvK <N> roster** (`#t=roster`): totals, power per alliance, the full
+roster; the pop-up shows the roster alliance and rank. Imported: KvK 11 (11 Nov 2026, 225/600 slots, 9.86B).
+
 ## Past KvK sheets
 
 `python3 .claude/skills/rok-weekly/scripts/import_kvk.py N <sheet link> --date YYYY-MM-DD [--estimated]` imports

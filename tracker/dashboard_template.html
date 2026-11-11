@@ -87,6 +87,8 @@ button.theme { font: inherit; background: none; border: 1px solid var(--border);
 .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
 .tile .v { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .tile .l { color: var(--text-secondary); font-size: 12px; }
+.up { color: var(--good); font-weight: 600; }
+.dn { color: var(--critical); font-weight: 600; }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
 .grid2 .card { margin-top: 0; }
 .charts-row { margin-top: 16px; }
@@ -208,6 +210,8 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
     <button data-tab="gh" type="button">20 GH</button>
     <button data-tab="canyon" type="button">Canyon Clash</button>
     <button data-tab="aoo" type="button">Ark of Osiris</button>
+    <button data-tab="power" type="button">CH25 power</button>
+    <button data-tab="roster" id="rosterTabBtn" type="button" hidden>KvK roster</button>
     <button data-tab="kvk" type="button">KvK history</button>
     <button data-tab="review" id="reviewTabBtn" type="button" hidden>Review <span class="badge" id="reviewCount"></span></button>
   </nav>
@@ -370,11 +374,28 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
     </div>
     <div class="card">
       <h2>Migrated out</h2>
-      <div class="sub">Marked by an R4 once the account left Kingdom 3514. They are left out of the must-migrate list and the weekly zero-fill.</div>
+      <div class="sub">Marked by an R4 once the account left Kingdom 3514, or shown emigrating in the in-game Immigration Log. They are left out of the must-migrate list and the weekly zero-fill.</div>
       <div class="table-wrap"><table>
         <thead><tr><th>Player</th><th id="migOutActTh" hidden></th><th>ID</th><th>Marked by</th><th>When</th><th class="num">Times zeroed</th></tr></thead>
         <tbody id="migOutBody"></tbody>
       </table></div>
+    </div>
+    <div class="card">
+      <h2>Immigration log</h2>
+      <div class="sub" id="immSub"></div>
+      <div class="controls">
+        <input type="search" id="immSearch" placeholder="Filter by name…" autocomplete="off">
+        <select id="immShow">
+          <option value="all">Everyone</option>
+          <option value="out">Emigrated out</option>
+          <option value="in">Entered the kingdom</option>
+        </select>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Date (UTC)</th><th>Player</th><th>Name in the log</th><th>Event</th></tr></thead>
+        <tbody id="immBody"></tbody>
+      </table></div>
+      <div class="sub" id="immCount"></div>
     </div>
     <div class="card" id="zeroCard" hidden>
       <h2>Zero log</h2>
@@ -487,6 +508,87 @@ footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
         <tbody id="ccBody"></tbody>
       </table></div>
       <div class="sub" id="ccCount"></div>
+    </div>
+  </section>
+
+  <section data-panel="power" hidden>
+    <div class="controls">
+      <label class="sub" for="pwFrom">From</label><select id="pwFrom"></select>
+      <label class="sub" for="pwTo">to</label><select id="pwTo"></select>
+    </div>
+    <div class="tiles" id="pwTiles"></div>
+    <div class="card">
+      <h2 id="pwTitle">Total power by member export</h2>
+      <div class="sub" id="pwSub"></div>
+      <div class="legend"><span><i class="line" style="background:var(--series-1)"></i><span id="pwL1"></span></span><span><i class="line" style="background:var(--series-2)"></i><span id="pwL2"></span></span></div>
+      <div id="pwChart"></div>
+    </div>
+    <div class="grid2 charts-row">
+      <div class="card">
+        <h2>Where the change came from</h2>
+        <div class="sub" id="pwBridgeSub"></div>
+        <div id="pwBridge"></div>
+      </div>
+      <div class="card">
+        <h2>Per export</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Export</th><th class="num" id="pwThN"></th><th class="num" id="pwThT"></th><th class="num">Change</th><th class="num" id="pwThA"></th></tr></thead>
+          <tbody id="pwExBody"></tbody>
+        </table></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Governors</h2>
+      <div class="sub" id="pwGovSub"></div>
+      <div class="controls">
+        <input type="search" id="pwSearch" placeholder="Filter by name…" autocomplete="off">
+        <select id="pwShow">
+          <option value="all">Everyone</option>
+          <option value="down">Power went down</option>
+          <option value="up">Power went up</option>
+          <option value="left">Left the kingdom</option>
+          <option value="joined">Joined the kingdom</option>
+        </select>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Player</th><th class="num" id="pwThFrom"></th><th class="num" id="pwThTo"></th><th class="num">Change</th><th>Status</th></tr></thead>
+        <tbody id="pwBody"></tbody>
+      </table></div>
+      <div class="sub" id="pwCount"></div>
+    </div>
+  </section>
+
+  <section data-panel="roster" hidden>
+    <div class="controls">
+      <label class="sub" for="krSel">KvK</label><select id="krSel"></select>
+    </div>
+    <div class="tiles" id="krTiles"></div>
+    <div class="card">
+      <h2>Alliances</h2>
+      <div class="sub" id="krAllySub"></div>
+      <div id="krChart"></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Alliance</th><th class="num">Governors</th><th class="num">Total power</th><th class="num">Share</th><th class="num">Average</th><th class="num">Strongest</th></tr></thead>
+        <tbody id="krAllyBody"></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <h2>Roster</h2>
+      <div class="sub" id="krSub"></div>
+      <div class="controls">
+        <input type="search" id="krSearch" placeholder="Filter by name or ID…" autocomplete="off">
+        <select id="krAlly"></select>
+        <select id="krType">
+          <option value="all">Mains and farms</option>
+          <option value="main">Mains</option>
+          <option value="farm">Farms</option>
+        </select>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th class="num">#</th><th>Player</th><th>Alliance</th><th>Rank</th><th>Type</th><th class="num">Roster power</th><th class="num">Power now</th></tr></thead>
+        <tbody id="krBody"></tbody>
+      </table></div>
+      <div class="sub" id="krCount"></div>
     </div>
   </section>
 
@@ -815,6 +917,8 @@ function renderPlayer() {
         : !a ? 'before tracking' : a === b ? dayLabel(a) : `${dayLabel(a)} – ${dayLabel(b)}`;
       return `<div class="nm${i ? ' old' : ''}"><span class="n">${esc(n)}${i ? '' : ' <span class="chip">current</span>'}</span>
         <span class="when">${src ? esc(src) + ' · ' : ''}${dates}</span></div>`; }).join('')}</div>` : ''}
+    ${(() => { const on = ROSTERS.map(R => [R, R.r.find(r => r[0] === P.indexOf(p))]).filter(x => x[1]); return on.length ? `<div class="p-sec">KvK roster</div><div class="names">${on.reverse().map(([R, r]) => `<div class="nm"><span class="n">KvK ${R.k}: ${esc(r[1])}${r[2] ? ' · ' + r[2] : ''}</span><span class="when">${fmt(r[4])} power · ${dayLabel(R.d)}</span></div>`).join('')}</div>` : ''; })()}
+    ${p.im ? `<div class="p-sec">Immigration log</div><div class="names">${p.im.slice().reverse().map(([d, dir, sp]) => `<div class="nm"><span class="n">${dir === 'out' ? 'Emigrated out of the kingdom' : `Entered the kingdom${sp ? ' (special immigration)' : ''}`}</span><span class="when">${dayLabel(d)}</span></div>`).join('')}</div>` : ''}
     ${p.kv ? `<div class="p-sec">KvK history</div><div class="table-wrap"><table class="kv">
       <thead><tr><th>KvK</th><th>Name then</th><th>Type</th><th class="num">Result</th><th class="num">%</th><th>Notes</th></tr></thead>
       <tbody>${p.kv.slice().reverse().map(r => `<tr style="cursor:default"><td>KvK ${r[0]} <span class="muted">${kvkWhen(r[0])}</span></td>
@@ -880,8 +984,8 @@ const matches = (p, q) => !q || p.n.toLowerCase().includes(q) || (p.g || '').inc
 // Last seen only in the latest KvK: we can't tell "still on the KvK map" from "migrated".
 const LAST_KVK = (DATA.kvks || []).length ? 'KvK ' + Math.max(...DATA.kvks.map(k => k.k)) : '';
 const onMap = p => p.x && p.xs && p.xs === LAST_KVK;
-const goneTxt = p => onMap(p) ? `Not seen since ${p.xs}` : 'Migrated out';
-const goneNote = p => onMap(p) ? 'still on the KvK map, or migrated' : `last seen ${dayLabel(p.x)}${p.xs ? ` (${p.xs})` : ''}`;
+const goneTxt = p => !p.em && onMap(p) ? `Not seen since ${p.xs}` : 'Migrated out';
+const goneNote = p => p.em ? `emigrated ${dayLabel(p.em)} (Immigration log)` : onMap(p) ? 'still on the KvK map, or migrated' : `last seen ${dayLabel(p.x)}${p.xs ? ` (${p.xs})` : ''}`;
 const leftChip = p => `<span class="chip"><span class="dot" style="background:var(--text-secondary)"></span>${goneTxt(p)} · ${goneNote(p)}</span>`;
 function renderRoster() {
   const q = $('rosterSearch').value.trim().toLowerCase(), t = $('rosterType').value, chf = $('rosterCh').value;
@@ -1417,6 +1521,184 @@ function renderAoo() {
 $('aooSel').innerHTML = (DATA.aoos || []).slice().reverse().map(a => `<option value="${a.s}">${esc(a.l)} · ${esc(a.tm)}${a.f ? '' : ' (live ranking)'}</option>`).join('');
 ['aooSel', 'aooSearch', 'aooShow'].forEach(id => $(id).addEventListener('input', renderAoo));
 
+// ---------- KvK roster tab ----------
+// DATA.rosters: [{k: KvK number, d: recorded, slots, r: [[player index or null, alliance, rank, name on roster, roster power]]}]
+const ROSTERS = DATA.rosters || [];
+const RANKS = {Leader: 0, R4: 1, R3: 2, R2: 3, R1: 4, '': 5};
+const NOALLY = 'No alliance';
+const krLoose = n => n.normalize('NFKC').replace(/[\s\u3000]/g, '').toLowerCase();
+function renderRosterKvk() {
+  const R = ROSTERS.find(x => String(x.k) === $('krSel').value);
+  if (!R) return;
+  const q = $('krSearch').value.trim().toLowerCase(), ally = $('krAlly').value, ty = $('krType').value;
+  const nm = r => r[0] != null ? P[r[0]].n : r[3];
+  const total = R.r.reduce((s, r) => s + r[4], 0);
+  const groups = {};
+  R.r.forEach(r => { (groups[r[1]] = groups[r[1]] || []).push(r); });
+  const allies = Object.entries(groups).map(([a, rs]) => ({a, rs, p: rs.reduce((s, r) => s + r[4], 0)}))
+    .sort((x, y) => (x.a === NOALLY) - (y.a === NOALLY) || y.p - x.p);
+  const farms = R.r.filter(r => r[0] != null && isFarm(P[r[0]])).length;
+  $('krTiles').innerHTML = [
+    [`${R.r.length}<span class="sub"> / ${R.slots}</span>`, 'Governors on the roster (slots)'],
+    [short(total), 'Total power'],
+    [short(Math.round(total / R.r.length)), 'Average power'],
+    [allies.filter(x => x.a !== NOALLY).length, 'Alliances with governors on it'],
+    [(groups[NOALLY] || []).length, 'Without an alliance'],
+    [farms, 'Farm accounts'],
+  ].map(([v, l]) => `<div class="tile"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+  $('krAllySub').textContent = `KvK ${R.k} battle roster, recorded ${dayLabel(R.d)}. Power is each governor's power on the roster screen; the game's alliance power counts every member, not just the roster.`;
+  // horizontal bars: total power per alliance
+  const box = $('krChart'); box.innerHTML = '';
+  const W = 800, rh = 26, lw = 230, H = rh * allies.length + 4, mx = Math.max(...allies.map(x => x.p));
+  const svg = el('svg', {viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Roster power by alliance'}, box);
+  allies.forEach((x, i) => {
+    const y = 2 + i * rh, w = Math.max(2, (W - lw - 90) * x.p / mx);
+    el('text', {x: lw - 8, y: y + rh / 2 + 4, 'text-anchor': 'end', class: 'lbl'}, svg).textContent = x.a.length > 30 ? x.a.slice(0, 29) + '…' : x.a;
+    const b = el('rect', {x: lw, y: y + 4, width: w, height: rh - 8, rx: 3, fill: x.a === NOALLY ? 'var(--text-muted)' : 'var(--series-1)'}, svg);
+    el('text', {x: lw + w + 6, y: y + rh / 2 + 4, class: 'lbl'}, svg).textContent = `${short(x.p)} · ${x.rs.length}`;
+    b.addEventListener('pointermove', ev => showTip(`<b>${esc(x.a)}</b><br>${x.rs.length} governor${x.rs.length === 1 ? '' : 's'} · ${fmt(x.p)} power<br>${(100 * x.p / total).toFixed(1)}% of the roster`, ev));
+    b.addEventListener('pointerleave', hideTip);
+  });
+  $('krAllyBody').innerHTML = allies.map(x => { const top = x.rs.slice().sort((a, b) => b[4] - a[4])[0];
+    return `<tr style="cursor:default"><td>${esc(x.a)}</td><td class="num">${x.rs.length}</td><td class="num">${fmt(x.p)}</td>
+    <td class="num">${(100 * x.p / total).toFixed(1)}%</td><td class="num">${short(Math.round(x.p / x.rs.length))}</td>
+    <td class="num">${esc(nm(top))} <span class="muted">${short(top[4])}</span></td></tr>`; }).join('') +
+    `<tr style="cursor:default"><td><b>Total</b></td><td class="num"><b>${R.r.length}</b></td><td class="num"><b>${fmt(total)}</b></td><td class="num">100%</td><td class="num">${short(Math.round(total / R.r.length))}</td><td></td></tr>`;
+  // roster, strongest first
+  const rows = R.r.map((r, i) => r).slice().sort((a, b) => b[4] - a[4]);
+  const shown = rows.map((r, i) => [i + 1, r]).filter(([, r]) => (ally === 'all' || r[1] === ally) &&
+    (ty === 'all' || (r[0] != null && (ty === 'farm') === isFarm(P[r[0]]))) &&
+    (!q || nm(r).toLowerCase().includes(q) || r[3].toLowerCase().includes(q) || (r[0] != null && String(P[r[0]].g).includes(q))));
+  $('krBody').innerHTML = shown.map(([i, r]) => { const p = r[0] != null ? P[r[0]] : null;
+    return `<tr${p ? ` data-i="${r[0]}"` : ' style="cursor:default"'}><td class="num">${i}</td>
+    <td>${esc(nm(r))}${p && krLoose(p.n) !== krLoose(r[3]) ? ` <span class="muted">(${esc(r[3])})</span>` : ''}</td><td>${esc(r[1])}</td><td>${r[2] || '–'}</td>
+    <td>${p ? typeTxt(p) : '–'}</td><td class="num">${fmt(r[4])}</td><td class="num">${p && p.pw != null ? short(p.pw) : '–'}</td></tr>`; }).join('')
+    || '<tr><td colspan="7" class="empty">No players match.</td></tr>';
+  $('krCount').textContent = `${shown.length} of ${R.r.length} governors · ${short(shown.reduce((s, [, r]) => s + r[4], 0))} power shown`;
+  $('krSub').textContent = 'Strongest first. Tap a row for the player. Names in brackets are the name on the roster when it differs from the current one.';
+}
+(function () {
+  if (!ROSTERS.length) return;
+  $('rosterTabBtn').hidden = false;
+  $('rosterTabBtn').textContent = ROSTERS.length === 1 ? `KvK ${ROSTERS[0].k} roster` : 'KvK roster';
+  $('krSel').innerHTML = ROSTERS.slice().reverse().map(R => `<option value="${R.k}">KvK ${R.k} · ${dayLabel(R.d)}</option>`).join('');
+  const fillAlly = () => { const R = ROSTERS.find(x => String(x.k) === $('krSel').value);
+    const names = [...new Set(R.r.map(r => r[1]))].sort((a, b) => (a === NOALLY) - (b === NOALLY) || a.localeCompare(b));
+    $('krAlly').innerHTML = '<option value="all">Every alliance</option>' + names.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join(''); };
+  fillAlly();
+  $('krSel').addEventListener('input', () => { fillAlly(); renderRosterKvk(); });
+  ['krSearch', 'krAlly', 'krType'].forEach(id => $(id).addEventListener('input', renderRosterKvk));
+})();
+
+// ---------- CH25 power tab ----------
+// DATA.power: ex = [[export date, top-N power of every governor]], r = [[player index, power in each export or null]]
+const PW = DATA.power || {ex: [], r: []};
+const pwSigned = v => (v > 0 ? '+' : v < 0 ? '−' : '') + short(Math.abs(v));
+const pwCls = v => v < 0 ? 'dn' : v > 0 ? 'up' : '';
+function pwRange() {
+  let a = +$('pwFrom').value, b = +$('pwTo').value;
+  if (a > b) [a, b] = [b, a];
+  return [a, b];
+}
+// one export: CH-level governors in it, top N of them by power
+function pwTotal(i, rows = PW.r) {
+  return rows.map(r => r[i + 1]).filter(v => v != null).sort((x, y) => y - x).slice(0, PW.top).reduce((s, v) => s + v, 0);
+}
+function renderPower() {
+  if (PW.ex.length < 2) { $('pwChart').innerHTML = '<div class="empty">Needs at least two member exports.</div>'; return; }
+  const [a, b] = pwRange(), idx = []; for (let i = a; i <= b; i++) idx.push(i);
+  const ex = PW.ex, lbl = i => dayLabel(ex[i][0]).replace(/ \d{4}$/, '');
+  const inEx = (r, i) => r[i + 1] != null;
+  const same = PW.r.filter(r => idx.every(i => inEx(r, i)));
+  const tot = idx.map(i => pwTotal(i)), coh = idx.map(i => same.reduce((s, r) => s + r[i + 1], 0));
+  const cnt = idx.map(i => PW.r.filter(r => inEx(r, i)).length);
+  const T = tot[tot.length - 1], d = T - tot[0], prev = tot.length > 1 ? T - tot[tot.length - 2] : 0;
+  const left = PW.r.filter(r => inEx(r, a) && !inEx(r, b)), joined = PW.r.filter(r => !inEx(r, a) && inEx(r, b));
+  const cohD = coh[coh.length - 1] - coh[0], leftD = -left.reduce((s, r) => s + r[a + 1], 0), joinD = joined.reduce((s, r) => s + r[b + 1], 0);
+  const topTxt = `top ${PW.top} CH${PW.ch}`;
+  $('pwTiles').innerHTML = [
+    [short(T), `CH${PW.ch} total power, ${lbl(b)} (${cnt[cnt.length - 1]} governors)`, ''],
+    [pwSigned(prev), `since the export before (${lbl(idx[Math.max(0, idx.length - 2)])})`, pwCls(prev)],
+    [`${pwSigned(d)} <span class="sub">${(100 * d / tot[0]).toFixed(1)}%</span>`, `${lbl(a)} → ${lbl(b)}`, pwCls(d)],
+    [pwSigned(cohD), `the same ${same.length} governors, ${lbl(a)} → ${lbl(b)}`, pwCls(cohD)],
+  ].map(([v, l, c]) => `<div class="tile"><div class="v ${c}">${v}</div><div class="l">${l}</div></div>`).join('');
+  const few = Math.max(...cnt) < PW.top;
+  $('pwSub').textContent = `Sum of Power of the ${topTxt} governors in each in-game member export.` +
+    (few ? ` Only ${Math.min(...cnt)}–${Math.max(...cnt)} CH${PW.ch} governors are in an export, so this is all of them.` : '') +
+    ` CH${PW.ch} = on a CH${PW.ch} roster; governors who reached CH${PW.ch} later count once a newer roster is imported.`;
+  $('pwL1').textContent = `All CH${PW.ch} in the kingdom (${topTxt})`;
+  $('pwL2').textContent = `Same ${same.length} governors (in every export shown), so arrivals and departures don't move it`;
+
+  // line chart: y axis fitted to the data (not from zero) so the movement is visible; tooltips carry the exact values
+  const box = $('pwChart'); box.innerHTML = '';
+  const W = 800, H = 300, m = {l: 54, r: 64, t: 12, b: 30}, iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const svg = el('svg', {viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `CH${PW.ch} total power by export`}, box);
+  const all = tot.concat(coh), span = Math.max(...all) - Math.min(...all) || 1;
+  const step = niceMax(span / 4), lo = Math.floor((Math.min(...all) - span * .08) / step) * step, hi = Math.ceil((Math.max(...all) + span * .08) / step) * step;
+  const t0 = Date.parse(ex[a][0]), t1 = Date.parse(ex[b][0]) || t0 + 1;
+  const x = i => m.l + (t1 === t0 ? iw / 2 : (Date.parse(ex[i][0]) - t0) / (t1 - t0) * iw), y = v => m.t + (hi - v) / (hi - lo) * ih;
+  for (let v = lo; v <= hi + step / 2; v += step) {
+    el('line', {x1: m.l, x2: m.l + iw, y1: y(v), y2: y(v), stroke: 'var(--grid)', 'stroke-width': 1}, svg);
+    el('text', {x: m.l - 6, y: y(v) + 4, 'text-anchor': 'end'}, svg).textContent = short(v);
+  }
+  let lastX = -99;
+  idx.forEach(i => { if (x(i) - lastX >= 44 || i === b) { el('text', {x: x(i), y: H - 8, 'text-anchor': 'middle'}, svg).textContent = lbl(i); lastX = x(i); } });
+  [[tot, 'var(--series-1)'], [coh, 'var(--series-2)']].forEach(([vals, c]) => {
+    el('path', {d: vals.map((v, k) => (k ? 'L' : 'M') + x(idx[k]) + ' ' + y(v)).join(''), fill: 'none', stroke: c, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'}, svg);
+    vals.forEach((v, k) => el('circle', {cx: x(idx[k]), cy: y(v), r: k === vals.length - 1 ? 4.5 : 3, fill: c, stroke: 'var(--surface-1)', 'stroke-width': 2}, svg));
+    el('text', {x: m.l + iw + 8, y: y(vals[vals.length - 1]) + 4, class: 'lbl'}, svg).textContent = short(vals[vals.length - 1]);
+  });
+  const cross = el('line', {y1: m.t, y2: m.t + ih, stroke: 'var(--text-muted)', 'stroke-dasharray': '3 3', visibility: 'hidden'}, svg);
+  const hit = el('rect', {x: m.l - 16, y: 0, width: iw + 32, height: H, fill: 'transparent'}, svg);
+  hit.addEventListener('pointermove', ev => {
+    const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) / r.width * W;
+    let k = 0; idx.forEach((i, j) => { if (Math.abs(x(i) - px) < Math.abs(x(idx[k]) - px)) k = j; });
+    cross.setAttribute('x1', x(idx[k])); cross.setAttribute('x2', x(idx[k])); cross.setAttribute('visibility', 'visible');
+    const ch = (vals, cls = v => pwCls(v)) => k ? ` <span class="${cls(vals[k] - vals[k - 1])}">${pwSigned(vals[k] - vals[k - 1])}</span>` : '';
+    showTip(`<b>${dayLabel(ex[idx[k]][0])}</b><br>All CH${PW.ch}: ${short(tot[k])} (${cnt[k]})${ch(tot)}<br>Same ${same.length}: ${short(coh[k])}${ch(coh)}`, ev);
+  });
+  hit.addEventListener('pointerleave', () => { hideTip(); cross.setAttribute('visibility', 'hidden'); });
+
+  // where the change came from: left, joined, same governors, everyone else (in a and b but missed one in between)
+  const parts = [[`Left (${left.length})`, leftD], [`Joined (${joined.length})`, joinD], [`Same ${same.length}`, cohD]];
+  const rest = d - leftD - joinD - cohD; if (Math.abs(rest) >= 1e5) parts.push(['Others', rest]);
+  parts.push(['Net change', d]);
+  $('pwBridgeSub').textContent = `CH${PW.ch} total, ${lbl(a)} → ${lbl(b)}` + (parts.some(p => p[0] === 'Others') ? '. Others = in both exports but missing from one in between.' : '');
+  const bb = $('pwBridge'); bb.innerHTML = '';
+  const BW = 460, rh = 34, bm = {l: 170, r: 8}, BH = rh * parts.length + 6;
+  const bs = el('svg', {viewBox: `0 0 ${BW} ${BH}`, role: 'img', 'aria-label': 'Breakdown of the change'}, bb);
+  const mn = Math.min(0, ...parts.map(p => p[1])), mx = Math.max(0, ...parts.map(p => p[1])), bx = v => bm.l + (v - mn) / ((mx - mn) || 1) * (BW - bm.l - bm.r);
+  el('line', {x1: bx(0), x2: bx(0), y1: 0, y2: BH, stroke: 'var(--border)'}, bs);
+  parts.forEach(([k, v], i) => {
+    const yy = 4 + i * rh, h = rh - 12, net = i === parts.length - 1;
+    el('text', {x: 0, y: yy + h / 2 + 4, class: 'lbl', 'font-weight': net ? 650 : 400}, bs).textContent = k;
+    el('rect', {x: Math.min(bx(v), bx(0)), y: yy, width: Math.max(Math.abs(bx(v) - bx(0)), 1), height: h, rx: 3, fill: v < 0 ? 'var(--critical)' : 'var(--good)', opacity: net ? 1 : .75}, bs);
+    el('text', {x: bm.l - 10, y: yy + h / 2 + 4, 'text-anchor': 'end', class: 'lbl', 'font-weight': net ? 650 : 400}, bs).textContent = pwSigned(v);  // value column, clear of the bars
+  });
+
+  $('pwThN').textContent = `CH${PW.ch} governors`; $('pwThT').textContent = `CH${PW.ch} total`; $('pwThA').textContent = `Top ${PW.top} overall`;
+  $('pwExBody').innerHTML = idx.map((i, k) => `<tr style="cursor:default"><td>${dayLabel(ex[i][0])}</td><td class="num">${cnt[k]}</td><td class="num">${short(tot[k])}</td>
+    <td class="num">${k ? `<span class="${pwCls(tot[k] - tot[k - 1])}">${pwSigned(tot[k] - tot[k - 1])}</span>` : '–'}</td><td class="num">${short(ex[i][1])}</td></tr>`).join('');
+
+  // governors: power at a and b
+  const q = $('pwSearch').value.trim().toLowerCase(), show = $('pwShow').value;
+  const kind = r => !inEx(r, b) ? (inEx(r, a) ? 'left' : 'out') : !inEx(r, a) ? 'joined' : r[b + 1] < r[a + 1] ? 'down' : r[b + 1] > r[a + 1] ? 'up' : 'same';
+  const delta = r => (r[b + 1] || 0) - (r[a + 1] || 0);
+  const rows = PW.r.filter(r => kind(r) !== 'out' && (!q || P[r[0]].n.toLowerCase().includes(q)) && (show === 'all' || kind(r) === show))
+    .sort((p, q2) => delta(p) - delta(q2));
+  $('pwThFrom').textContent = lbl(a); $('pwThTo').textContent = lbl(b);
+  $('pwGovSub').textContent = `CH${PW.ch} governors in the ${lbl(a)} or ${lbl(b)} export, biggest drop first. Tap a row for the player.`;
+  const st = {left: '<span class="below">Left the kingdom</span>', joined: '<span class="paid">Joined</span>', down: '', up: '', same: ''};
+  $('pwBody').innerHTML = rows.map(r => `<tr data-i="${r[0]}"><td>${esc(P[r[0]].n)}</td><td class="num">${short(r[a + 1])}</td><td class="num">${short(r[b + 1])}</td>
+    <td class="num"><span class="${pwCls(delta(r))}">${pwSigned(delta(r))}</span></td><td>${st[kind(r)]}</td></tr>`).join('')
+    || '<tr><td colspan="5" class="empty">No players match.</td></tr>';
+  $('pwCount').textContent = `${rows.length} governor${rows.length === 1 ? '' : 's'}`;
+}
+const pwOpts = PW.ex.map(([d], i) => `<option value="${i}">${dayLabel(d)}</option>`).join('');
+$('pwFrom').innerHTML = pwOpts; $('pwTo').innerHTML = pwOpts;
+$('pwFrom').value = 0; $('pwTo').value = Math.max(0, PW.ex.length - 1);
+['pwFrom', 'pwTo', 'pwSearch', 'pwShow'].forEach(id => $(id).addEventListener('input', renderPower));
+
 // ---------- multi-select (R4 mode): change many accounts at once ----------
 const picked = new Set();  // player indexes ticked in the master list
 let rosterShown = [];      // selectable rows currently shown (for "select all")
@@ -1634,7 +1916,7 @@ const lastFail = p => weeks.filter(w => p.w[w] && p.w[w].o >= 4).pop();  // last
 const autoMust = p => !isFarm(p) && p.o >= 4 && !!lastFail(p);
 function migState(p) {
   const m = mig[p.id] || {};
-  if (m.out) return 'out';
+  if (m.out || p.em) return 'out';  // p.em = emigrated per the in-game Immigration Log
   if (m.m === 'must') return 'manual';
   if (!autoMust(p)) return '';
   return m.m === 'revoke' && m.mt.slice(0, 10) > weekEnd(lastFail(p)) ? 'revoked' : 'auto';
@@ -1677,7 +1959,23 @@ const zeroRow = (z, withName) => { const i = P.findIndex(p => p.id === z.account
     <td>${esc(z.by)}</td><td style="white-space:normal">${z.note ? esc(z.note) : '<span class="muted">–</span>'}</td>
     <td>${i >= 0 ? `<button class="act ghost" data-mig="zero_undo" data-ref="${esc(z.ref)}" data-i="${i}" type="button">Undo</button>` : ''}</td></tr>`; };
 
+// Immigration log rows: [date, time UTC, 'in'/'out', name in the log, player index or null, special immigration]
+const IMM = DATA.immig || [];
+function renderImm() {
+  const q = $('immSearch').value.trim().toLowerCase(), show = $('immShow').value;
+  const name = r => r[4] != null ? P[r[4]].n : r[3];
+  const rows = IMM.filter(r => (show === 'all' || r[2] === show) && (!q || name(r).toLowerCase().includes(q) || r[3].toLowerCase().includes(q)));
+  $('immBody').innerHTML = rows.map(r => `<tr${r[4] != null ? ` data-i="${r[4]}"` : ' style="cursor:default"'}><td style="font-variant-numeric:tabular-nums">${dayLabel(r[0])} <span class="muted">${r[1]}</span></td>
+    <td>${r[4] != null ? esc(name(r)) : '<span class="muted">not matched</span>'}</td><td>${r[4] != null && name(r) === r[3] ? '<span class="muted">same</span>' : esc(r[3])}</td>
+    <td>${r[2] === 'out' ? '<span class="below">Emigrated out</span>' : `<span class="paid">Entered${r[5] ? ' (special immigration)' : ''}</span>`}</td></tr>`).join('')
+    || `<tr><td colspan="4" class="empty">${IMM.length ? 'No players match.' : 'No immigration log imported yet.'}</td></tr>`;
+  const outs = IMM.filter(r => r[2] === 'out').length;
+  $('immSub').textContent = IMM.length ? `From the in-game Immigration Log, ${dayLabel(IMM[IMM.length - 1][0])} – ${dayLabel(IMM[0][0])}: ${outs} emigrated, ${IMM.length - outs} entered. An emigration counts as migrated out.` : '';
+  $('immCount').textContent = `${rows.length} of ${IMM.length} shown`;
+}
+['immSearch', 'immShow'].forEach(id => $(id).addEventListener('input', renderImm));
 function renderMigrate() {
+  renderImm();
   const q = $('migSearch').value.trim().toLowerCase(), show = $('migShow').value;
   const list = P.filter(onMigList), out = P.filter(p => migState(p) === 'out');
   const rows = list.filter(p => matches(p, q) && (show === 'all' || (show === 'zeroed' ? (mig[p.id] || {}).z :
@@ -1692,10 +1990,11 @@ function renderMigrate() {
       <td class="num">${unpaidOf(p) ? gold(unpaidOf(p)) : '–'}</td><td class="num">${m.z || '–'}</td>
       <td>${m.zt ? dayLabel(m.zt.slice(0, 10)) : '<span class="muted">–</span>'}</td></tr>`; }).join('') ||
     `<tr><td colspan="${officer ? 9 : 8}" class="empty">${list.length ? 'No players match.' : 'Nobody has to migrate.'}</td></tr>`;
-  $('migOutBody').innerHTML = out.sort((a, b) => (mig[b.id].out.time).localeCompare(mig[a.id].out.time)).map(p => { const m = mig[p.id];
+  const outDay = p => (mig[p.id] || {}).out ? mig[p.id].out.time.slice(0, 10) : p.em;
+  $('migOutBody').innerHTML = out.sort((a, b) => outDay(b).localeCompare(outDay(a))).map(p => { const m = mig[p.id] || {};
     return `<tr data-i="${P.indexOf(p)}"><td>${esc(p.n)}</td>${officer ? `<td>${migButtons(p)}</td>` : ''}
-      <td class="muted" style="font-variant-numeric:tabular-nums">${p.g || 'no ID'}</td><td>${esc(m.out.by)}</td>
-      <td>${dayLabel(m.out.time.slice(0, 10))}</td><td class="num">${m.z || '–'}</td></tr>`; }).join('') ||
+      <td class="muted" style="font-variant-numeric:tabular-nums">${p.g || 'no ID'}</td><td>${m.out ? esc(m.out.by) : '<span class="muted">Immigration log</span>'}</td>
+      <td>${dayLabel(outDay(p))}</td><td class="num">${m.z || '–'}</td></tr>`; }).join('') ||
     `<tr><td colspan="${officer ? 6 : 5}" class="empty">Nobody marked yet.</td></tr>`;
   $('migActTh').hidden = $('migOutActTh').hidden = !officer;
   const zeroed = Object.values(mig).filter(m => m.z);
@@ -1878,7 +2177,7 @@ $('finesOff').innerHTML = '<option value="all">All offenses</option>' +
 ['finesSearch', 'finesSel', 'finesEv', 'finesOff'].forEach(id => $(id).addEventListener('input', renderFines));
 
 // ---------- tabs (#t=players|activity|fines|review, plus p=<name> on the players tab) ----------
-const TABS = ['players', 'activity', 'fines', 'migrate', 'mge', 'gh', 'canyon', 'aoo', 'kvk', 'review'];
+const TABS = ['players', 'activity', 'fines', 'migrate', 'mge', 'gh', 'canyon', 'aoo', 'power', 'roster', 'kvk', 'review'];
 let tab = 'activity';
 function setHash() {
   const q = new URLSearchParams({t: tab});
@@ -1895,6 +2194,8 @@ function renderSubtitle() {
     : tab === 'gh' ? '20 GH (Gold Head): point limits and fines'
     : tab === 'canyon' ? 'Canyon Clash: who used all their attacks'
     : tab === 'aoo' ? 'Ark of Osiris: who played, who did not, and low scores'
+    : tab === 'power' ? `CH${(DATA.power || {}).ch || 25} total power across the in-game member exports`
+    : tab === 'roster' ? 'KvK battle roster: who is on it, their alliance and total power'
     : tab === 'kvk' ? 'Past KvK results, including governors not in the kingdom now'
     : 'Farm and main account changes waiting for approval';
 }
@@ -1904,6 +2205,7 @@ function showTab(t) {
   document.querySelectorAll('section[data-panel]').forEach(sec => { sec.hidden = sec.dataset.panel !== tab; });
   renderSubtitle();
   if (tab === 'activity') renderOverview();  // charts need a visible width
+  if (tab === 'power') renderPower();
   setHash();
 }
 function route() {
@@ -1928,7 +2230,7 @@ function selectPlayer(p) {
 function closePlayer() { $('playerDlg').close(); }
 
 function renderAll() {
-  renderSubtitle(); renderTiles(); renderTable(); renderRoster(); renderReview(); renderMigrate(); renderKvk(); renderMge(); renderMgh(); renderGh(); renderCanyon(); renderAoo();
+  renderSubtitle(); renderTiles(); renderTable(); renderRoster(); renderReview(); renderMigrate(); renderKvk(); renderMge(); renderMgh(); renderGh(); renderCanyon(); renderAoo(); renderPower(); renderRosterKvk();
   if (tab === 'activity') renderOverview();
   renderPlayer();
 }

@@ -33,6 +33,10 @@ Reads:
                     dashboard works before the slow web app answers
   accounts_online.csv  governor_id, name, type, approved_by, proposed_by, decided: farm/main changes proposed on the
                     dashboard (by an R4 or a player) and approved in the ledger (--pull); they override accounts.csv
+  kvk/rosters.csv  kvk, date: KvK battle rosters; kvk/kvk<N>_roster.csv  alliance, rank, name, power, governor_id, match
+                   (import_kvk_roster.py, from the Lost Kingdom Battle Roster recording)
+  immigration.csv  date, time, direction (in/out), name, special, governor_id: the in-game Immigration Log
+                   (import_immigration.py); an emigration counts as migrated out
   migrate_online.csv  governor_id, name, must, marked_by, marked, migrated_out, out_by, out_date, times_zeroed,
                     last_zeroed: the dashboard's Must migrate list (--pull). must = "must" (marked by an R4) or "revoke"
                     (lifted, also an automatic 4th offense until the next failed week); migrated_out = yes once an R4
@@ -103,6 +107,9 @@ MGE_FINE = {'food': 1000, 'wood': 1000, 'stone': 750, 'gold': 500}
 # Limits live in gh/ghs.csv (default_cap) and gh/<start>_slots.csv (e.g. rank 1 with no limit).
 GH_FINE = {'food': 20_000, 'wood': 20_000, 'stone': 15_000, 'gold': 10_000}
 CANYON_ATTACKS = 3  # attacks each governor gets in a Canyon Clash
+POWER_CH = 25  # CH25 power tab: city hall level counted (from the ch/ rosters)
+KVK_SLOTS = 600  # KvK battle roster: slots per kingdom
+POWER_TOP = 300  # ... and how many of them, by power, are summed per member export
 AOO_MIN = 10_000  # Ark of Osiris: individual points below this get a warning; 0 = did not participate
 MGE_CONTACTS = ['ＡＧＡＭ', 'Totos メtreme']  # named in the sanctions mail for working out a mixed payment
 
@@ -241,9 +248,26 @@ def pull_migrate(state):
     print(f'Pulled {len(state)} must-migrate entr{"y" if len(state) == 1 else "ies"} from the ledger')
 
 
+def immigration():
+    """(rows oldest first, {key: date} of accounts whose latest Immigration Log event is an emigration).
+    immigration.csv comes from the in-game Immigration Log (import_immigration.py)."""
+    rows = sorted(read('immigration.csv'), key=lambda r: (r['date'], r['time']))
+    last = {}
+    for r in rows:
+        last[key(r)] = r
+    return rows, {k: r['date'] for k, r in last.items() if r['direction'] == 'out'}
+
+
 def read_migrate():
-    """key -> migrate_online.csv row"""
-    return {key(r): r for r in read('migrate_online.csv')}
+    """key -> migrate_online.csv row, plus accounts the Immigration Log shows emigrating (migrated out by the log)."""
+    mig = {key(r): r for r in read('migrate_online.csv')}
+    names = {key(r): r['name'] for r in read('immigration.csv')}
+    for k, day in immigration()[1].items():
+        r = mig.setdefault(k, dict(governor_id='' if k.startswith('name:') else k, name=names[k], must='', marked_by='',
+                                   marked='', migrated_out='', out_by='', out_date='', times_zeroed='0', last_zeroed=''))
+        if not r['migrated_out']:
+            r.update(migrated_out='yes', out_by='Immigration log', out_date=day)
+    return mig
 
 
 def revoked_since(m, wk):
@@ -941,6 +965,29 @@ def city_halls():
     return ch
 
 
+def power_trend(ids, ch):
+    """CH25 power tab: every member export (names/<date>.csv). ex = per export [date, top-300 overall power];
+    r = [player index, power per export or None] for each governor at POWER_CH or above on a city hall list."""
+    d = os.path.join(HERE, 'names')
+    days = sorted(f[:-4] for f in os.listdir(d) if re.fullmatch(r'\d{4}-\d{2}-\d{2}\.csv', f)) if os.path.isdir(d) else []
+    pw = {day: {key(r): num(r['power']) or 0 for r in read(f'names/{day}.csv')} for day in days}
+    keep = [k for k, (lvl, _, _) in ch.items() if lvl >= POWER_CH and k in ids and any(k in pw[day] for day in days)]
+    return dict(ch=POWER_CH, top=POWER_TOP,
+                ex=[[day, sum(sorted(pw[day].values(), reverse=True)[:POWER_TOP])] for day in days],
+                r=[[ids[k]] + [pw[day].get(k) for day in days] for k in keep])
+
+
+def kvk_rosters(ids):
+    """KvK battle rosters (kvk/rosters.csv + kvk/kvk<N>_roster.csv from import_kvk_roster.py), newest last:
+    r = [player index or None, alliance, rank, name on the roster, power on the roster]."""
+    out = []
+    for m in sorted(read('kvk/rosters.csv'), key=lambda m: int(m['kvk'])):
+        rows = read(f"kvk/kvk{m['kvk']}_roster.csv")
+        out.append(dict(k=int(m['kvk']), d=m['date'], slots=KVK_SLOTS,
+                        r=[[ids.get(key(r)), r['alliance'], r['rank'], r['name'], int(r['power'])] for r in rows]))
+    return out
+
+
 def kvk_records():
     """(kvks, {key: [[kvk, value, target, pct, fine, status, type, name then], ...]}) from tracker/kvk/."""
     kvks = [dict(k=int(m['kvk']), d=m['date'], e=m['estimated'] == 'yes', m=m['metric']) for m in read('kvk/kvks.csv')]
@@ -1019,6 +1066,14 @@ def write_dashboard(history, state, accounts, fines, mges, canyons, aoos, ghs):
         if k not in ids and not k.startswith('name:'):
             ids[k] = len(players)
             players.append(dict(n=name, t=accounts.get(k, {}).get('type') or 'main', r='', w={}, x=day, xs=f'CH{lvl} list'))
+    imm_rows, emig = immigration()
+    for r in imm_rows:  # pop-up: [date, 'in'/'out', special immigration]
+        if key(r) in ids:
+            players[ids[key(r)]].setdefault('im', []).append([r['date'], r['direction'], r['special'] == 'yes'])
+    for k, day in emig.items():
+        if k in ids:
+            players[ids[k]]['em'] = day
+    immig = [[r['date'], r['time'], r['direction'], r['name'], ids.get(key(r)), r['special'] == 'yes'] for r in reversed(imm_rows)]
     for k, i in ids.items():
         s, a, r = state.get(k, {}), accounts.get(k, {}), scan.get(k)
         p = players[i]
@@ -1104,7 +1159,7 @@ def write_dashboard(history, state, accounts, fines, mges, canyons, aoos, ghs):
     ledger = json.load(open(lp, encoding='utf-8')) if os.path.exists(lp) else {}
     data = dict(weeks=[wk for wk, _ in history], minF=MIN_FORTS, minT=MIN_TECH, players=players,
                 fines=fines, finesUrl=FINES_URL, scanDay=scan_day, namesDay=names_day, mainAlly=MAIN_ALLIANCE, kvks=kvks,
-                mges=mge, mgeHist=mgh, ghs=gh, ghFine=GH_FINE, canyons=canyon, aoos=aoo, aooMin=AOO_MIN, mgeFine=MGE_FINE, fineKinds=FINE_KINDS, bank=BANK, claimsOn=CLAIMS_ON,
+                mges=mge, mgeHist=mgh, ghs=gh, ghFine=GH_FINE, canyons=canyon, aoos=aoo, power=power_trend(ids, ch), immig=immig, rosters=kvk_rosters(ids), aooMin=AOO_MIN, mgeFine=MGE_FINE, fineKinds=FINE_KINDS, bank=BANK, claimsOn=CLAIMS_ON,
                 ledger=dict(paid=ledger.get('paid', {}), accounts=ledger.get('accounts', {}), migrate=ledger.get('migrate', {})),
                 officers=ledger.get('officers', []),
                 updated=date.today().isoformat())
